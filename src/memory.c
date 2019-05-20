@@ -6236,6 +6236,51 @@ void mem_threshold(unsigned char *img, int len, int level)
 		*img = (level - *img) >> 8;
 }
 
+/* Industrial-grade thresholding */
+void do_xhold(int start, int step, int cnt, unsigned char *mask,
+	unsigned char *imgr, unsigned char *img0)
+{
+	unsigned char lo = mem_ts.lo, hi = mem_ts.hi;
+	int n, mstep = step, bpp = MEM_BPP;
+
+	mask += start - step;
+	start *= bpp; step *= bpp;
+	img0 += start - step;
+	imgr += start - step;
+	if ((bpp > 1) && (mem_ts.mode <= XHOLD_MIN)) /* By max or min */
+	{
+		int m = mem_ts.mode; // 0 for max, 1 for min
+
+		while (cnt-- > 0)
+		{
+			img0 += step; imgr += step; mask += mstep;
+			if (*mask == 255) continue;
+			n = (img0[0] > img0[1]) ^ m ? img0[0] : img0[1];
+			n = (n > img0[2]) ^ m ? n : img0[2];
+			imgr[0] = imgr[1] = imgr[2] =
+				((0xFFFF + lo - n) & (0xFFFF - hi + n)) >> 8;
+		}
+	}
+	else /* By R/G/B/value */
+	{
+		unsigned char mx = 255;
+
+		if (bpp > 1) img0 += mem_ts.mode - XHOLD_RED;
+		else if (mem_channel == CHN_IMAGE) mx = mem_cols - 1;
+
+		while (cnt-- > 0)
+		{
+			img0 += step; imgr += step; mask += mstep;
+			if (*mask == 255) continue;
+			n = *img0;
+			imgr[0] = n = mx &
+				(((0xFFFF + lo - n) & (0xFFFF - hi + n)) >> 8);
+			if (bpp == 1) continue;
+			imgr[1] = imgr[2] = n;
+		}
+	}
+}
+
 /* Only supports BPP = 1 and 3 */
 void mem_demultiply(unsigned char *img, unsigned char *alpha, int len, int bpp)
 {
@@ -6388,26 +6433,31 @@ void row_protected(int x, int y, int len, unsigned char *mask)
 	prep_mask(0, 1, len, mask, mask0, mem_img[CHN_IMAGE] + ofs * mem_img_bpp);
 }
 
+/* Make code not compile if it cannot work */
+typedef char Too_Many_Blend_Modes[2 * (BLEND_NMODES <= BLEND_MMASK + 1) - 1];
+
 static void blend_pixels(int start, int step, int cnt, const unsigned char *mask,
 	unsigned char *imgr, unsigned char *img0, unsigned char *img,
 	int bpp, int mode)
 {
-	static const unsigned char hhsv[8 * 3] = {
-		0, 1, 2, /* #0: B..M */
-		2, 1, 0, /* #1: M+..R- */
-		0, 1, 2, /* #2: B..M alt */
-		1, 0, 2, /* #3: C+..B- */
-		2, 0, 1, /* #4: G..C */
-		0, 2, 1, /* #5: Y+..G- */
-		1, 2, 0, /* #6: R..Y */
-		1, 2, 0  /* #7: W */ };
+	static const unsigned char hhsv[8] = {
+		0x24, /* 0, 1, 2 = #0: B..M */
+		0x06, /* 2, 1, 0 = #1: M+..R- */
+		0x24, /* 0, 1, 2 = #2: B..M alt */
+		0x21, /* 1, 0, 2 = #3: C+..B- */
+		0x12, /* 2, 0, 1 = #4: G..C */
+		0x18, /* 0, 2, 1 = #5: Y+..G- */
+		0x09, /* 1, 2, 0 = #6: R..Y */
+		0x49  /* 1, 2, 0, 1 = #7: W */ };
+#define HHSV(X,N) (((X) >> ((N) * 2)) & 3)
 	const unsigned char *new, *old;
-	int j, step3, uninit_(nhex), uninit_(ohex);
+	int j, step3, mx, uninit_(nhex), uninit_(ohex);
 
 
 	/* Backward transfer? */
 	if (mode & BLEND_REVERSE) new = img0 , old = img;
 	else new = img , old = img0;
+	mx = mode & BLENDF_IDX ? mem_cols - 1 : 255;
 	mode &= BLEND_MMASK;
 	if (bpp == 1) mode += BLEND_NMODES;
 
@@ -6428,122 +6478,119 @@ static void blend_pixels(int start, int step, int cnt, const unsigned char *mask
 
 		if (mode < BLEND_1BPP)
 		{
-			nhex = ((((0x200 + new[0]) - new[1]) ^ ((0x400 + new[1]) - new[2]) ^
-				 ((0x100 + new[2]) - new[0])) >> 8) * 3;
-			ohex = ((((0x200 + old[0]) - old[1]) ^ ((0x400 + old[1]) - old[2]) ^
-				 ((0x100 + old[2]) - old[0])) >> 8) * 3;
+			nhex = hhsv[(((0x200 + new[0]) - new[1]) ^
+				((0x400 + new[1]) - new[2]) ^
+				((0x100 + new[2]) - new[0])) >> 8];
+			ohex = hhsv[(((0x200 + old[0]) - old[1]) ^
+				((0x400 + old[1]) - old[2]) ^
+				((0x100 + old[2]) - old[0])) >> 8];
 		}
 
 		switch (mode)
 		{
 		case BLEND_HUE: /* HS* Hue */
 		{
-			int i, nsi, nvi;
-			unsigned char os, ov;
+			int i;
+			unsigned char os, ov, ns;
 
-			ov = old[hhsv[ohex + 2]];
+			ov = old[HHSV(ohex, 2)];
 
-			if (nhex == 7 * 3) /* New is white */
+			if (nhex & 0x40) /* New is white */
 			{
 				dest[0] = dest[1] = dest[2] = ov;
 				break;
 			}
 
-			os = old[hhsv[ohex + 1]];
-			nsi = hhsv[nhex + 1];
-			nvi = hhsv[nhex + 2];
+			os = old[HHSV(ohex, 1)];
+			ns = new[HHSV(nhex, 1)];
 
-			i = new[nvi] - new[nsi];
-			dest[hhsv[nhex]] = (i + (ov - os) * 2 *
-				(new[hhsv[nhex]] - new[nsi])) / (i + i) + os;
-			dest[nsi] = os;
-			dest[nvi] = ov;
+			i = new[HHSV(nhex, 2)] - ns;
+			dest[HHSV(nhex, 0)] = (i + (ov - os) * 2 *
+				(new[HHSV(nhex, 0)] - ns)) / (i + i) + os;
+			dest[HHSV(nhex, 1)] = os;
+			dest[HHSV(nhex, 2)] = ov;
 			break;
 		}
 		case BLEND_SAT: /* HSV Saturation */
 		{
-			int i, osi, ovi;
+			int i;
 			unsigned char ov, os, ns, nv;
 
-			if (ohex == 7 * 3) /* Old is white - leave it so */
+			if (ohex & 0x40) /* Old is white - leave it so */
 			{
 				dest[0] = old[0]; dest[1] = old[1]; dest[2] = old[2];
 				break;
 			}
 
-			ovi = hhsv[ohex + 2];
-			ov = old[ovi];
+			ov = old[HHSV(ohex, 2)];
 
-			if (nhex == 7 * 3) /* New is white */
+			if (nhex & 0x40) /* New is white */
 			{
 				dest[0] = dest[1] = dest[2] = ov;
 				break;
 			}
 
-			osi = hhsv[ohex + 1];
-			os = old[osi];
+			os = old[HHSV(ohex, 1)];
 
-			nv = new[hhsv[nhex + 2]];
-			ns = (new[hhsv[nhex + 1]] * ov * 2 + nv) / (nv + nv);
+			nv = new[HHSV(nhex, 2)];
+			ns = (new[HHSV(nhex, 1)] * ov * 2 + nv) / (nv + nv);
 
 			i = ov - os;
-			dest[hhsv[ohex]] = (i + (ov - ns) * 2 *
-				(old[hhsv[ohex]] - os)) / (i + i) + ns;
-			dest[osi] = ns;
-			dest[ovi] = ov;
+			dest[HHSV(ohex, 0)] = (i + (ov - ns) * 2 *
+				(old[HHSV(ohex, 0)] - os)) / (i + i) + ns;
+			dest[HHSV(ohex, 1)] = ns;
+			dest[HHSV(ohex, 2)] = ov;
 			break;
 		}
 		case BLEND_VALUE: /* HSV Value */
 		{
-			int osi, ovi;
 			unsigned char ov, nv;
 
-			nv = new[hhsv[nhex + 2]];
+			nv = new[HHSV(nhex, 2)];
 
-			if (ohex == 7 * 3) /* Old is white */
+			if (ohex & 0x40) /* Old is white */
 			{
 				dest[0] = dest[1] = dest[2] = nv;
 				break;
 			}
 
-			ov = old[hhsv[ohex + 2]];
-			osi = hhsv[ohex + 1];
-			ovi = hhsv[ohex + 2];
+			ov = old[HHSV(ohex, 2)];
 
-			dest[hhsv[ohex]] = (old[hhsv[ohex]] * nv * 2 + ov) / (ov + ov);
-			dest[osi] = (old[osi] * nv * 2 + ov) / (ov + ov);
-			dest[ovi] = nv;
+			dest[HHSV(ohex, 0)] =
+				(old[HHSV(ohex, 0)] * nv * 2 + ov) / (ov + ov);
+			dest[HHSV(ohex, 1)] =
+				(old[HHSV(ohex, 1)] * nv * 2 + ov) / (ov + ov);
+			dest[HHSV(ohex, 2)] = nv;
 			break;
 		}
 		case BLEND_COLOR: /* HSL Hue + Saturation */
 		{
-			int nsi, nvi, x0, x1, y0, y1, vsy1, vs1y;
+			int x0, x1, y0, y1, vsy1, vs1y;
 			unsigned char os, ov;
 
-			os = old[hhsv[ohex + 1]];
-			ov = old[hhsv[ohex + 2]];
+			os = old[HHSV(ohex, 1)];
+			ov = old[HHSV(ohex, 2)];
 			x0 = os + ov;
 
 			/* New is white */
-			if (nhex == 7 * 3)
+			if (nhex & 0x40)
 			{
 				dest[0] = dest[1] = dest[2] = (x0 + 1) >> 1;
 				break;
 			}
 
-			nsi = hhsv[nhex + 1];
-			nvi = hhsv[nhex + 2];
-			x1 = new[nvi] + new[nsi];
+			x1 = new[HHSV(nhex, 2)] + new[HHSV(nhex, 1)];
 
 			y1 = x1 > 255 ? 510 - x1 : x1;
 			vs1y = (x0 + 1) * y1;
 			y0 = x0 > 255 ? 510 - x0 : x0;
-			vsy1 = (new[nvi] - new[nsi]) * y0;
+			vsy1 = (new[HHSV(nhex, 2)] - new[HHSV(nhex, 1)]) * y0;
 			y1 += y1;
 
-			dest[hhsv[nhex]] = (vs1y + (new[hhsv[nhex]] * 2 - x1) * y0) / y1;
-			dest[nsi] = (vs1y - vsy1) / y1;
-			dest[nvi] = (vs1y + vsy1) / y1;
+			dest[HHSV(nhex, 0)] =
+				(vs1y + (new[HHSV(nhex, 0)] * 2 - x1) * y0) / y1;
+			dest[HHSV(nhex, 1)] = (vs1y - vsy1) / y1;
+			dest[HHSV(nhex, 2)] = (vs1y + vsy1) / y1;
 			break;
 		}
 		case BLEND_SATPP: /* Perceived saturation */
@@ -6673,12 +6720,20 @@ static void blend_pixels(int start, int step, int cnt, const unsigned char *mask
 			j0 = old[0] + new[0] - 128;
 			dest[0] = j0 < 0 ? 0 : j0 > 255 ? 255 : j0;
 			break;
+		case BLEND_XHOLD:
+			dest[1] = (0xFFFF + new[1] - old[1]) >> 8;
+			dest[2] = (0xFFFF + new[2] - old[2]) >> 8;
+		case BLEND_XHOLD + BLEND_NMODES:
+			/* For indexed, upper limit is last palette index */
+			dest[0] = mx & ((0xFFFF + new[0] - old[0]) >> 8);
+			break;
 // Photoshop's "Linear light" is equivalent to XFader's "Stamp" with swapped A&B
 		default: /* RGB mode applied to 1bpp */
 			dest[0] = img0[j];
  			break;
 		}
 	}
+#undef HHSV
 }
 
 void put_pixel_def(int x, int y)	/* Combined */

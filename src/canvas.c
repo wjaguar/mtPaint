@@ -52,6 +52,7 @@ int clone_mode = TRUE, clone_x0 = -1, clone_y0 = -1,			// Clone settings
 	clone_dx0, clone_dy0;
 
 int recent_files;					// Current recent files setting
+char *recent_filenames[MAX_RECENT];			// Recent filenames themselves
 
 int	show_paste,					// Show contents of clipboard while pasting
 	col_reverse,					// Painting with right button
@@ -1232,7 +1233,7 @@ void update_stuff(int flags)
 	if (flags & CF_PREFS)
 	{
 		update_undo_depth();	// If undo depth was changed
-		update_recent_files();
+		update_recent_files(FALSE);
 		init_status_bar();	// Takes care of all statusbar parts
 	}
 	if (flags & CF_MENU)
@@ -3478,37 +3479,55 @@ void refresh_line(int mode, const int *lxy, rgbcontext *ctx)
 	if (line_clip(line, lxy, &j) >= 0) render_line(mode, line, j, ctx);
 }
 
-void update_recent_files()			// Update the menu items
+void update_recent_files(int save)		// Update the menu items
 {
 	char txt[64], *t, txt2[PATHTXT];
-	int i, count = 0;
+	int i, j;
 
-	for (i = 0; i < recent_files; i++)	// Display recent filenames
+	/* Init from inifile, skipping empty lines */
+	if (!recent_filenames[0])
 	{
-		sprintf(txt, "file%i", i + 1);
-
-		t = inifile_get(txt, "");
-		if (t[0])
+		for (i = j = 0; i < MAX_RECENT; i++)
 		{
-			gtkuncpy(txt2, t, PATHTXT);
-			cmd_setv(menu_slots[MENU_RECENT1 + i], txt2, LABEL_VALUE);
-			count++;
+			sprintf(txt, "file%i", i + 1);
+			t = inifile_get(txt, "");
+			if (t[0]) recent_filenames[j++] = strdup(t);
 		}
-		cmd_showhide(menu_slots[MENU_RECENT1 + i], t[0]); // Hide if empty
+		while (j < MAX_RECENT) recent_filenames[j++] = "";
 	}
-	for (; i < MAX_RECENT; i++)		// Hide extra items
-		cmd_showhide(menu_slots[MENU_RECENT1 + i], FALSE);
 
-	// Hide separator if not needed
-	cmd_showhide(menu_slots[MENU_RECENT_S], count);
+	if (save) /* Store to inifile */
+	{
+// !!! Or maybe set everything from recent_files to ""?
+		for (i = 0; i < MAX_RECENT; i++)
+		{
+			sprintf(txt, "file%i", i + 1);
+			inifile_set(txt, recent_filenames[i]);
+		}
+		return;
+	}
+
+	/* Display recent filenames */
+	for (i = 0; i < recent_files; i++)
+	{
+		if (!recent_filenames[i][0]) break; // Should only be at end
+		gtkuncpy(txt2, recent_filenames[i], PATHTXT);
+		cmd_setv(menu_slots[MENU_RECENT1 + i], txt2, LABEL_VALUE);
+		cmd_showhide(menu_slots[MENU_RECENT1 + i], TRUE); // Show
+	}
+	/* Hide separator if not needed */
+	cmd_showhide(menu_slots[MENU_RECENT_S], i);
+	/* Hide extra items */
+	for (; i < MAX_RECENT; i++) cmd_showhide(menu_slots[MENU_RECENT1 + i], FALSE);
 }
 
-void register_file( char *filename )		// Called after successful load/save
+void register_file(char *filename)	// Called after successful load/save
 {
-	char txt[64], txt1[64], *c;
-	int i, f;
+	char *c;
+	int i;
 
-	c = strrchr( filename, DIR_SEP );
+	if (!filename[0]) return;	// Paranoia
+	c = strrchr(filename, DIR_SEP);
 	if (c)
 	{
 		i = *c;
@@ -3517,30 +3536,25 @@ void register_file( char *filename )		// Called after successful load/save
 		*c = i;
 	}
 
-	// Is it already in used file list?  If so shift relevant filenames down and put at top.
-	i = 1;
-	f = 0;
-	while ( i<MAX_RECENT && f==0 )
+	/* Is it already in used file list? */
+	for (i = 0; i < MAX_RECENT; i++)
+		if (!strcmp(recent_filenames[i], filename)) break;
+	/* Copy it into LAST slot if not */
+	if (i >= MAX_RECENT)
 	{
-		sprintf( txt, "file%i", i );
-		c = inifile_get(txt, "");
-		if ( strcmp( filename, c ) == 0 ) f = 1;	// Filename found in list
-		else i++;
+		i = MAX_RECENT - 1;
+		if (recent_filenames[i][0]) free(recent_filenames[i]);
+		recent_filenames[i] = strdup(filename);
 	}
-	if ( i>1 )			// If file is already most recent, do nothing
+	/* Now rotate it to the top if not already there */
+	if (i > 0)
 	{
-		while ( i>1 )
-		{
-			sprintf( txt, "file%i", i-1 );
-			sprintf( txt1, "file%i", i );
-			inifile_set(txt1, inifile_get(txt, ""));
-
-			i--;
-		}
-		inifile_set("file1", filename);		// Strip off filename
+		filename = recent_filenames[i];
+		memmove(recent_filenames + 1, recent_filenames,
+			i * sizeof(recent_filenames[0]));
+		recent_filenames[0] = filename;
+		update_recent_files(FALSE);
 	}
-
-	update_recent_files();
 }
 
 void create_default_image()			// Create default new image

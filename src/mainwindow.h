@@ -132,6 +132,7 @@ enum { // To let constants renumber themselves when adding new ones
 	DLG_SCRIPT,
 	DLG_LASSO,
 	DLG_KEYS,
+	DLG_XHOLD,
 
 	FILT_2RGB,
 	FILT_INVERT,
@@ -250,8 +251,6 @@ enum {
 
 	TOTAL_MENU_IDS
 };
-
-#define MAX_RECENT 20
 
 /// TRACING IMAGE
 

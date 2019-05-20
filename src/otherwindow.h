@@ -1,5 +1,5 @@
 /*	otherwindow.h
-	Copyright (C) 2004-2014 Mark Tyler and Dmitry Groshev
+	Copyright (C) 2004-2019 Mark Tyler and Dmitry Groshev
 
 	This file is part of mtPaint.
 
@@ -54,6 +54,7 @@ transform_state def_bcsp;
 int sharper_reduce;
 int spal_mode;
 seg_state *seg_preview;
+int xhold_preview;
 
 void generic_new_window(int type);
 
@@ -83,3 +84,5 @@ void pressed_skew();
 void bkg_setup();
 
 void pressed_segment();
+
+void pressed_xhold();

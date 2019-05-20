@@ -1,5 +1,5 @@
 /*	canvas.h
-	Copyright (C) 2004-2016 Mark Tyler and Dmitry Groshev
+	Copyright (C) 2004-2019 Mark Tyler and Dmitry Groshev
 
 	This file is part of mtPaint.
 
@@ -26,7 +26,6 @@ int line_status, line_xy[4];				// Line tool
 int poly_status;					// Polygon selection tool
 int clone_status, clone_x, clone_y, clone_dx, clone_dy;	// Clone tool state
 int clone_mode, clone_x0, clone_y0, clone_dx0, clone_dy0;	// Clone settings
-int recent_files;					// Current recent files setting
 int brush_spacing;					// Step in non-continuous mode
 int lasso_sel;						// Lasso by selection channel
 
@@ -45,6 +44,10 @@ int lasso_sel;						// Lasso by selection channel
 #define line_y1 line_xy[1]
 #define line_x2 line_xy[2]
 #define line_y2 line_xy[3]
+
+#define MAX_RECENT 20
+int recent_files;					// Current recent files setting
+char *recent_filenames[MAX_RECENT];			// Recent filenames themselves
 
 int preserved_gif_delay, undo_load;
 
@@ -238,7 +241,7 @@ void repaint_grad(const int *old);		// Repaint gradient line and maybe clear old
 void repaint_line(const int *old);		// Repaint line on canvas and maybe clear old one
 void refresh_line(int mode, const int *lxy, rgbcontext *ctx);	// Refresh a part of line/gradient if needed
 void register_file( char *filename );		// Called after successful load/save
-void update_recent_files();			// Update the menu items
+void update_recent_files(int save);		// Update the menu items / save to inifile
 
 void create_default_image();			// Create default new image
 

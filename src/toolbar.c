@@ -301,7 +301,7 @@ static char *blends[BLEND_NMODES] = {
 	_("Multiply"), _("Divide"), _("Screen"), _("Dodge"),
 	_("Burn"), _("Hard Light"), _("Soft Light"), _("Difference"),
 	_("Darken"), _("Lighten"), _("Grain Extract"),
-	_("Grain Merge") };
+	_("Grain Merge"), _("Threshold") };
 
 #define WBbase blend_dd
 static void *blend_code[] = {

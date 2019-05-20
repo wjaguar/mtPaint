@@ -2955,3 +2955,111 @@ void pressed_segment()
 
 	run_create_(seg_code, &tdata, sizeof(tdata), script_cmds);
 }
+
+/// THRESHOLDING WINDOW
+
+int xhold_preview;
+
+typedef struct {
+	int lo[3], hi[3], mode, preview;
+	int rgb;
+	void **lspin, **hspin, **pbutton;
+} xhold_dd;
+
+static void xhold_changed(xhold_dd *dt, void **wdata, int what, void **where)
+{
+	void *cause = cmd_read(where, dt);
+
+	if (dt->lo[0] > dt->hi[0]) // Inversion tried to happen
+	{
+		if (cause == dt->hspin) cmd_set(dt->lspin, dt->hi[0]);
+		else cmd_set(dt->hspin, dt->lo[0]);
+		return; // Changed slider did the update
+	}
+	mem_ts.lo = dt->lo[0];
+	mem_ts.hi = dt->hi[0];
+	mem_ts.mode = dt->mode;
+	if (xhold_preview) update_stuff(UPD_RENDER);
+}
+
+static void xhold_evt(seg_dd *dt, void **wdata, int what, void **where)
+{
+	int update = 0;
+
+	if (what == op_EVT_CHANGE) // Toggle preview
+	{
+		cmd_read(where, dt);
+		if (dt->preview ^ !xhold_preview) return; // Nothing to do
+		xhold_preview = dt->preview;
+		update_stuff(UPD_RENDER);
+		return;
+	}
+
+	/* First, disable preview */
+	if (xhold_preview) update = UPD_RENDER;
+	xhold_preview = FALSE;
+
+	while (what == op_EVT_OK)
+	{
+		unsigned char *dest, *xbuf, *mask;
+		int i, bpp = MEM_BPP;
+
+		mask = malloc(mem_width * (bpp + 1));
+		if (!mask) break;
+		spot_undo(UNDO_FILT);
+		xbuf = mask + mem_width;
+
+		for (i = 0; i < mem_height; i++)
+		{
+			row_protected(0, i, mem_width, mask);
+			dest = mem_img[mem_channel] + i * mem_width * bpp;
+			do_xhold(0, 1, mem_width, mask, xbuf, dest);
+			process_img(0, 1, mem_width, mask, dest, dest, xbuf,
+				NULL, bpp, BLENDF_SET | BLENDF_INVM);
+		}
+
+		free(mask);
+		mem_undo_prepare();
+		update |= UPD_IMG;
+		break;
+	}
+
+	run_destroy(wdata); // Finished
+	update_stuff(update);
+}
+
+static char *xh_txt[] = {_("Max"), _("Min"), _("Red"), _("Green"), _("Blue")};
+
+#define WBbase xhold_dd
+static void *xhold_code[] = {
+	WINDOWm(_("Threshold Image")), DEFW(300),
+	TABLE2(2), OPNAME0,
+	REF(lspin), TSPINSLIDEa(_("From"), lo),
+		EVENT(CHANGE, xhold_changed), TRIGGER,
+	REF(hspin), TSPINSLIDEa(_("To"), hi), EVENT(CHANGE, xhold_changed),
+	WDONE,
+	IFx(rgb, 1),
+		BORDER(RPACK, 0),
+		RPACKe(xh_txt, XHOLD_NMODES, 0, mode, xhold_changed),
+		OPNAME(""), // default
+	ENDIF(1),
+	HSEP,
+	EQBOX,
+	CANCELBTN(_("Cancel"), xhold_evt),
+	REF(pbutton), TOGGLE(_("Preview"), preview, xhold_evt),
+	OKBTN(_("OK"), xhold_evt),
+	WSHOW
+};
+#undef WBbase
+
+void pressed_xhold()
+{
+	xhold_dd tdata = { { 128, 0, 255 }, { 255, 0, 255 }, 0, FALSE, MEM_BPP == 3 };
+
+	if (IS_INDEXED)
+	{
+		tdata.lo[0] = mem_cols / 2;
+		tdata.hi[0] = tdata.hi[2] = tdata.lo[2] = mem_cols - 1;
+	}
+	run_create_(xhold_code, &tdata, sizeof(tdata), script_cmds);
+}

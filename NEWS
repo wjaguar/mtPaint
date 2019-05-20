@@ -18,8 +18,10 @@ Here is a summary of the main changes in this release (see handbook for full det
 	* Background layer now can use transparency like any other layer
 	* Background layer position now can be changed via Ctrl+arrows or layers window spinbuttons, like any other layer
 	* Patterns for colours A and B can now be chosen separately (Preferences->General->Separate patterns for A&B)
-	* Builtin Bayer patterns now can be redefined : See handbook section A.4.3 for details
+	* Builtin Bayer patterns now can be redefined : See handbook section A.6.1 for details
+	* Threshold effect with interactive preview added (see handbook section 6.6.7)
 	* Colour transform and source selection added to blend mode options
+	* Threshold blend mode added
 	* "Saturate more" blend mode redefined to not ignore source (previous behaviour available with "Image" source selected)
 	* Lasso tool can be configured to shrink selection based on the selection channel - right click the tool icon
 	* Clone tool is now continuous

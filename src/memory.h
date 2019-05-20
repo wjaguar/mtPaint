@@ -280,7 +280,8 @@ enum {
 	BLEND_SATPP,
 
 	/* Per-channel modes */
-	BLEND_MULT,
+	BLEND_1BPP,	// First one-byte mode
+	BLEND_MULT = BLEND_1BPP,
 	BLEND_DIV,
 	BLEND_SCREEN,
 // !!! No "Overlay" - it is a reverse "Hard Light"
@@ -293,10 +294,10 @@ enum {
 	BLEND_LIGHT,
 	BLEND_GRAINX,
 	BLEND_GRAINM,
+	BLEND_XHOLD,
 
 	BLEND_NMODES
 };
-#define BLEND_1BPP BLEND_MULT /* First one-byte mode */
 
 #define BLEND_MMASK    0x3F
 #define BLEND_XFORM    0x40
@@ -424,6 +425,24 @@ transform_state mem_bcsp[2];
 #define BRCOSA_ITEMS 6
 #define BRCOSA_POSTERIZE 3
 #define DEF_POSTERIZE(T) ((T) ? 256 : 8) /* truncated/rounded vs bitwise */
+
+/// THRESHOLD
+
+enum {
+	XHOLD_MAX = 0,
+	XHOLD_MIN = 1,
+	XHOLD_RED,
+	XHOLD_GREEN,
+	XHOLD_BLUE,
+
+	XHOLD_NMODES
+};
+
+typedef struct {
+	int lo, hi, mode;
+} threshold_state;
+
+threshold_state mem_ts;
 
 /// PATTERNS
 
@@ -799,6 +818,10 @@ void mem_smudge(int ox, int oy, int nx, int ny);
 //	Apply colour transform
 void do_transform(int start, int step, int cnt, unsigned char *mask,
 	unsigned char *imgr, unsigned char *img0, int m0);
+
+//	Apply thresholding
+void do_xhold(int start, int step, int cnt, unsigned char *mask,
+	unsigned char *imgr, unsigned char *img0);
 
 void mem_flip_v(char *mem, char *tmp, int w, int h, int bpp);	// Flip image vertically
 void mem_flip_h( char *mem, int w, int h, int bpp );		// Flip image horizontally

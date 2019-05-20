@@ -246,13 +246,10 @@ static void clear_perim_real(int x0, int y0, int s)
 
 static void pressed_load_recent(int item)
 {
-	char txt[64];
-
 	if ((layers_total ? check_layers_for_changes() :
 		check_for_changes()) == 1) return;
 
-	sprintf(txt, "file%i", item);
-	do_a_load(inifile_get(txt, ""), undo_load);	// Load requested file
+	do_a_load(recent_filenames[item - 1], undo_load); // Load requested file
 }
 
 static void pressed_crop()
@@ -1106,6 +1103,8 @@ static void delete_event(main_dd *dt, void **wdata)
 	inifile_set_gint32("tiffTypeI", tiff_formats[tiff_itype].id);
 	inifile_set_gint32("tiffTypeBW", tiff_formats[tiff_btype].id);
 #endif
+
+	update_recent_files(TRUE); // Store the list
 
 	if (files_passed <= 1) inifile_set_gboolean("showDock", show_dock);
 	toggle_dock(FALSE); // To remember dock size
@@ -2307,8 +2306,8 @@ static void grad_render(int start, int step, int cnt, int x, int y,
 typedef struct {
 	chanlist tlist;		// Channel overrides
 	unsigned char *mask0;	// Active mask channel
-	unsigned char *pvi;	// Xform render: temp image row
-	unsigned char *pvm;	// Xform render: temp mask row
+	unsigned char *pvi;	// Xform/xhold render: temp image row
+	unsigned char *pvm;	// Xform/xhold render: temp mask row
 	int rxy[4];		// Clipped area
 	int dx;			// Image-space X offset
 	int lx;			// Allocated row length
@@ -2453,7 +2452,7 @@ typedef struct {
 	main_render_state r;
 	paste_render_state p;
 	render_mem_req m;
-	int tflag, gflag, pflag, lr;
+	int tflag, xflag, gflag, pflag, lr;
 	int pw;
 	int cxy[4];
 	unsigned char *rgb, *irgb;
@@ -2487,6 +2486,13 @@ static void main_render_req(u_render_state *u)
 		else u->m.rgb_s = r.lx * 3;
 	}
 
+	/* Threshold preview */
+	else if ((u->xflag = xhold_preview))
+	{
+		u->m.mask_s = r.lx;
+		u->m.channel_s = r.lx * MEM_BPP;
+	}
+
 	/* Color selective mode preview */
 	else if (csel_overlay) u->m.overlay_s = r.lx;
 
@@ -2495,8 +2501,9 @@ static void main_render_req(u_render_state *u)
 		u->gflag = grad_render_req(&u->m, r.lx);
 
 	/* Paste preview - can only coexist with transform */
-	if (show_paste && (marq_status >= MARQUEE_PASTE) && !u->m.overlay_s &&
-		!u->gflag) u->pflag = paste_render_req(&u->m, &u->p, &r);
+	if (show_paste && (marq_status >= MARQUEE_PASTE) &&
+		!u->xflag && !u->m.overlay_s && !u->gflag)
+		u->pflag = paste_render_req(&u->m, &u->p, &r);
 
 	/* Pass the data */
 	u->r = r;
@@ -2517,6 +2524,14 @@ static void main_render(u_render_state *u, int py, int ph)
 	{
 		r.pvm = u->m.mask;
 		r.tlist[CHN_IMAGE] = r.pvi = u->m.rgb ? u->m.rgb : u->m.channel;
+	}
+
+	/* Threshold preview */
+	if (u->xflag)
+	{
+		if (mem_channel > CHN_ALPHA) r.mask0 = NULL;
+		r.pvm = u->m.mask;
+		r.tlist[mem_channel] = r.pvi = u->m.channel;
 	}
 
 	/* Gradient preview */
@@ -2548,16 +2563,26 @@ static void main_render(u_render_state *u, int py, int ph)
 			l = mem_width * j + r.dx;
 			tlist = r.tlist; /* Default override */
 
-			/* Color transform preview */
-			if (u->tflag)
+			/* Color transform/threshold preview */
+			if (u->tflag | u->xflag)
 			{
-				unsigned char *src = mem_img[CHN_IMAGE] + l * 3;
+				unsigned char *src, *img;
+				int bpp = mem_img_bpp;
+
+				src = img = mem_img[CHN_IMAGE] + l * bpp;
+
 				prep_mask(0, r.zoom, r.pww, r.pvm,
-					r.mask0 ? r.mask0 + l : NULL, src);
-				do_transform(0, r.zoom, r.pww, r.pvm,
-					r.pvi, src, 255);
+					r.mask0 ? r.mask0 + l : NULL, img);
+				if (u->tflag) do_transform(0, r.zoom, r.pww,
+					r.pvm, r.pvi, src, 255);
+				else
+				{
+					bpp = MEM_BPP;
+					src = mem_img[mem_channel] + l * bpp;
+					do_xhold(0, r.zoom, r.pww, r.pvm, r.pvi, src);
+				}
 				process_img(0, r.zoom, r.pww, r.pvm,
-					r.pvi, r.pvi, src, NULL, 3, BLENDF_SET);
+					r.pvi, r.pvi, src, NULL, bpp, BLENDF_SET);
 			}
 			/* Color selective mode preview */
 			else if (overlay)
@@ -4813,6 +4838,8 @@ void action_dispatch(int action, int mode, int state, int kbd)
 		lasso_settings(); break;
 	case DLG_KEYS:
 		keys_selector(); break;
+	case DLG_XHOLD:
+		pressed_xhold(); break;
 	case FILT_2RGB:
 		if (mem_img_bpp == 1) pressed_convert_rgb();
 		// Allow a noop in script mode
@@ -5412,6 +5439,7 @@ static void *main_menu_code[] = {
 		SHORTCUT(g, C),
 	MENUITEMs(_("//Greyscale (Gamma corrected)"), ACTMOD(FILT_GREY, 1)),
 		SHORTCUT(g, CS),
+	MENUITEMs(_("//Threshold ..."), ACTMOD(DLG_XHOLD, 0)),
 	SUBMENU(_("//Isometric Transformation")),
 	MENUTEAR, ///
 	MENUITEMs(_("///Left Side Down"), ACTMOD(ACT_ISOMETRY, 0)),
@@ -5674,8 +5702,8 @@ void main_init()
 	show_dock |= inifile_get_gboolean("showDock", FALSE);
 	main_window_ = run_create_(main_code, &tdata, sizeof(tdata), script_cmds);
 
-	recent_files = recent_files < 0 ? 0 : recent_files > 20 ? 20 : recent_files;
-	update_recent_files();
+	recent_files = bounded(recent_files, 0, MAX_RECENT);
+	update_recent_files(FALSE);
 
 	if (!tdata.cline_d) // Stops first icon in toolbar being selected
 		cmd_setv(main_window_, NULL, WINDOW_FOCUS);

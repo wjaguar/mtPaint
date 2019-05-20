@@ -796,6 +796,7 @@ enum {
 #define T1SPINSLIDE(V,V0,V1) WBrhf_t1(SPINSLIDE, 4), WBfield(V), \
 	(void *)(V0), (void *)(V1), WBwh(255, 20)
 #define TSPINSLIDE(NM,V,V0,V1) T1SPINSLIDE(V,V0,V1), TLABEL(NM)
+#define TSPINSLIDEa(NM,A) WBrhf_t1(SPINSLIDEa, 1), WBfield(A), TLABEL(NM)
 #define TLSPINSLIDE(V,V0,V1,X,Y) WBrhf_t(SPINSLIDE, 4), WBfield(V), \
 	(void *)(V0), (void *)(V1), WBxyl(X, Y, 1)
 #define TLSPINSLIDEvs(V,V0,V1,X,Y) WBrh_t(SPINSLIDE, 5), &(V), \
