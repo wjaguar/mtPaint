@@ -3165,6 +3165,12 @@ static int paint_canvas(void *dt, void **wdata, int what, void **where,
 		nt2 = ceil_div(vpix, kpix_threads * 1024);
 		if (nt2 > nt) nt2 = nt;
 
+		/* !!! csel_scan() cannot share its color cache and takes 50%+ of
+		 * per-row time, so 2 threads can interleave calls to it but more
+		 * than 2 only waste even more time on lock contention - WJ */
+		if ((nt2 > 2) && (u.m.overlay_s || (mem_cselect &&
+			(u.tflag | u.xflag | u.gflag | u.pflag)))) nt2 = 2;
+
 		u.tdata = talloc(MA_SKIP_ZEROSIZE | MA_FLAG_NONE, nt2,
 			&u, sizeof(u), NULL,
 #else
@@ -3183,6 +3189,11 @@ static int paint_canvas(void *dt, void **wdata, int what, void **where,
 #ifdef U_THREADS
 		if (u.tdata && (u.tdata != MEM_NONE)) // Threads w/allocation
 		{
+			/* !!! do_transform(), and any other preview code that
+			 * self-initializes global tables, should get an init
+			 * call here to avoid a thread clash - WJ */
+			if (u.tflag) do_transform(0, 0, 0, NULL, NULL, NULL, 255);
+
 			nt /= u.tdata->count;
 			if (nt > MAX_TH_STRIPS) nt = MAX_TH_STRIPS;
 			u.tdata->chunks = nt;

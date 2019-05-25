@@ -686,7 +686,8 @@ static void fpick_file_dialog(fpick_dd *dt, void **wdata, int what, void **where
 		if (fname[1] == ':') return; // Drive
 #endif
 
-		sprintf(tdata.title = fnm, "%s / %s", __("Delete"), __("Rename"));
+		snprintf(tdata.title = fnm, sizeof(fnm),
+			"%s / %s", __("Delete"), __("Rename"));
 		tdata.what = _("Enter the new filename");
 		strncpy0(tdata.fname, fname, PATHBUF);
 	}

@@ -133,7 +133,7 @@ static int tablet_preview(pref_dd *dt, void **wdata, int what, void **where,
 	if (mouse->button == 1)
 	{
 		char txt[64];
-		sprintf(txt, "%s = %.2f", __("Pressure"),
+		snprintf(txt, sizeof(txt), "%s = %.2f", __("Pressure"),
 			mouse->pressure * (1.0 / MAX_PRESSURE));
 		cmd_setv(dt->label_tablet_pressure, txt, LABEL_VALUE);
 	}

@@ -4,8 +4,8 @@
 
 echo
 
-MT_V="3.49.16"
-MT_DATE="2019-05-20"
+MT_V="3.49.17"
+MT_DATE="2019-05-25"
 
 MT_VERSION="mtPaint $MT_V"
 MT_LANG=NO
@@ -213,6 +213,7 @@ intl ............. Use internationalized po files
 man .............. Install the mtPaint man page
 
 --fakeroot=DIR ... DIR = location of library and include files to use for cross-compilation
+--fakeroot64=DIR . DIR = ... when targeting a 64-bit system
 icons ............ Compile with alternative icon set - see ./src/icons1/README for details
 
 --prefix=DIR ..... DIR = prefix location of all installs, e.g. /usr or /usr/local (default)

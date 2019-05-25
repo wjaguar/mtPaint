@@ -2154,7 +2154,8 @@ static int save_jpeg(char *file_name, ls_settings *settings)
  * And JP2 images with 4 channels, produced by OpenJPEG, cause JasPer
  * to die horribly.
  * Version 2.3.0 (04.10.17) was a sharp improvement, being twice faster than
- * JasPer and less memory hungry (overhead of 5x size) - WJ */
+ * JasPer when decompressing and less memory hungry (overhead of 5x size). When
+ * compressing however, as of 2.3.1 still about twice slower than JasPer - WJ */
 
 static int parse_opj(opj_image_t *image, ls_settings *settings)
 {
@@ -4069,35 +4070,63 @@ static unsigned char ctypes[256] = {
 #define ISCNTRL(x) (!ctypes[(unsigned char)(x)])
 #define WHITESPACE "\t\n\v\f\r "
 
-/* Reads text and cuts out C-style comments */
-static char *fgetsC(char *buf, int len, FILE *f)
-{
-	static int in_comment;
-	char *res;
-	int i, l, in_string = 0, has_chars = 0;
+typedef struct {
+	FILE *fp;
+	char *buf, *ptr;
+	int size, str, nl;
+} cctx;
 
-	if (!len) /* Init */
+static void fsetC(cctx *ctx, FILE *fp, char *buf, int len)
+{
+	if (fp) /* Full init */
 	{
-		*buf = '\0';
-		in_comment = 0;
-		return (NULL);
+		ctx->fp = fp;
+		ctx->buf = ctx->ptr = buf;
+		ctx->buf[0] = '\0';
+		ctx->size = len;
+		ctx->str = 0;
+		ctx->nl = 1; // Not middle of line
 	}
+	else /* Switch buffers to a LARGER one */
+	{
+		int l = strlen(ctx->ptr);
+		memmove(buf, ctx->ptr, l);
+		buf[l] = '\0';
+		ctx->buf = ctx->ptr = buf;
+		ctx->size = len;
+	}
+}
+
+/* Reads text and cuts out C-style comments */
+static char *fgetsC(cctx *ctx)
+{
+	char *buf = ctx->buf;
+	int i, l = 0, has_chars = 0, in_comment = 0, in_string = ctx->str;
+
+	/* Keep unparsed tail if the line isn't yet terminated */
+	if (!ctx->nl && ((l = strlen(ctx->ptr))))
+	{
+		memmove(buf, ctx->ptr, l);
+		for (i = 0; i < l; i++) if (!ISSPACE(buf[i])) has_chars++;
+	}
+	ctx->ptr = buf;
+	buf[l] = '\0';
 
 	while (TRUE)
 	{
 		/* Read a line */
-		buf[0] = '\0';
-		res = fgets(buf, len, f);
-		if (res != buf) return (res);
+		if (!fgets(buf + l, ctx->size - l, ctx->fp)) return (NULL);
 
 		/* Scan it for comments */
-		l = strlen(buf);
-		for (i = 0; i < l; i++)
+		i = l;
+		l += strlen(buf + l);
+		ctx->nl = l && (buf[l - 1] == '\n'); // Remember line termination
+		for (; i < l; i++)
 		{
 			if (in_string)
 			{
-				if ((buf[i] == '"') && (buf[i - 1] != '\\'))
-					in_string = 0; /* Close a string */
+				/* Ignore backslash before quote, as libXpm does */
+				if (buf[i] == '"') in_string = 0; /* Close a string */
 				continue;
 			}
 			if (in_comment)
@@ -4123,24 +4152,83 @@ static char *fgetsC(char *buf, int len, FILE *f)
 				has_chars -= 2;
 			}
 		}
-		/* For simplicity, have strings terminate on the same line */
-		if (in_string) return (NULL);
+		/* Fail unterminated strings, forbid continuations for simplicity */
+		if (in_string && ctx->nl) return (NULL);
 
-		/* All line is a comment - read the next one */
-		if (in_comment == 1) continue;
-
-		/* Cut off and remember non-closed comment */
-		if (in_comment)
+		/* Whitespace ending in unclosed comment - reduce it */
+		if ((in_comment > 1) && !has_chars)
 		{
-			buf[in_comment - 1] = '\0';
+			buf[0] = '/';
+			buf[1] = '*';
 			in_comment = 1;
 		}
 
-		/* All line is whitespace - read the next one */
-		if (!has_chars) continue;
+		/* Fail overlong lines ending in unclosed comment */
+		if (in_comment >= ctx->size - 3) return (NULL);
+
+		/* Continue reading till the comment closes */
+		if (in_comment)
+		{
+			l = in_comment + 1;
+			continue;
+		}
+
+		/* All line is whitespace - continue reading */
+		if (!has_chars)
+		{
+			l = !l || ctx->nl ? 0 : 1; // Remember 1 leading space
+			continue;
+		}
 		
-		return (res);
+		/* Remember if last string hasn't ended */
+		ctx->str = in_string;
+		return (buf);
 	}
+}
+
+/* Gets next C string out of buffer */
+static char *fstrC(cctx *ctx)
+{
+	char *s, *t, *w = ctx->ptr;
+
+	/* String has to begin somewhere */
+	while (!(s = strchr(w, '"')))
+	{
+		*(ctx->ptr = ctx->buf) = '\0';
+		if (!(w = fgetsC(ctx))) return (NULL);
+	}
+	/* And to end on the same line */
+	t = strchr(s + 1, '"');
+	if (!t)
+	{
+		ctx->ptr = s;
+		if (!(s = fgetsC(ctx))) return (NULL);
+		t = strchr(s + 1, '"');
+	}
+	if (!t) return (NULL); // Overlong string
+	/* Cut off the remainder */
+	if (*++t)
+	{
+		*t++ = '\0'; // Ignoring whatever it was
+		while (ISSPACE(*t)) t++;
+	}
+	/* Remember the tail */
+	ctx->ptr = t;
+
+	return (s);
+}
+
+/* Gets next C line out of buffer */
+static char *flineC(cctx *ctx)
+{
+	/* Skip to end of this line */
+	while (!ctx->nl)
+	{
+		*(ctx->ptr = ctx->buf) = '\0';
+		if (!fgetsC(ctx)) return (NULL);
+	}
+	/* And read the next */
+	return (fgetsC(ctx));
 }
 
 /* "One at a time" hash function */
@@ -4188,7 +4276,7 @@ static int ch_find(str_hash *cuckoo, char *str)
 	while (TRUE)
 	{
 		idx = cuckoo->hash[k];
-		if (idx && !strncmp(cuckoo->keys + (idx - 1) * step, str, cpp))
+		if (idx && !memcmp(cuckoo->keys + (idx - 1) * step, str, cpp))
 			return (idx);
 		if (k & 1) return (0); /* Not found */
 		k = ((key >> 16) & HMASK) * 2 + 1;
@@ -4235,19 +4323,19 @@ static int ch_insert(str_hash *cuckoo, char *str)
 
 #define XPM_COL_DEFS 5
 
-/* Comments are allowed where valid; but missing newlines or newlines where
- * should be none aren't tolerated */
+/* Comments are allowed where valid */
 static int load_xpm(char *file_name, ls_settings *settings)
 {
 	static const char *cmodes[XPM_COL_DEFS] =
 		{ "c", "g", "g4", "m", "s" };
 	unsigned char *src, *dest, pal[XPM_MAXCOL * 3];
-	char lbuf[4096], tstr[20], *buf = lbuf;
-	char ckeys[XPM_MAXCOL * 32], *cdefs[XPM_COL_DEFS], *r, *r2;
+	char lbuf[4096], *buf = lbuf;
+	char ckeys[XPM_MAXCOL * 32], *cdefs[XPM_COL_DEFS], *r, *r2, *t;
 	str_hash cuckoo;
+	cctx ctx;
 	FILE *fp;
-	int w, h, cols, cpp, hx, hy, lsz = 4096, res = -1, bpp = 1, trans = -1;
-	int i, j, k, l;
+	int w, h, cols, cpp, hx, hy, res = -1, bpp = 1, trans = -1;
+	int i, j, k, l, lsz = sizeof(lbuf);
 
 
 	if (!(fp = fopen(file_name, "r"))) return (-1);
@@ -4255,18 +4343,13 @@ static int load_xpm(char *file_name, ls_settings *settings)
 	/* Read the header - accept XPM3 and nothing else */
 	j = 0; fscanf(fp, " /* XPM */%n", &j);
 	if (!j) goto fail;
-	fgetsC(lbuf, 0, fp); /* Reset reader */
+	fsetC(&ctx, fp, lbuf, sizeof(lbuf)); /* Init reader */
 
-	/* Read the "intro sequence" */
-	if (!fgetsC(lbuf, 4096, fp)) goto fail;
-	/* !!! Skip validation; libXpm doesn't do it, and some weird tools
-	 * write this line differently - WJ */
-//	j = 0; sscanf(lbuf, " static char * %*[^[][] = {%n", &j);
-//	if (!j) goto fail;
+	/* Skip right to the first string like libXpm does */
+	if (!(r = fstrC(&ctx))) goto fail;
 
 	/* Read the values section */
-	if (!fgetsC(lbuf, 4096, fp)) goto fail;
-	i = sscanf(lbuf, " \"%d%d%d%d%d%d", &w, &h, &cols, &cpp, &hx, &hy);
+	i = sscanf(r + 1, "%d%d%d%d%d%d", &w, &h, &cols, &cpp, &hx, &hy);
 	if (i == 4) hx = hy = -1;
 	else if (i != 6) goto fail;
 	/* Extension marker is ignored, as are extensions themselves */
@@ -4298,46 +4381,51 @@ static int load_xpm(char *file_name, ls_settings *settings)
 	/* Read colormap */
 // !!! When/if huge numbers of colors get allowed, will need a progressbar here
 	dest = pal;
-	sprintf(tstr, " \"%%n%%*%dc %%n", cpp);
 	for (i = 0; i < cols; i++ , dest += 3)
 	{
-		if (!fgetsC(lbuf, 4096, fp)) goto fail;
-
-		/* Parse color ID */
-		k = 0; sscanf(lbuf, tstr, &k, &l);
-		if (!k) goto fail;
+		if (!(r = fstrC(&ctx))) goto fail;
+		l = strlen(r);
+		if (l < cpp + 4) goto fail;
+		r[l - 1] = '\0'; // Cut off closing quote
 
 		/* Insert color into hash */
-		ch_insert(&cuckoo, lbuf + k);
+		ch_insert(&cuckoo, r + 1);
 
 		/* Parse color definitions */
-		if (!(r = strchr(lbuf + l, '"'))) goto fail;
-		*r = '\0';
 		memset(cdefs, 0, sizeof(cdefs));
+		r += cpp + 2;
 		k = -1; r2 = NULL;
-		for (r = strtok(lbuf + l, " \t\n"); r; )
+		while (TRUE)
 		{
-			for (j = 0; j < XPM_COL_DEFS; j++)
+			while (ISSPACE(*r)) r++;
+			if (!*r) break;
+			t = r++;
+			while (*r && !ISSPACE(*r)) r++;
+			if (*r) *r++ = '\0';
+			if (k < 0) /* Mode */
 			{
-				if (!strcmp(r, cmodes[j])) break;
+				for (j = 0; j < XPM_COL_DEFS; j++)
+				{
+					if (!strcmp(t, cmodes[j])) break;
+				}
+				if (j < XPM_COL_DEFS) /* Key */
+				{
+					k = j; r2 = NULL;
+					continue;
+				}
 			}
-			if (j < XPM_COL_DEFS) /* Key */
-			{
-				k = j; r2 = NULL;
-			}
-			else if (!r2) /* Color name */
+			if (!r2) /* Color name */
 			{
 				if (k < 0) goto fail;
-				cdefs[k] = r2 = r;
+				cdefs[k] = r2 = t;
+				k = -1;
 			}
 			else /* Add next part of name */
 			{
 				l = strlen(r2);
 				r2[l] = ' ';
-				if ((l = r - r2 - l - 1))
-					for (; (*(r - l) = *r); r++);
+				memmove(r2 + l + 1, t, strlen(t) + 1);
 			}
-			r = strtok(NULL, " \t\n");
 		}
 		if (!r2) goto fail; /* Key w/o name */
 
@@ -4409,6 +4497,7 @@ static int load_xpm(char *file_name, ls_settings *settings)
 	if (i > lsz) buf = malloc(lsz = i);
 	res = FILE_MEM_ERROR;
 	if (!buf) goto fail;
+	fsetC(&ctx, NULL, buf, lsz); /* Switch buffers */
 	if ((res = allocate_image(settings, CMASK_IMAGE))) goto fail2;
 
 	if (!settings->silent) ls_init("XPM", 0);
@@ -4418,9 +4507,9 @@ static int load_xpm(char *file_name, ls_settings *settings)
 	dest = settings->img[CHN_IMAGE];
 	for (i = 0; i < h; i++)
 	{
-		if (!fgetsC(buf, lsz, fp)) goto fail3;
-		if (!(r = strchr(buf, '"'))) goto fail3;
-		if (++r - buf + w * cpp >= lsz) goto fail3;
+		if (!(r = fstrC(&ctx))) goto fail3;
+		/* libXpm allows overlong strings */
+		if (strlen(++r) < w * cpp + 1) goto fail3;
 		for (j = 0; j < w; j++ , dest += bpp)
 		{
 			k = ch_find(&cuckoo, r);
@@ -4598,7 +4687,8 @@ static int load_xbm(char *file_name, ls_settings *settings)
 			0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15,
 			10, 11, 12, 13, 14, 15, 16, 16, 16, 16, 16 };
 	unsigned char ctb[256], *dest;
-	char lbuf[4096];
+	char lbuf[4096], *r;
+	cctx ctx;
 	FILE *fp;
 	int w , h, hx = -1, hy = -1, bpn = 16, res = -1;
 	int i, j, k, c, v = 0;
@@ -4607,34 +4697,35 @@ static int load_xbm(char *file_name, ls_settings *settings)
 	if (!(fp = fopen(file_name, "r"))) return (-1);
 
 	/* Read & parse what serves as header to XBM */
-	fgetsC(lbuf, 0, fp); /* Reset reader */
+	fsetC(&ctx, fp, lbuf, sizeof(lbuf)); /* Init reader */
 	/* Width and height - required part in fixed order */
-	if (!fgetsC(lbuf, 4096, fp)) goto fail;
-	if (!sscanf(lbuf, "#define %*s%n %d", &i, &w)) goto fail;
-	if (strncmp(lbuf + i - 5, "width", 5)) goto fail;
-	if (!fgetsC(lbuf, 4096, fp)) goto fail;
-	if (!sscanf(lbuf, "#define %*s%n %d", &i, &h)) goto fail;
-	if (strncmp(lbuf + i - 6, "height", 6)) goto fail;
+	if (!(r = flineC(&ctx))) goto fail;
+	if (!sscanf(r, "#define %*s%n %d", &i, &w)) goto fail;
+	if (strncmp(r + i - 5, "width", 5)) goto fail;
+	if (!(r = flineC(&ctx))) goto fail;
+	if (!sscanf(r, "#define %*s%n %d", &i, &h)) goto fail;
+	if (strncmp(r + i - 6, "height", 6)) goto fail;
 	/* Hotspot X and Y - optional part in fixed order */
-	if (!fgetsC(lbuf, 4096, fp)) goto fail;
-	if (sscanf(lbuf, "#define %*s%n %d", &i, &hx))
+	if (!(r = flineC(&ctx))) goto fail;
+	if (sscanf(r, "#define %*s%n %d", &i, &hx))
 	{
-		if (strncmp(lbuf + i - 5, "x_hot", 5)) goto fail;
-		if (!fgetsC(lbuf, 4096, fp)) goto fail;
-		if (!sscanf(lbuf, "#define %*s%n %d", &i, &hy)) goto fail;
-		if (strncmp(lbuf + i - 5, "y_hot", 5)) goto fail;
-		if (!fgetsC(lbuf, 4096, fp)) goto fail;
+		if (strncmp(r + i - 5, "x_hot", 5)) goto fail;
+		if (!(r = flineC(&ctx))) goto fail;
+		if (!sscanf(r, "#define %*s%n %d", &i, &hy)) goto fail;
+		if (strncmp(r + i - 5, "y_hot", 5)) goto fail;
+		if (!(r = flineC(&ctx))) goto fail;
 	}
 	/* "Intro" string */
-	j = 0; sscanf(lbuf, " static short %*[^[]%n[] = {%n", &i, &j);
+	j = 0; sscanf(r, " static short %*[^[]%n[] = {%n", &i, &j);
 	if (!j)
 	{
 		bpn = 8; /* X11 format - 8-bit data */
-		j = 0; sscanf(lbuf, " static unsigned char %*[^[]%n[] = {%n", &i, &j);
-		if (!j) sscanf(lbuf, " static char %*[^[]%n[] = {%n", &i, &j);
+		j = 0; sscanf(r, " static unsigned char %*[^[]%n[] = {%n", &i, &j);
+		if (!j) sscanf(r, " static char %*[^[]%n[] = {%n", &i, &j);
 		if (!j) goto fail;
 	}
-	if (strncmp(lbuf + i - 4, "bits", 4)) goto fail;
+	if (strncmp(r + i - 4, "bits", 4)) goto fail;
+// !!! For now, newline is required between "intro" and data
 
 	/* Store values */
 	settings->width = w;
@@ -5573,15 +5664,15 @@ static void copy_rgb_pal(png_color *dest, unsigned char *src, int cnt)
 
 static int load_pcx(char *file_name, ls_settings *settings)
 {
-	static const unsigned char planarconfig[8] = {
-		0x11, /* BW */  0x12, /* 4c */  0x31, /* 8c */
+	static const unsigned char planarconfig[9] = {
+		0x11, /* BW */  0x12, /* 4c */ 0x21, /* 4c */ 0x31, /* 8c */
 		0x41, /* 16c */ 0x14, /* 16c */ 0x18, /* 256c */
 		0x38, /* RGB */	0x48  /* RGBA */ };
 	unsigned char hdr[PCX_HSIZE], pbuf[769];
 	unsigned char *buf, *row, *dest, *tmp;
 	FILE *fp;
 	int ver, bits, planes, ftype;
-	int y, ccnt, bstart, bstop, strl, plane;
+	int y, ccnt, bstart, bstop, strl, plane, cf;
 	int w, h, cols, buflen, bpp = 3, res = -1;
 
 
@@ -5591,18 +5682,20 @@ static int load_pcx(char *file_name, ls_settings *settings)
 	if (fread(hdr, 1, PCX_HSIZE, fp) < PCX_HSIZE) goto fail;
 
 	/* PCX has no real signature - so check fields one by one */
-	if ((hdr[PCX_ID] != 10) || (hdr[PCX_ENC] != 1)) goto fail;
+	if ((hdr[PCX_ID] != 10) || (hdr[PCX_ENC] > 1)) goto fail;
 	ver = hdr[PCX_VER];
 	if (ver > 5) goto fail;
 
 	bits = hdr[PCX_BPP];
 	planes = hdr[PCX_NPLANES];
-	if ((bits | planes) > 15) goto fail;
-	if (!(tmp = memchr(planarconfig, (planes << 4) | bits, 8))) goto fail;
-	ftype = tmp - planarconfig;
+	if ((bits == 24) && (planes == 1)) ftype = 7; /* Single-plane RGB */
+	else if ((bits | planes) > 15) goto fail;
+	else if ((tmp = memchr(planarconfig, (planes << 4) | bits, 9)))
+		ftype = tmp - planarconfig;
+	else goto fail;
 
 	/* Prepare palette */
-	if (ftype < 6)
+	if (ftype < 7)
 	{
 		bpp = 1;
 		settings->colors = cols = 1 << (bits * planes);
@@ -5673,7 +5766,7 @@ static int load_pcx(char *file_name, ls_settings *settings)
 	res = FILE_MEM_ERROR;
 	if (!buf) goto fail;
 	row = buf + PCX_BUFSIZE;
-	if ((res = allocate_image(settings, ftype > 6 ? CMASK_RGBA : CMASK_IMAGE)))
+	if ((res = allocate_image(settings, ftype > 7 ? CMASK_RGBA : CMASK_IMAGE)))
 		goto fail2;
 
 	/* Read and decode the file */
@@ -5685,6 +5778,7 @@ static int load_pcx(char *file_name, ls_settings *settings)
 	y = plane = ccnt = 0;
 	bstart = bstop = PCX_BUFSIZE;
 	strl = buflen;
+	cf = hdr[PCX_ENC] ? 0xC0 : 0x100; // Compressed, or not
 	while (TRUE)
 	{
 		unsigned char v;
@@ -5705,7 +5799,7 @@ static int load_pcx(char *file_name, ls_settings *settings)
 			memset(row + buflen - strl, v, l);
 			strl -= l; ccnt -= l;
 		}
-		else if (v >= 0xC0) /* Start of a run */
+		else if (v >= cf) /* Start of a run */
 		{
 			ccnt = v & 0x3F;
 			bstart++;
@@ -5726,6 +5820,8 @@ static int load_pcx(char *file_name, ls_settings *settings)
 				dest[i] |= (v & 0x80) >> n;
 			}
 		}
+		else if (bits == 24) // 1 plane of RGB
+			memcpy(dest, row, w * 3);
 		else if (plane < 3) // BPP planes of 2/4/8-bit data (MSB first)
 			stream_MSB(row, dest + plane, w, bits, 0, bits, bpp);
 		else if (settings->img[CHN_ALPHA]) // 8-bit alpha plane
@@ -7914,7 +8010,7 @@ static int do_detect_format(char *name, FILE *fp)
 	{
 		if (buf[1] > 5) break;
 		if (buf[1] > 1) return (FT_PCX);
-		if (buf[2] != 1) break;
+		if (buf[2] != 1) break; // Uncompressed PCX is nonstandard
 		/* Ambiguity - look at name as a last resort
 		 * Bias to PCX - TGAs usually have 0th byte = 0 */
 		stop = strrchr(name, '.');
