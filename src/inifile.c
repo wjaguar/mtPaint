@@ -1,5 +1,5 @@
 /*	inifile.c
-	Copyright (C) 2007-2018 Dmitry Groshev
+	Copyright (C) 2007-2019 Dmitry Groshev
 
 	This file is part of mtPaint.
 
@@ -382,7 +382,7 @@ void forget_ini(inifile *inip)
 }
 
 /* Load file whole into memory, with N zero bytes before and two after */
-char *slurp_file(char *fname, int before)
+char *slurp_file_l(char *fname, int before, int *len)
 {
 	FILE *fp;
 	char *buf = NULL;
@@ -404,6 +404,7 @@ char *slurp_file(char *fname, int before)
 		}
 	}
 	fclose(fp);
+	if (len) *len = l;
 	return (buf);
 }
 

@@ -83,8 +83,8 @@ typedef struct {
 	char **script;	// Commands if simulated
 	int xywh[5];	// Stored window position/size/state
 	int actn;	// Actmap slots count
-	int actmask;	// Last actmap mask
-	int vismask;	// Visibility mask
+	unsigned actmask;	// Last actmap mask
+	unsigned vismask;	// Visibility mask
 	char modal;	// Set modal flag when displaying
 	char raise;	// Raise after displaying
 	char unfocus;	// Focus to NULL after displaying
@@ -96,16 +96,17 @@ typedef struct {
 #define ACT_SIZE 2 /* Pointers per actmap slot */
 #define ADD_ACT(W,S,V) ((W)[0] = (S) , (W)[1] = (V))
 
-static void act_state(v_dd *vdata, int mask)
+static void act_state(v_dd *vdata, unsigned int mask)
 {
 	void **map = vdata->actmap;
-	int i, n, m, vm = vdata->vismask;
+	unsigned int n, m, vm = vdata->vismask;
+	int i;
 
 	vdata->actmask = mask;
 	i = vdata->actn;
 	while (i-- > 0)
 	{
-		n = (int)map[1];
+		n = (unsigned)map[1];
 		if ((m = n & vm)) cmd_showhide(map[0], !!(m & mask));
 		if ((m = n & ~vm)) cmd_sensitive(map[0], !!(m & mask));
 		map += ACT_SIZE;
@@ -4647,6 +4648,33 @@ void *smartmenu_done(void **tbar, void **r)
 	return (sd);
 }
 
+/* Heightbar: increase own height to max height of invisible neighbors */
+
+typedef struct {
+	GtkWidget *self;
+	GtkRequisition *req;
+} heightbar_data;
+
+static void heightbar_req(GtkWidget *widget, gpointer data)
+{
+	heightbar_data *hd = data;
+	GtkRequisition req;
+
+	if (widget == hd->self) return; // Avoid recursion
+	if (GTK_WIDGET_VISIBLE(widget)) return; // Let GTK+ handle it, for now
+	gtk_widget_size_request(widget, &req); // Ask what invisible ones want
+	if (req.height > hd->req->height) hd->req->height = req.height;
+}
+
+// !!! Can attach to any regular widget, but what's best way to do it in V-code?
+static void heightbar_size_req(GtkWidget *widget, GtkRequisition *req,
+	gpointer user_data)
+{
+	heightbar_data hd = { widget, req };
+	if (widget->parent) gtk_container_foreach(GTK_CONTAINER(widget->parent),
+		(GtkCallback)heightbar_req, &hd);
+}
+
 /* Get/set window position & size from/to inifile */
 void rw_pos(v_dd *vdata, int set)
 {
@@ -6357,6 +6385,14 @@ void **run_create_(void **ifcode, void *ddata, int ddsize, char **script)
 			get_evt_1(where[0], NEXT_SLOT(where));
 			break;
 		}
+		/* Add a height-limiter item */
+		case op_HEIGHTBAR:
+		{
+			widget = gtk_label_new(""); // Gives useful lower limit
+			gtk_signal_connect(GTK_OBJECT(widget), "size_request",
+				GTK_SIGNAL_FUNC(heightbar_size_req), NULL);
+			break;
+		}
 #if 0
 		/* Call a function */
 		case op_EXEC:
@@ -6387,7 +6423,7 @@ void **run_create_(void **ifcode, void *ddata, int ddsize, char **script)
 			continue;
 		/* Put last referrable widget into activation map */
 		case op_ACTMAP:
-			if (lp > 1) vdata->vismask = (int)v; // VISMASK
+			if (lp > 1) vdata->vismask = (unsigned)v; // VISMASK
 			else
 			{
 				void **where = vdata->actmap + vdata->actn++ * ACT_SIZE;
@@ -6457,9 +6493,9 @@ void **run_create_(void **ifcode, void *ddata, int ddsize, char **script)
 			gtk_signal_connect(GTK_OBJECT(widget), "size_request",
 				GTK_SIGNAL_FUNC(scroll_max_size_req), v);
 			continue;
-		/* Make widget keep max requested width */
-		case op_KEEPWIDTH:
-			widget_set_keepsize(widget, FALSE);
+		/* Make widget keep max requested width/height */
+		case op_KEEPSIZE:
+			widget_set_keepsize(widget, lp);
 			continue;
 		/* Use saved size & position for window */
 		case op_WXYWH:
@@ -7804,6 +7840,7 @@ int cmd_run_script(void **slot, char **strs)
 
 void cmd_showhide(void **slot, int state)
 {
+	GtkWidget *ws = NULL;
 	void **keymap = NULL;
 	int raise = FALSE, unfocus = FALSE, mx = FALSE;
 
@@ -7838,6 +7875,22 @@ void cmd_showhide(void **slot, int state)
 			if (vdata->modal) gtk_window_set_modal(GTK_WINDOW(w), TRUE);
 			/* Prepare to do postponed actions */
 			mx = vdata->xywh[4];
+#if GTK_MAJOR_VERSION > 1
+			/* !!! When doing maximize, we have to display window
+			 * contents after window itself, or some widgets may get
+			 * locked into wrong size by premature first-time size
+			 * request & allocation within unmaximized window.
+			 * On GTK+1 the resize mechanism is quite different and
+			 * such reordering only makes the result even worse; what
+			 * can cause proper resizing there, isn't found yet - WJ */
+			if (mx)
+			{
+				ws = GTK_BIN(w)->child;
+				if (ws && GTK_WIDGET_VISIBLE(ws))
+					widget_showhide(ws, FALSE);
+				else ws = NULL;
+			}
+#endif
 			keymap = vdata->keymap;
 			raise = vdata->raise;
 			unfocus = vdata->unfocus;
@@ -7866,8 +7919,9 @@ void cmd_showhide(void **slot, int state)
 	}
 	widget_showhide(slot[0], state);
 	/* !!! Window must be visible, or maximize fails if either dimension is
-	 * already at max, with KDE3 at least - WJ */
+	 * already at max, with KDE3 & 4 at least - WJ */
 	if (mx) set_maximized(slot[0]);
+	if (ws) widget_showhide(ws, TRUE);
 	if (raise) gdk_window_raise(GTK_WIDGET(slot[0])->window);
 	if (unfocus) gtk_window_set_focus(slot[0], NULL);
 	/* !!! Have to wait till canvas is displayed, to init keyboard */
@@ -8267,8 +8321,8 @@ void cmd_setv(void **slot, void *res, int idx)
 		if (idx == WDATA_ACTMAP)
 		{
 			v_dd *vdata = GET_VDATA(slot);
-			if (vdata->actmask != (int)res) // If anything changed
-				act_state(vdata, (int)res);
+			if (vdata->actmask != (unsigned)res) // If anything changed
+				act_state(vdata, (unsigned)res);
 			return;
 		}
 		// skip to toplevel slot

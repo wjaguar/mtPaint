@@ -1,5 +1,5 @@
 /*	fpick.c
-	Copyright (C) 2007-2015 Mark Tyler and Dmitry Groshev
+	Copyright (C) 2007-2019 Mark Tyler and Dmitry Groshev
 
 	This file is part of mtPaint.
 
@@ -355,6 +355,8 @@ static void fpick_scan_drives(fpick_dd *dt)	// Scan drives, populate widgets
 
 #endif
 
+#define MAX_DIR_FILES (16 * 1024 * 1024) /* 16+ million is when to say "Enough" */
+
 static void scan_dir(fpick_dd *dt, DIR *dp, char *select)
 {
 	char full_name[PATHBUF], txt_size[64], txt_date[64], tmp_txt[64];
@@ -382,7 +384,7 @@ static void scan_dir(fpick_dd *dt, DIR *dp, char *select)
 		cnt++;
 	}
 
-	while ((ep = readdir(dp)))
+	while ((cnt < MAX_DIR_FILES) && (ep = readdir(dp)))
 	{
 		wjstrcat(full_name, PATHBUF, dir, l, ep->d_name, NULL);
 

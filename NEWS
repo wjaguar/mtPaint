@@ -37,6 +37,7 @@ Here is a summary of the main changes in this release (see handbook for full det
 	* Colours A and B now highlighted in palette window
 	* New image format PMM (Portable MultiMap) added for interoperable storage and exchange of images : See handbook section A.2.4 for details
 	* WebP file format save/load added
+	* LBM file format (ILBM/PBM) save/load added
 	* XPM files with 65-92 colours are now saved with smaller size
 	* Raw RGB palette files (6-bit PAL and 8-bit ACT) can now be loaded/saved via the Palette menu
 	* TIFF compression made configurable
@@ -44,6 +45,8 @@ Here is a summary of the main changes in this release (see handbook for full det
 	* SVG files now can be loaded through 'rsvg-convert', in absence of GTK+2 librsvg plugin
 	* Animation frames now can be saved in any suitable supported file format
 	* Animation cycles can now specify sequence steps as containing several layers, or none : See handbook section 9.3.3 for details
+	* Passing a list of files on command line is now possible using --flist option
+	* Filenames passed on command line can now be sorted alphabetically with --sort option
 	* Image loading and new image creation are now undoable by default
 	* Committing paste when changing tool is now enabled by default
 	* Saving an image now commits paste if auto commit mode is enabled

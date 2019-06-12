@@ -149,6 +149,7 @@ enum {
 
 	op_MOUNT,
 	op_REMOUNT,
+	op_HEIGHTBAR,
 	op_uCHECK,
 	op_uCHECKb,
 	op_uSPIN,
@@ -256,7 +257,7 @@ enum {
 	op_MKSHRINK,
 	op_NORESIZE,
 	op_WANTMAX,
-	op_KEEPWIDTH,
+	op_KEEPSIZE,
 	op_WXYWH,
 	op_WPMOUSE,
 	op_WPWHEREVER,
@@ -978,6 +979,7 @@ enum {
 #define PMOUNT(V,FN,H,K,NK) WBr2hf_x(MOUNT, 4 + 2), WBfield(V), (FN), (K), \
 	(void *)(NK), EVENT(CHANGE, H)
 #define REMOUNTv(V) WBrh_x(REMOUNT, 1), &(V)
+#define HEIGHTBAR WBh_e(HEIGHTBAR, 0)
 //#define EXEC(FN) WBh(EXEC, 1), (FN)
 #define GOTO(A) WBh(GOTO, 1), (A)
 #define CALL(A) WBh(CALL, 1), (A)
@@ -1025,7 +1027,8 @@ enum {
 #define FOCUS WBh(FOCUS, 0)
 #define WIDTH(N) WBh(WIDTH, 1), (void *)(N)
 #define MINWIDTH(N) WBh(WIDTH, 1), (void *)(-(N))
-#define KEEPWIDTH WBh(KEEPWIDTH, 0)
+#define KEEPWIDTH WBh(KEEPSIZE, 0)
+#define KEEPHEIGHT WBh(KEEPSIZE, 1), NULL
 #define HEIGHT(N) WBh(HEIGHT, 1), (void *)(N)
 #define ONTOP(V) WBhf(ONTOP, 1), WBfield(V)
 #define ONTOP0 WBh(ONTOP, 0)

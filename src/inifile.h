@@ -1,5 +1,5 @@
 /*	inifile.h
-	Copyright (C) 2007-2015 Dmitry Groshev
+	Copyright (C) 2007-2019 Dmitry Groshev
 
 	This file is part of mtPaint.
 
@@ -66,7 +66,8 @@ int ini_transient(inifile *inip, int section, char *key);
 
 /* File functions */
 
-char *slurp_file(char *fname, int before);
+char *slurp_file_l(char *fname, int before, int *len);
+#define slurp_file(A,B) slurp_file_l((A), (B), NULL)
 char *get_home_directory(void);
 char *extend_path(const char *path);
 

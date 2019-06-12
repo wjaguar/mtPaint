@@ -300,6 +300,7 @@ int	show_menu_icons, paste_commit, scroll_zoom, arrow_scroll;
 int	drag_index_vals[2], cursor_corner, use_gamma, view_vsplit;
 int	files_passed, cmd_mode, tablet_working;
 char **file_args, **script_cmds;
+#define FILES_MAX (1024 * 1024) /* A million+ files should be enough */
 
 extern char mem_clip_file[];
 

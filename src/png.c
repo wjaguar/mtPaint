@@ -93,41 +93,42 @@ int silence_limit, jpeg_quality, png_compression;
 int tga_RLE, tga_565, tga_defdir, jp2_rate;
 int lzma_preset, zstd_level, tiff_predictor, tiff_rtype, tiff_itype, tiff_btype;
 int webp_preset, webp_quality, webp_compression;
+int lbm_mask, lbm_untrans, lbm_pack, lbm_pbm;
 int apply_icc;
 
 fformat file_formats[NUM_FTYPES] = {
 	{ "", "", "", 0},
-	{ "PNG", "png", "", FF_256 | FF_RGB | FF_ALPHA | FF_MULTI
-		| FF_TRANS | FF_COMPZ | FF_MEM },
+	{ "PNG", "png", "", FF_256 | FF_RGB | FF_ALPHA | FF_MULTI | FF_MEM,
+		XF_TRANS | XF_COMPZ },
 #ifdef U_JPEG
-	{ "JPEG", "jpg", "jpeg", FF_RGB | FF_COMPJ },
+	{ "JPEG", "jpg", "jpeg", FF_RGB, XF_COMPJ },
 #else
 	{ "", "", "", 0},
 #endif
 #ifdef HANDLE_JP2
-	{ "JPEG2000", "jp2", "", FF_RGB | FF_ALPHA | FF_COMPJ2 },
-	{ "J2K", "j2k", "jpc", FF_RGB | FF_ALPHA | FF_COMPJ2 },
+	{ "JPEG2000", "jp2", "", FF_RGB | FF_ALPHA, XF_COMPJ2 },
+	{ "J2K", "j2k", "jpc", FF_RGB | FF_ALPHA, XF_COMPJ2 },
 #else
 	{ "", "", "", 0},
 	{ "", "", "", 0},
 #endif
 #ifdef U_TIFF
-#define TIFF0FLAGS (FF_LAYER | FF_COMPT)
+#define TIFF0FLAGS FF_LAYER
 #define TIFFLAGS (FF_BW | FF_256 | FF_RGB | FF_ALPHA | TIFF0FLAGS)
-	{ "TIFF", "tif", "tiff", TIFFLAGS },
+	{ "TIFF", "tif", "tiff", TIFFLAGS, XF_COMPT },
 #else
 	{ "", "", "", 0},
 #endif
 #ifdef U_GIF
-	{ "GIF", "gif", "", FF_256 | FF_ANIM | FF_TRANS },
+	{ "GIF", "gif", "", FF_256 | FF_ANIM, XF_TRANS },
 #else
 	{ "", "", "", 0},
 #endif
 	{ "BMP", "bmp", "", FF_256 | FF_RGB | FF_ALPHAR | FF_MEM },
-	{ "XPM", "xpm", "", FF_256 | FF_RGB | FF_TRANS | FF_SPOT },
-	{ "XBM", "xbm", "", FF_BW | FF_SPOT },
+	{ "XPM", "xpm", "", FF_256 | FF_RGB, XF_TRANS | XF_SPOT },
+	{ "XBM", "xbm", "", FF_BW, XF_SPOT },
 	{ "LSS16", "lss", "", FF_16 },
-	{ "TGA", "tga", "", FF_256 | FF_RGB | FF_ALPHAR | FF_TRANS | FF_COMPR },
+	{ "TGA", "tga", "", FF_256 | FF_RGB | FF_ALPHAR, XF_TRANS | XF_COMPR },
 	{ "PCX", "pcx", "", FF_256 | FF_RGB },
 	{ "PBM", "pbm", "", FF_BW | FF_LAYER },
 	{ "PGM", "pgm", "", FF_256 | FF_LAYER | FF_NOSAVE },
@@ -146,15 +147,16 @@ fformat file_formats[NUM_FTYPES] = {
 	{ "SVG", "svg", "", FF_RGB | FF_ALPHA | FF_SCALE | FF_NOSAVE },
 /* mtPaint's own format - extended PAM */
 	{ "* PMM *", "pmm", "", FF_256 | FF_RGB | FF_ANIM | FF_ALPHA | FF_MULTI
-		| FF_TRANS | FF_LAYER | FF_PALETTE | FF_MEM },
+		| FF_LAYER | FF_PALETTE | FF_MEM, XF_TRANS },
 #ifdef U_WEBP
 /* !!! For later */
-//	{ "WEBP", "webp", "", FF_RGB | FF_ANIM | FF_ALPHA | FF_COMPW },
+//	{ "WEBP", "webp", "", FF_RGB | FF_ANIM | FF_ALPHA, XF_COMPW },
 /* For now */
-	{ "WEBP", "webp", "", FF_RGB | FF_ALPHA | FF_COMPW },
+	{ "WEBP", "webp", "", FF_RGB | FF_ALPHA, XF_COMPW },
 #else
 	{ "", "", "", 0},
 #endif
+	{ "LBM", "lbm", "ilbm", FF_256 | FF_RGB | FF_ALPHA, XF_TRANS | XF_COMPRL },
 };
 
 #ifndef U_TIFF
@@ -2799,21 +2801,21 @@ static void copy_bytes(unsigned char *dest, unsigned char *src, int len,
  * not guaranteed. But the common varieties of TIFF format should load OK. */
 
 tiff_format tiff_formats[TIFF_MAX_TYPES] = {
-	{ _("None"),	COMPRESSION_NONE, TIFFLAGS },
-	{ "Group 3",	COMPRESSION_CCITTFAX3, FF_BW | TIFF0FLAGS },
-	{ "Group 4",	COMPRESSION_CCITTFAX4, FF_BW | TIFF0FLAGS },
-	{ "PackBits",	COMPRESSION_PACKBITS, TIFFLAGS },
-	{ "LZW",	COMPRESSION_LZW, TIFFLAGS, 1 },
-	{ "ZIP",	COMPRESSION_ADOBE_DEFLATE, TIFFLAGS | FF_COMPZT, 1 },
+	{ _("None"),	COMPRESSION_NONE, TIFFLAGS, XF_COMPT },
+	{ "Group 3",	COMPRESSION_CCITTFAX3, FF_BW | TIFF0FLAGS, XF_COMPT },
+	{ "Group 4",	COMPRESSION_CCITTFAX4, FF_BW | TIFF0FLAGS, XF_COMPT },
+	{ "PackBits",	COMPRESSION_PACKBITS, TIFFLAGS, XF_COMPT },
+	{ "LZW",	COMPRESSION_LZW, TIFFLAGS, XF_COMPT, 1 },
+	{ "ZIP",	COMPRESSION_ADOBE_DEFLATE, TIFFLAGS, XF_COMPT | XF_COMPZT, 1 },
 #ifdef COMPRESSION_LZMA
-	{ "LZMA2",	COMPRESSION_LZMA, TIFFLAGS | FF_COMPLZ, 1 },
+	{ "LZMA2",	COMPRESSION_LZMA, TIFFLAGS, XF_COMPT | XF_COMPLZ, 1 },
 #endif
 #ifdef COMPRESSION_ZSTD
-	{ "ZSTD",	COMPRESSION_ZSTD, TIFFLAGS | FF_COMPZS, 1 },
+	{ "ZSTD",	COMPRESSION_ZSTD, TIFFLAGS, XF_COMPT | XF_COMPZS, 1 },
 #endif
-	{ "JPEG",	COMPRESSION_JPEG, FF_RGB | FF_COMPJ | TIFF0FLAGS },
+	{ "JPEG",	COMPRESSION_JPEG, FF_RGB | TIFF0FLAGS, XF_COMPT | XF_COMPJ },
 #ifdef COMPRESSION_WEBP
-	{ "WebP",	COMPRESSION_WEBP, FF_RGB | FF_ALPHAR | FF_COMPWT | TIFF0FLAGS },
+	{ "WebP",	COMPRESSION_WEBP, FF_RGB | FF_ALPHAR | TIFF0FLAGS, XF_COMPT | XF_COMPWT },
 #endif
 	{ NULL }
 };
@@ -3313,7 +3315,7 @@ static int save_tiff(char *file_name, ls_settings *settings)
 {
 	unsigned char buf[MAX_WIDTH / 8], *src, *row = NULL;
 	uint16 rgb[256 * 3];
-	unsigned int tflags, sflags;
+	unsigned int tflags, sflags, xflags;
 	int i, l, type, bw, af, pf, res = 0;
 	int w = settings->width, h = settings->height, bpp = settings->bpp;
 	TIFF *tif;
@@ -3365,18 +3367,19 @@ static int save_tiff(char *file_name, ls_settings *settings)
 
 	/* Write compression-specific tags */
 	TIFFSetField(tif, TIFFTAG_COMPRESSION, tiff_formats[type].id);
-	if (tflags & FF_COMPZT)
+	xflags = tiff_formats[type].xflags;
+	if (xflags & XF_COMPZT)
 		TIFFSetField(tif, TIFFTAG_ZIPQUALITY, settings->png_compression);
 #ifdef COMPRESSION_LZMA
-	if (tflags & FF_COMPLZ)
+	if (xflags & XF_COMPLZ)
 		TIFFSetField(tif, TIFFTAG_LZMAPRESET, settings->lzma_preset);
 #endif
 #ifdef COMPRESSION_ZSTD
-	if (tflags & FF_COMPZS)
+	if (xflags & XF_COMPZS)
 		TIFFSetField(tif, TIFFTAG_ZSTD_LEVEL, settings->zstd_level);
 #endif
 #ifdef COMPRESSION_WEBP
-	if (tflags & FF_COMPWT)
+	if (xflags & XF_COMPWT)
 	{
 		TIFFSetField(tif, TIFFTAG_WEBP_LEVEL, settings->webp_quality);
 		// !!! libtiff 4.0.10 *FAILS* to do it losslessly despite trying
@@ -3384,7 +3387,7 @@ static int save_tiff(char *file_name, ls_settings *settings)
 			TIFFSetField(tif, TIFFTAG_WEBP_LOSSLESS, 1);
 	}
 #endif
-	if (tflags & FF_COMPJ)
+	if (xflags & XF_COMPJ)
 		TIFFSetField(tif, TIFFTAG_JPEGQUALITY, settings->jpeg_quality);
 	if (pf) TIFFSetField(tif, TIFFTAG_PREDICTOR, PREDICTOR_HORIZONTAL);
 
@@ -5925,6 +5928,693 @@ static int save_pcx(char *file_name, ls_settings *settings)
 	return (0);
 }
 
+/* *** PREFACE ***
+ * LBM format has no one definitive documentation source, nor a good testsuite,
+ * and while I found enough examples of some types, other ones I never observed
+ * in the wild remain unsupported. If you encounter some such curiosity failing
+ * to load or loading wrong, send a bugreport with the file attached to it. */
+
+/* Macros for accessing values in Motorola byte order */
+#define GET16B(buf) (((buf)[0] << 8) + (buf)[1])
+#define GET32B(buf) (((buf)[0] << 24) + ((buf)[1] << 16) + ((buf)[2] << 8) + (buf)[3])
+#define PUT16B(buf, v) (buf)[0] = (v) >> 8; (buf)[1] = (v) & 0xFF;
+#define PUT32B(buf, v) (buf)[0] = (v) >> 24; (buf)[1] = ((v) >> 16) & 0xFF; \
+	(buf)[2] = ((v) >> 8) & 0xFF; (buf)[3] = (v) & 0xFF;
+
+/* Macros for IFF tags; big-endian too */
+#define TAG4B(A,B,C,D) (((A) << 24) + ((B) << 16) + ((C) << 8) + (D))
+#define TAG4B_FORM TAG4B('F', 'O', 'R', 'M')
+#define TAG4B_ILBM TAG4B('I', 'L', 'B', 'M')
+#define TAG4B_PBM  TAG4B('P', 'B', 'M', ' ')
+#define TAG4B_BMHD TAG4B('B', 'M', 'H', 'D')
+#define TAG4B_CMAP TAG4B('C', 'M', 'A', 'P')
+#define TAG4B_GRAB TAG4B('G', 'R', 'A', 'B')
+#define TAG4B_DEST TAG4B('D', 'E', 'S', 'T')
+#define TAG4B_CAMG TAG4B('C', 'A', 'M', 'G')
+#define TAG4B_BODY TAG4B('B', 'O', 'D', 'Y')
+/* Multipalette tags */
+#define TAG4B_SHAM TAG4B('S', 'H', 'A', 'M')
+#define TAG4B_CTBL TAG4B('C', 'T', 'B', 'L')
+#define TAG4B_PCHG TAG4B('P', 'C', 'H', 'G')
+
+/* LBM header block (BMHD tag) */
+#define BMHD_W     0 /* 16b */
+#define BMHD_H     2 /* 16b */
+#define BMHD_X0    4 /* 16b */
+#define BMHD_Y0    6 /* 16b */
+#define BMHD_BPP   8 /*  8b */
+#define BMHD_MASK  9 /*  8b */
+#define BMHD_COMP 10 /*  8b */
+#define BMHD_PAD  11 /*  8b */
+#define BMHD_TRAN 12 /* 16b */
+#define BMHD_ASPX 14 /*  8b */
+#define BMHD_ASPY 15 /*  8b */
+#define BMHD_SCW  16 /* 16b */
+#define BMHD_SCH  18 /* 16b */
+#define BMHD_SIZE 20
+
+/*  LBM DEST block */
+#define DEST_DEPTH 0 /*  8b */
+#define DEST_PAD   1 /*  8b */
+#define DEST_PICK  2 /* 16b */
+#define DEST_ONOFF 4 /* 16b */
+#define DEST_MASK  6 /* 16b */
+#define DEST_SIZE  8
+
+/* PCHG block header */
+#define PCHG_COMPR  0 /* 16b */
+#define PCHG_FLAGS  2 /* 16b */
+#define PCHG_START  4 /* 16b */
+#define PCHG_COUNT  6 /* 16b */
+#define PCHG_CHLIN  8 /* 16b */
+#define PCHG_MINR  10 /* 16b */
+#define PCHG_MAXR  12 /* 16b */
+#define PCHG_MAXCH 14 /* 16b */
+#define PCHG_TOTCH 16 /* 32b */
+#define PCHG_HSIZE 20
+
+#define HAVE_BMHD 1
+#define HAVE_CMAP 2
+#define HAVE_GRAB 4
+#define HAVE_DEST 8
+
+static int load_lbm(char *file_name, ls_settings *settings)
+{
+	static const unsigned char bitdepths[] =
+		{ 1, 2, 3, 4, 5, 6, 7, 8, 21, 24, 32 };
+	unsigned char hdr[BMHD_SIZE], dbuf[DEST_SIZE], pchdr[PCHG_HSIZE];
+	unsigned char pbuf[768], wbuf[256];
+	unsigned char *buf, *row, *dest, *mpp, *pr = NULL;
+	FILE *fp;
+	int y, ccnt, bstart, bstop, strl, np, ap, mp;
+	unsigned tag, tl;
+	int pstart = 0, ctbl = 0, ctbll = 0, pchg = 0, pchgl = 0, pcnt = 0, sh2 = 0;
+	int w, h, bpp, bits, mask, tbits, buflen, plen, half = 0, ham = 0;
+	int pbm, palsize = 0, blocks = 0, hx = 0, hy = 0, res = -1;
+	int i, j, l, p, pad, want_pal;
+
+
+	if (!(fp = fopen(file_name, "rb"))) return (-1);
+
+	/* Read the IFF header & check signature */
+	if (fread(wbuf, 1, 12, fp) < 12) goto fail;
+	if (GET32B(wbuf) != TAG4B_FORM) goto fail;
+	tag = GET32B(wbuf + 8);
+	if (!(pbm = tag == TAG4B_PBM) && !(tag == TAG4B_ILBM)) goto fail;
+
+	/* Read block headers & see what we get */
+	want_pal = (settings->mode == FS_PALETTE_LOAD) ||
+		(settings->mode == FS_PALETTE_DEF);
+	while (fread(wbuf, 1, 8, fp) == 8)
+	{
+		tag = GET32B(wbuf);
+		tl = GET32B(wbuf + 4);
+		if (tl >= LONG_MAX) break; // Sanity check
+		pad = tl & 1;
+		if (tag == TAG4B_BMHD)
+		{
+			if (tl != BMHD_SIZE) break;
+			if (fread(hdr, 1, BMHD_SIZE, fp) != BMHD_SIZE) break;
+			blocks |= HAVE_BMHD;
+			continue;
+		}
+		else if (tag == TAG4B_CMAP)
+		{
+			/* Allow palette being too long */
+			palsize = tl > 768 ? 768 : tl;
+			if (fread(pbuf, 1, palsize, fp) != palsize) break;
+			blocks |= HAVE_CMAP;
+			tl -= palsize;
+			/* If palette is all we need; hope there's only one */
+			if (want_pal)
+			{
+				res = 1;
+				break;
+			}
+			// Fallthrough
+		}
+		else if (tag == TAG4B_GRAB)
+		{
+			if ((tl != 4) || (fread(wbuf, 1, 4, fp) != 4)) break;
+			blocks |= HAVE_GRAB;
+			hx = GET16B(wbuf);
+			hy = GET16B(wbuf + 2);
+			continue;
+		}
+		else if (tag == TAG4B_DEST)
+		{
+			if (tl != DEST_SIZE) break;
+			if (fread(dbuf, 1, DEST_SIZE, fp) != DEST_SIZE) break;
+			blocks |= HAVE_DEST;
+			continue;
+		}
+		else if (tag == TAG4B_CAMG)
+		{
+			if ((tl != 4) || (fread(wbuf, 1, 4, fp) != 4)) break;
+			tag = GET32B(wbuf);
+			half = tag & 0x80;
+			ham = tag & 0x800;
+			continue;
+		}
+		else if ((tag == TAG4B_SHAM) || (tag == TAG4B_CTBL))
+		{
+			ctbl = ftell(fp);
+			ctbll = tl;
+			// SHAM has "version" word at the beginning
+			if (tag == TAG4B_SHAM) ctbl += 2 , ctbll -= 2;
+		}
+		else if (tag == TAG4B_PCHG)
+		{
+			if ((tl < PCHG_HSIZE) ||
+				(fread(pchdr, 1, PCHG_HSIZE, fp) != PCHG_HSIZE)) break;
+			pchg = ftell(fp);
+			pchgl = tl -= PCHG_HSIZE;
+		}
+		else if (tag == TAG4B_BODY)
+		{
+			/* Palette & header must be before body */
+			if (!want_pal && (blocks & HAVE_BMHD)) res = 0;
+			break;
+		}
+		/* Default: skip (the rest of) tag data */
+		tl += pad;
+		if (tl && fseek(fp, tl, SEEK_CUR)) break;
+	}
+	if (res < 0) goto fail;
+
+	/* Parse bitplanes */
+	tbits = !(blocks & HAVE_BMHD) ? 0 : // Palette may happen before header
+		blocks & HAVE_DEST ? dbuf[DEST_DEPTH] : hdr[BMHD_BPP];
+
+	/* Prepare palette */
+	if (blocks & HAVE_CMAP)
+	{
+		/* Corrective multipliers to counteract dumb shift */
+		static const unsigned char mult[8] =
+			{ 128, 128, 130, 132, 136, 146, 170, 255 };
+
+		/* Limit palette to actual bitplanes */
+		l = palsize / 3;
+		if (tbits && (tbits < 9))
+		{
+			i = tbits;
+			if (ham) i = i > 6 ? 6 : 4;
+			else if (half && (i > 5)) i = 5;
+			i = 1 << i;
+			if (l > i) l = i;
+		}
+		/* Detect and correct palettes where 6..1-bit color was shifted
+		 * left by 2..7 without replicating high bits into low */
+		l *= 3;
+		for (i = 0 , j = 0x80; i < l; i++) j |= pbuf[i];
+		for (i = 0; !(j & 1); i++) j >>= 1;
+		for (j = mult[i] , i = 0; i < l; i++)
+			pbuf[i] = (pbuf[i] * j) >> 7;
+		/* Apply half-brite mode */
+		if (half && (l <= 32 * 3))
+		{
+			memset(pbuf + l, 0, 32 * 3 - l);
+			for (i = 0; i < l; i++)
+				pbuf[i + 32 * 3] = pbuf[i] >> 1;
+			l += 32 * 3;
+		}
+		/* Store the result */
+		copy_rgb_pal(settings->pal, pbuf, settings->colors = l / 3);
+	}
+	if (want_pal) goto fail;
+
+	/* Check sanity */
+	res = -1;
+	if (hdr[BMHD_COMP] > 1) goto fail; // Unknown compression type
+	bits = hdr[BMHD_BPP];
+	if (!memchr(bitdepths, bits, sizeof(bitdepths))) goto fail;
+	if (ham)
+	{
+ 		if ((bits < 5) || (bits > 8)) goto fail;
+		// No reason for grayscale HAM to exist
+		if (!(blocks & HAVE_CMAP)) goto fail;
+		ham = bits > 6 ? 6 : 4; // Shift value
+	}
+	if (ctbl)
+	{
+		h = GET16B(hdr + BMHD_H);
+		sh2 = ctbll == (h >> 1) * 32;
+		if (!sh2 && (ctbll != h * 32)) goto fail; // Size must match
+		pchg = pchgl = 0; // If both present, simpler is better
+		if (bits > (ham ? 6 : 4)) goto fail;
+	}
+	if (pchg)
+	{
+		/* No examples of anything but uncompressed 12-bit PCHG blocks,
+		 * so no reason to waste code supporting anything else */
+		if (GET16B(pchdr + PCHG_COMPR)) goto fail;
+		if (GET16B(pchdr + PCHG_FLAGS) != 1) goto fail;
+		if (bits > (half || ham ? 6 : 5)) goto fail;
+		pstart = GET16B(pchdr + PCHG_START);
+		pcnt = GET16B(pchdr + PCHG_COUNT);
+
+	}
+	mask = hdr[BMHD_MASK] == 1;
+	if (pbm && (mask || ham || ctbl || pchg || (bits != 8)))
+		goto fail; // Not compatible
+
+	/* DEST block if any */
+	if (blocks & HAVE_DEST)
+	{
+		unsigned skip, setv, v;
+
+		/* For simplicity, as no one ever saw files w/DEST anyway */
+		if ((tbits < bits) || (tbits > 8) || ham) goto fail;
+		/* Make a lookup table for remapping bits after the fact;
+		 * ignore planeMask in hope it masks only planeOnOff */
+		skip = ((1 << tbits) - 1) & ~GET16B(dbuf + DEST_PICK); // Skipmask
+		setv = skip & GET16B(dbuf + DEST_ONOFF); // Setmask
+		for (v = i = 0; !(i >> bits); i++)
+		{
+			wbuf[i] = v | setv;
+			v = (v + skip + 1) & ~skip; // Increment across gaps
+		}
+	}
+	/* 21-bit RGB */
+	else if (bits == 21)
+	{
+		set_xlate(wbuf, 7);
+		blocks |= HAVE_DEST; // !!! Let same xlate do either thing
+	}
+
+	/* Make greyscale palette if needed */
+	if ((tbits <= 8) && !(blocks & HAVE_CMAP))
+		mem_bw_pal(settings->pal, 0, (settings->colors = 1 << tbits) - 1);
+
+	/* Transparent color - nearly always a glitch, rarely a real thing */
+	if (!lbm_untrans && (hdr[BMHD_MASK] > 1))
+	{
+		j = GET16B(hdr + BMHD_TRAN);
+		if (j < settings->colors) settings->xpm_trans = j;
+	}
+
+	if (blocks & HAVE_GRAB) settings->hot_x = hx , settings->hot_y = hy;
+
+	/* Allocate buffer and image */
+	settings->width = w = GET16B(hdr + BMHD_W);
+	settings->height = h = GET16B(hdr + BMHD_H);
+	plen = ctbll + pchgl;
+	settings->bpp = bpp = ham || plen || (bits > 8) ? 3 : 1;
+	buflen = pbm ? w + (w & 1) : ((w + 15) >> 4) * 2 * (bits + mask);
+	buf = multialloc(MA_ALIGN_DEFAULT, &buf, PCX_BUFSIZE, &row, buflen,
+		&mpp, plen, NULL);
+	res = FILE_MEM_ERROR;
+	if (!buf) goto fail;
+	i = bits == 32 ? CMASK_RGBA : CMASK_IMAGE;
+	if (mask) i |= CMASK_FOR(lbm_mask);
+	if ((res = allocate_image(settings, i))) goto fail2;
+	if (!pbm) // Prepare for writes by OR
+	{
+		memset(settings->img[CHN_IMAGE], 0, w * h * bpp);
+		if (settings->img[CHN_ALPHA])
+			memset(settings->img[CHN_ALPHA], 0, w * h);
+		if ((i & ~CMASK_RGBA) && settings->img[lbm_mask])
+			memset(settings->img[lbm_mask], 0, w * h);
+	}
+
+	/* Load color change table if any */
+	if (plen)
+	{
+		long b = ftell(fp);
+		if (fseek(fp, ctbl + pchg, SEEK_SET) ||
+			(fread(mpp, 1, plen, fp) != plen)) goto fail2;
+		fseek(fp, b, SEEK_SET);
+		if (!ham) ham = 8; // Use same decoding loop in mode 0
+		pr = mpp + ((pcnt + 31) >> 5) * 4;
+	}
+
+	/* Read and decode the file */
+	if (!settings->silent) ls_init("LBM", 0);
+	res = FILE_LIB_ERROR;
+	ap = bits > 24 ? 24 : -1; // First alpha plane
+	if (!settings->img[CHN_ALPHA]) ap = -1; // No alpha
+	mp = bits; // Mask plane
+	if (!mask || !lbm_mask || !settings->img[lbm_mask] ||
+		((lbm_mask == CHN_ALPHA) && (ap > 0))) mp = -1;
+	np = mp > 0 ? bits + 1 : (ap > 0) || (bits < 24) ? bits : 24; // Planes to read
+	y = ccnt = 0;
+	if (!hdr[BMHD_COMP]) ccnt = buflen * h; // Uncompressed is file-sized copy run
+	bstart = bstop = PCX_BUFSIZE;
+	strl = buflen;
+	while (TRUE)
+	{
+		/* Keep the buffer filled */
+		if (bstart >= bstop)
+		{
+			bstart -= bstop;
+			bstop = fread(buf, 1, PCX_BUFSIZE, fp);
+			if (bstop <= bstart) goto fail3; /* Truncated file */
+		}
+
+		/* Decode data */
+		if (ccnt < 0) /* Middle of a repeat run */
+		{
+			int l = strl + ccnt < 0 ? strl : -ccnt;
+			memset(row + buflen - strl, buf[bstart], l);
+			strl -= l; bstart += !(ccnt += l);
+		}
+		else if (ccnt > 0) /* Middle of a copy run */
+		{
+			int l = strl < ccnt ? strl : ccnt;
+			if (l > bstop - bstart) l = bstop - bstart;
+			memcpy(row + buflen - strl, buf + bstart, l);
+			strl -= l; ccnt -= l; bstart += l;
+		}
+		else /* Start of a run */
+		{
+			ccnt = buf[bstart];
+			ccnt += ccnt < 128 ? 1 : -257;
+			bstart++;
+		}
+		if (strl) continue;
+
+		/* Store a line */
+		p = y * w;
+		dest = settings->img[CHN_IMAGE] + p * bpp;
+		if (pbm) memcpy(dest, row, w);
+		while (!pbm)
+		{
+			unsigned char *dsta = NULL, *dstm = NULL;
+			unsigned char uninit_(v), *tmp, *dp;
+			int i, n, plane, step = bpp;
+
+			if (ap > 0) dsta = settings->img[CHN_ALPHA] + p;
+			if (mp > 0) dstm = settings->img[lbm_mask] + p;
+			for (plane = 0; plane < np; plane++)
+			{
+				tmp = row + ((w + 15) >> 4) * 2 * plane;
+				if (bits == 21)
+					dp = dest + plane % 3 , n = 1 + plane / 3;
+				else dp = dest + (plane >> 3) , n = 7 - (plane & 7);
+				if (plane == mp) dp = dstm , step = 1; // Mask
+				else if (plane >= 24) dp = dsta , step = 1; // Alpha
+				if (!dp) continue; // Skipping alpha till mask
+				for (i = 0; i < w; i++ , v += v , dp += step)
+				{
+					if (!(i & 7)) v = *tmp++;
+					*dp |= (v & 0x80) >> n;
+				}
+			}
+
+			if (!ham) break;
+
+			/* Multipalette, simpler kind */
+			if (ctbl && !(y & sh2))
+			{
+				unsigned char *dest = pbuf;
+				for (i = 0; i < 16; i++ , pr += 2 , dest += 3)
+				{
+					int v = GET16B(pr);
+					dest[0] = ((v >> 8) & 0xF) * 0x11;
+					dest[1] = ((v >> 4) & 0xF) * 0x11;
+					dest[2] = (v & 0xF) * 0x11;
+				}
+			}
+			/* Multipalette, complex kind */
+			while (pchg && (y >= pstart) && (y < pstart + pcnt))
+			{
+				unsigned char *dest;
+				int n, n16, v, i, j;
+				i = y - pstart;
+				j = (i >> 5) * 4;
+				if (!(((unsigned)GET32B(mpp + j) >> (~i & 0x1F)) & 1))
+					break; // Nothing to do for this line
+				n16 = pr[1]; // Colors 16-31 for this many
+				n = pr[0] + n16; // Total indices
+				pr += 2;
+				while (n-- > 0)
+				{
+					v = GET16B(pr);
+					pr += 2;
+					dest = pbuf + (n < n16) * 16 * 3 + (v >> 12) * 3;
+					dest[0] = ((v >> 8) & 0xF) * 0x11;
+					dest[1] = ((v >> 4) & 0xF) * 0x11;
+					dest[2] = (v & 0xF) * 0x11;
+				}
+				if (half) for (i = 0; i < 32 * 3; i++)
+					pbuf[i + 32 * 3] = pbuf[i] >> 1;
+				break;
+			}
+
+			/* Recode the row */
+			/* !!! Start with palette color 0 as amigaos.net says and
+			 * GrafX2 does, not RGB 0 as ilbmtopnm does */
+			tmp = pbuf;
+			dp = dest;
+			for (i = 0; i < w; i++ , dp += 3)
+			{
+				n = (v = *dp) >> ham;
+				if (!n) tmp = pbuf + v * 3; // Palette color
+				dp[0] = tmp[0];
+				dp[1] = tmp[1];
+				dp[2] = tmp[2];
+				tmp = dp;
+				if (!n) continue;
+				v ^= n << ham;
+				n ^= (n >> 1) ^ 3; // 0BRG -> RGB
+				/* !!! In HAM8, preserve low 2 bits as Amiga docs
+				 * say and ilbmtopnm does; but in HAM6, put value
+				 * into lower & upper bits like GrafX2 and unlike
+				 * ilbmtopnm: those old Amigas did not HAVE any
+				 * color bits beyond the 4 */
+				dp[n] = ham == 4 ? v + (v << 4) :
+					(v << 2) + (dp[n] & 3);
+			}
+			break;
+		}
+		ls_progress(settings, y, 10);
+		if (++y >= h) break;
+		strl = buflen;
+	}
+	res = 1;
+
+	/* Finalize DEST or 21-bit */
+	if (blocks & HAVE_DEST) do_xlate(wbuf, settings->img[CHN_IMAGE], w * h * bpp);
+	/* Finalize mask */
+	if (mp < 0); // No mask
+	else if (is_filled(settings->img[lbm_mask], settings->img[lbm_mask][0], w * h))
+		deallocate_image(settings, CMASK_FOR(lbm_mask)); // Useless mask
+	else
+	{
+		memset(wbuf + 1, 255, 255); // Nonzero means fully opaque
+		wbuf[0] = 0;
+		do_xlate(wbuf, settings->img[lbm_mask], w * h);
+	}
+
+fail3:	if (!settings->silent) progress_end();
+fail2:	free(buf);
+fail:	fclose(fp);
+	return (res);
+}
+
+static int save_lbm(char *file_name, ls_settings *settings)
+{
+	unsigned char *buf, *wb, *src, *dest;
+	FILE *fp;
+	long bstart, fend;
+	int w = settings->width, h = settings->height, bpp = settings->bpp;
+	int pbm = settings->lbm_pbm && (bpp == 1), comp = !!settings->lbm_pack;
+	int i, j, l, rl, plane, st, cnt, np = 0, mask = 0;
+
+	/* Count bitplanes */
+	if (!pbm)
+	{
+		mask = settings->img[lbm_mask] ? lbm_mask : 0;
+		if (bpp == 1) // Planes to hold indexed color
+		{
+			i = settings->colors - 1;
+			if (i > 15) np = 4 , i >>= 4;
+			if (i > 3) np += 2 , i >>= 2;
+			if (i > 1) np++ , i >>= 1;
+			np += i;
+		}
+		else np = settings->img[CHN_ALPHA] ? 32 : 24; // RGBA/RGB
+		if ((np == 32) && (mask == CHN_ALPHA)) mask = 0; // No need
+	}
+
+	/* Allocate buffer */
+	rl = pbm ? w + (w & 1) : ((w + 15) >> 4) * 2; // One plane
+	i = rl + (rl + 127) / 128; // Worst-case RLE expansion
+	if (!pbm) i *= np + !!mask; // Buffer all planes
+	i += comp * rl; // Uncompressed source
+	if (i < 8 + 768) i = 8 + 768; // For CMAP & header
+	buf = calloc(1, i); // Zeroing out is for header
+	if (!buf) return (-1);
+	wb = buf + comp * rl; // Compressed data go here
+	
+	if (!(fp = fopen(file_name, "wb")))
+	{
+		free(buf);
+		return (-1);
+	}
+
+	/* Prepare header */
+	memcpy(buf, "FORM\0\0\0\0", 8);
+	memcpy(buf + 8, pbm ? "PBM " : "ILBM", 4);
+	memcpy(buf + 12, "BMHD", 4);
+	PUT32B(buf + 16, BMHD_SIZE);
+	PUT16B(buf + 20 + BMHD_W, w);
+	PUT16B(buf + 20 + BMHD_H, h);
+	buf[20 + BMHD_BPP] = pbm ? 8 : np;
+	buf[20 + BMHD_MASK] = mask ? 1 : 0;
+	buf[20 + BMHD_COMP] = comp;
+	if (!mask && (settings->xpm_trans >= 0))
+	{
+		buf[20 + BMHD_MASK] = 2;
+		PUT16B(buf + 20 + BMHD_TRAN, settings->xpm_trans);
+	}
+	buf[20 + BMHD_ASPX] = buf[20 + BMHD_ASPY] = 1;
+	/* Leave page size unset */
+//	PUT16B(buf + 20 + BMHD_W, w);
+//	PUT16B(buf + 20 + BMHD_H, h);
+	fwrite(buf, 1, 20 + BMHD_SIZE, fp);
+
+	/* Palette (none for RGB/RGBA, to avoid confusing readers) */
+	if (bpp == 1)
+	{
+		memcpy(buf, "CMAP", 4);
+		i = settings->colors * 3;
+		i += i & 1; // Align the size itself, as in every example observed
+		PUT32B(buf + 4, i);
+		pal2rgb(buf + 8, settings->pal);
+		fwrite(buf, 1, 8 + i, fp);
+	}
+
+	/* Anchor point */
+	if ((settings->hot_x >= 0) && (settings->hot_y >= 0))
+	{
+		memcpy(buf, "GRAB", 4);
+		PUT32B(buf + 4, 4);
+		PUT16B(buf + 8, settings->hot_x);
+		PUT16B(buf + 10, settings->hot_y);
+		fwrite(buf, 1, 8 + 4, fp);
+	}
+
+	/* Compress & write pixel rows */
+	if (!settings->silent) ls_init("LBM", 1);
+	fwrite("BODY\0\0\0\0", 1, 8, fp);
+	bstart = ftell(fp);
+	l = np + (pbm || mask); // Total planes
+	for (i = 0; i < h; i++)
+	{
+		src = settings->img[CHN_IMAGE] + w * bpp * i;
+		dest = wb;
+		for (plane = 0; plane < l; plane++)
+		{
+			unsigned char v, *d, *s = src + (plane >> 3);
+			int n = plane & 7, step = bpp;
+
+			d = comp ? buf : dest;
+			if (pbm)
+			{
+				/* Copy indexed row */
+				memcpy(d, src, w);
+				d += w;
+			}
+			else
+			{
+				/* Extract a bitplane */
+				if (plane >= 24) // Alpha
+					s = settings->img[CHN_ALPHA] + w * i , step = 1;
+				if (plane == np) // Mask - threshold at 128
+					s = settings->img[mask] + w * i , step = 1 , n = 7;
+				for (j = v = 0; j < w; j++ , s += step)
+				{
+					v |= ((*s >> n) & 1) << (~j & 7);
+					if (~j & 7) continue;
+					*d++ = v;
+					v = 0;
+				}
+				if (w & 7) *d++ = v;
+			}
+			if ((d - buf) & 1) *d++ = 0; // Align
+
+			if (!comp)
+			{
+				dest = d;
+				continue;
+			}
+
+			/* Compress a bitplane */
+#define FILL 1
+#define EMIT 2
+#define STOP 4
+#define NFIL 8
+			s = buf;
+			st = cnt = 0;
+			while (TRUE)
+			{
+				if (d - s <= 0) st |= EMIT + STOP;
+				else if (cnt == 128) st |= EMIT;
+				else if (st & FILL)
+				{
+					if (s[0] != *(s - 1)) st = EMIT + FILL;
+				}
+				else if ((d - s > 1) && (s[0] == s[1]))
+				{
+				/* Code pairs as repeats only when NOT following
+				 * a copy block; code triples as repeats always */
+					if (!cnt || ((d - s > 2) && (s[0] == s[2])))
+						st = EMIT + NFIL;
+				}
+				if (!(st & EMIT))
+				{
+					s++ , cnt++;
+					continue;
+				}
+				if (st & FILL)
+				{
+					*dest++ = 257 - cnt;
+					*dest++ = *(s - 1);
+				}
+				else if (cnt)
+				{
+					*dest++ = cnt - 1;
+					memcpy(dest, s - cnt, cnt);
+					dest += cnt;
+				}
+				if (st & STOP) break;
+				if (st & NFIL)
+				{
+					s += cnt = 2;
+					st = FILL;
+				}
+				else st = cnt = 0;
+			}
+#undef FILL
+#undef EMIT
+#undef STOP
+#undef NFIL
+		}
+		fwrite(wb, 1, dest - wb, fp);
+		ls_progress(settings, i, 20);
+	}
+
+	/* Align last block & write sizes */
+	fend = ftell(fp);
+	l = fend - bstart;
+	if (l & 1) fwrite("", 1, 1, fp); // Padding
+	PUT32B(buf, l);
+	fseek(fp, bstart - 4, SEEK_SET);
+	fwrite(buf, 1, 4, fp);
+	l = fend - 8;
+	l += l & 1; // Aligned
+	PUT32B(buf, l);
+	fseek(fp, 4, SEEK_SET);
+	fwrite(buf, 1, 4, fp);
+	fclose(fp);
+
+	if (!settings->silent) progress_end();
+
+	free(buf);
+	return (0);
+}
+
 typedef void (*cvt_func)(unsigned char *dest, unsigned char *src, int len,
 	int bpp, int step, int maxval);
 
@@ -7330,6 +8020,7 @@ static int save_image_x(char *file_name, ls_settings *settings, memFILE *mf)
 	case FT_LSS: res = save_lss(file_name, &setw); break;
 	case FT_TGA: res = save_tga(file_name, &setw); break;
 	case FT_PCX: res = save_pcx(file_name, &setw); break;
+	case FT_LBM: res = save_lbm(file_name, &setw); break;
 	case FT_PBM: res = save_pbm(file_name, &setw); break;
 	case FT_PPM: res = save_ppm(file_name, &setw); break;
 	case FT_PAM: res = save_pam(file_name, &setw); break;
@@ -7510,6 +8201,7 @@ static int load_image_x(char *file_name, memFILE *mf, int mode, int ftype,
 	case FT_LSS: res0 = load_lss(file_name, &settings); break;
 	case FT_TGA: res0 = load_tga(file_name, &settings); break;
 	case FT_PCX: res0 = load_pcx(file_name, &settings); break;
+	case FT_LBM: res0 = load_lbm(file_name, &settings); break;
 	case FT_PBM:
 	case FT_PGM:
 	case FT_PPM:
@@ -7972,6 +8664,8 @@ static int do_detect_format(char *name, FILE *fp)
 #else
 		return (FT_NONE);
 #endif
+	if (!memcmp(buf, "FORM", 4) && (!memcmp(buf + 8, "ILBM", 4) ||
+		!memcmp(buf + 8, "PBM ", 4))) return (FT_LBM);
 	if (!memcmp(buf, "BM", 2)) return (FT_BMP);
 
 	if (!memcmp(buf, "\x3D\xF3\x13\x14", 4)) return (FT_LSS);

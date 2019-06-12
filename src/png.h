@@ -59,6 +59,7 @@ enum {
 	FT_SVG,
 	FT_PMM,
 	FT_WEBP,
+	FT_LBM,
 	NUM_FTYPES
 };
 
@@ -67,39 +68,43 @@ enum {
 #define FTM_UNDO    0x0200 /* Allow undoing */
 #define FTM_FRAMES  0x0400 /* Allow frameset use */
 
-/* Features supported by file formats */
-#define FF_BW      0x0000001 /* Black and white */
-#define FF_16      0x0000002 /* 16 colors */
-#define FF_256     0x0000004 /* 256 colors */
-#define FF_IDX     0x0000007 /* Indexed image */
-#define FF_RGB     0x0000008 /* Truecolor */
-#define FF_IMAGE   0x000000F /* Image of any kind */
-#define FF_ANIM    0x0000010 /* Animation */
-#define FF_ALPHAI  0x0000020 /* Alpha channel for indexed images */
-#define FF_ALPHAR  0x0000040 /* Alpha channel for RGB images */
-#define FF_ALPHA   0x0000060 /* Alpha channel for all images */
-#define FF_MULTI   0x0000080 /* Multiple channels */
-#define FF_TRANS   0x0000100 /* Indexed transparency */
-#define FF_COMPJ   0x0000200 /* JPEG compression */
-#define FF_COMPZ   0x0000400 /* PNG zlib compression */
-#define FF_COMPR   0x0000800 /* RLE compression */
-#define FF_COMPJ2  0x0001000 /* JPEG2000 compression */
-#define FF_COMPZT  0x0002000 /* TIFF deflate compression */
-#define FF_COMPLZ  0x0004000 /* TIFF LZMA2 compression */
-#define FF_COMPT   0x0008000 /* TIFF selectable compression */
-#define FF_SPOT    0x0010000 /* "Hot spot" */
-#define FF_LAYER   0x0020000 /* Layered images */
-#define FF_PALETTE 0x0040000 /* Palette file (not image) */
-#define FF_RMEM    0x0080000 /* Can be read from memory */
-#define FF_WMEM    0x0100000 /* Can be written to memory */
-#define FF_MEM     0x0180000 /* Both of the above */
-#define FF_NOSAVE  0x0200000 /* Can be read but not written */
-#define FF_SCALE   0x0400000 /* Freely scalable (vector format) */
-#define FF_COMPV8  0x0800000 /* WebP V8 compression */
-#define FF_COMPV8L 0x1000000 /* WebP V8L compression */
-#define FF_COMPW   0x2000000 /* WebP selectable compression */
-#define FF_COMPWT  0x4000000 /* TIFF WebP compression */
-#define FF_COMPZS  0x8000000 /* TIFF ZSTD compression */
+/* Primary features supported by file formats */
+#define FF_BW      0x0001 /* Black and white */
+#define FF_16      0x0002 /* 16 colors */
+#define FF_256     0x0004 /* 256 colors */
+#define FF_IDX     0x0007 /* Indexed image */
+#define FF_RGB     0x0008 /* Truecolor */
+#define FF_IMAGE   0x000F /* Image of any kind */
+#define FF_ANIM    0x0010 /* Animation */
+#define FF_ALPHAI  0x0020 /* Alpha channel for indexed images */
+#define FF_ALPHAR  0x0040 /* Alpha channel for RGB images */
+#define FF_ALPHA   0x0060 /* Alpha channel for all images */
+#define FF_MULTI   0x0080 /* Multiple channels */
+#define FF_LAYER   0x0100 /* Layered images */
+#define FF_PALETTE 0x0200 /* Palette file (not image) */
+#define FF_RMEM    0x0400 /* Can be read from memory */
+#define FF_WMEM    0x0800 /* Can be written to memory */
+#define FF_MEM     0x0C00 /* Both of the above */
+#define FF_NOSAVE  0x1000 /* Can be read but not written */
+#define FF_SCALE   0x2000 /* Freely scalable (vector format) */
+
+/* Configurable features of file formats */
+#define XF_TRANS   0x0001 /* Indexed transparency */
+#define XF_SPOT    0x0002 /* "Hot spot" */
+#define XF_COMPJ   0x0004 /* JPEG compression */
+#define XF_COMPZ   0x0008 /* PNG zlib compression */
+#define XF_COMPR   0x0010 /* RLE compression */
+#define XF_COMPJ2  0x0020 /* JPEG2000 compression */
+#define XF_COMPZT  0x0040 /* TIFF deflate compression */
+#define XF_COMPLZ  0x0080 /* TIFF LZMA2 compression */
+#define XF_COMPWT  0x0100 /* TIFF WebP compression */
+#define XF_COMPZS  0x0200 /* TIFF ZSTD compression */
+#define XF_COMPT   0x0400 /* TIFF selectable compression */
+#define XF_COMPV8  0x0800 /* WebP V8 compression */
+#define XF_COMPV8L 0x1000 /* WebP V8L compression */
+#define XF_COMPW   0x2000 /* WebP selectable compression */
+#define XF_COMPRL  0x4000 /* LBM RLE compression */
+#define XF_PBM     0x8000 /* "Planar" LBM, aka PBM */
 
 #define FF_SAVE_MASK (mem_img_bpp == 3 ? FF_RGB : mem_cols > 16 ? FF_256 : \
 	mem_cols > 2 ? FF_16 | FF_256 : FF_IDX)
@@ -116,7 +121,7 @@ enum {
 
 typedef struct {
 	char *name, *ext, *ext2;
-	unsigned int flags;
+	unsigned int flags, xflags;
 } fformat;
 
 extern fformat file_formats[];
@@ -126,7 +131,7 @@ extern fformat file_formats[];
 typedef struct {
 	char *name;
 	int id;
-	unsigned int flags;
+	unsigned int flags, xflags;
 	int pflag;
 } tiff_format;
 
@@ -151,6 +156,7 @@ typedef struct {
 	int tga_RLE;
 	int jp2_rate;
 	int webp_preset, webp_quality, webp_compression;
+	int lbm_pack, lbm_pbm;
 	int gif_delay;
 	int rgb_trans;
 	int silent;
@@ -168,6 +174,7 @@ int silence_limit, jpeg_quality, png_compression;
 int tga_RLE, tga_565, tga_defdir, jp2_rate;
 int lzma_preset, zstd_level, tiff_predictor, tiff_rtype, tiff_itype, tiff_btype;
 int webp_preset, webp_quality, webp_compression;
+int lbm_mask, lbm_untrans, lbm_pack, lbm_pbm;
 int apply_icc;
 
 int file_type_by_ext(char *name, guint32 mask);

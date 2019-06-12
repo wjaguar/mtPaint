@@ -141,6 +141,8 @@ static int tablet_preview(pref_dd *dt, void **wdata, int what, void **where,
 	return (TRUE);
 }
 
+static char *xchans[NUM_CHANNELS];
+
 ///	V-CODE
 
 #define WBbase pref_dd
@@ -235,10 +237,10 @@ static void *pref_code[] = {
 	CHECKv(_("Apply colour profile"), apply_icc),
 #endif
 	WDONE,
+	BORDER(OPT, 2),
 #ifdef U_TIFF
 ///	---- TAB5 - TIFF
 	PAGE("TIFF"), GROUPN,
-	BORDER(OPT, 2),
 	TABLE2(5),
 // !!! Here also DPI (default)
 	TOPTDv(_("Compression (RGB)"), tiffrs, tiff_rtype),
@@ -257,7 +259,6 @@ static void *pref_code[] = {
 #ifdef U_WEBP
 ///	---- TAB6 - WebP
 	PAGE("WebP"), GROUPN,
-	BORDER(OPT, 2),
 	TABLE2(3),
 	TOPTv(_("Compression mode"), webp_presets, 0, webp_preset),
 	TSPINv(_("V8 Save Quality (100=High)"), webp_quality, 0, 100),
@@ -265,9 +266,18 @@ static void *pref_code[] = {
 	WDONE,
 	WDONE,
 #endif
+///	---- TAB7 - LBM
+	PAGE("LBM"), GROUPN,
+	TABLE2(1),
+	TOPTv(_("Channel for Mask Plane"), xchans, NUM_CHANNELS, lbm_mask),
+	WDONE,
+	CHECKv(_("Ignore Transparent Colour"), lbm_untrans),
+	CHECKv(_("PackBits Compression"), lbm_pack),
+	CHECKv(_("Write Indexed as Planar Bitmap (PBM)"), lbm_pbm),
+	WDONE,
 	/* !!! Interface is not scriptable */
 	UNLESSx(script, 1),
-///	---- TAB7 - PATHS
+///	---- TAB8 - PATHS
 	PAGE(_("Paths")),
 	PATHv(_("Clipboard Files"), _("Select Clipboard File"),
 		FS_CLIP_FILE, mem_clip_file),
@@ -284,7 +294,7 @@ static void *pref_code[] = {
 		FS_SELECT_FILE, DEFAULT_THEME_INI),
 #endif
 	WDONE,
-///	---- TAB8 - STATUS BAR
+///	---- TAB9 - STATUS BAR
 	PAGE(_("Status Bar")),
 	CHECKv(_("Canvas Geometry"), status_on[0]),
 	CHECKv(_("Cursor X,Y"), status_on[1]),
@@ -292,7 +302,7 @@ static void *pref_code[] = {
 	CHECKv(_("Selection Geometry"), status_on[3]),
 	CHECKv(_("Undo / Redo"), status_on[4]),
 	WDONE,
-///	---- TAB9 - TABLET
+///	---- TAB10 - TABLET
 	PAGE(_("Tablet")),
 	FVBOXB(_("Device Settings")),
 	BORDER(LABEL, 0),
@@ -359,6 +369,11 @@ void pressed_preferences()
 	}
 #endif
 	snprintf(txt, sizeof(txt), "%s (%%)", __("Factor"));
+	if (!xchans[0])
+	{
+		memcpy(xchans, channames_, sizeof(xchans));
+		xchans[CHN_IMAGE] = _("None");
+	}
 
 	run_create_(pref_code, &tdata, sizeof(tdata), script_cmds);
 }

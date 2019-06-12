@@ -81,6 +81,8 @@ static inilist ini_bool[] = {
 	{ "sharperReduce",	&sharper_reduce,	FALSE },
 	{ "tga565",		&tga_565,		FALSE },
 	{ "tgaDefdir",		&tga_defdir,		FALSE },
+	{ "tgaRLE",		&tga_RLE,		FALSE },
+	{ "lbmPBM",		&lbm_pbm,		FALSE },
 	{ "disableTransparency", &opaque_view,		FALSE },
 	{ "smudgeOpacity",	&smudge_mode,		FALSE },
 	{ "showMenuIcons",	&show_menu_icons,	FALSE },
@@ -111,6 +113,8 @@ static inilist ini_bool[] = {
 	{ "defaultGamma",	&use_gamma,		TRUE  },
 	{ "undoableLoad",	&undo_load,		TRUE  },
 	{ "tiffPredictor",	&tiff_predictor,	TRUE  },
+	{ "lbmPack",		&lbm_pack,		TRUE  },
+	{ "lbmIgnoreTrans",	&lbm_untrans,		TRUE  },
 #if STATUS_ITEMS != 5
 #error Wrong number of "status?Toggle" inifile items defined
 #endif
@@ -141,13 +145,13 @@ static inilist ini_bool[] = {
 static inilist ini_int[] = {
 	{ "jpegQuality",	&jpeg_quality,		85  },
 	{ "pngCompression",	&png_compression,	9   },
-	{ "tgaRLE",		&tga_RLE,		0   },
 	{ "jpeg2000Rate",	&jp2_rate,		1   },
 	{ "lzmaPreset",		&lzma_preset,		9   },
 	{ "zstdLevel",		&zstd_level,		9   },
 	{ "webpPreset",		&webp_preset,		1   },
 	{ "webpQuality",	&webp_quality,		90  },
 	{ "webpCompression",	&webp_compression,	9   },
+	{ "lbmMask",		&lbm_mask,		CHN_MASK },
 	{ "silence_limit",	&silence_limit,		18  },
 	{ "gradientOpacity",	&grad_opacity,		128 },
 	{ "gridMin",		&mem_grid_min,		8   },
@@ -3152,7 +3156,7 @@ static int paint_canvas(void *dt, void **wdata, int what, void **where,
 				0, layers_total, FALSE);
 			if (!vp2) break; // Nothing here, move along
 			// !!! Heuristic weight; maybe 1/8 would be better?
-			vpix += (vp2 - vpix) / 4;
+			vpix += vp2 / 4 - vpix / 4;
 
 			u.rgb += ((u.cxy[1] - py + margin_main_y) * pw +
 				u.cxy[0] - px + margin_main_x) * 3;

@@ -1,5 +1,5 @@
 /*	main.c
-	Copyright (C) 2004-2014 Mark Tyler and Dmitry Groshev
+	Copyright (C) 2004-2019 Mark Tyler and Dmitry Groshev
 
 	This file is part of mtPaint.
 
@@ -34,8 +34,14 @@
 #include "csel.h"
 #include "spawn.h"
 
+static int compare_names(const void *s1, const void *s2)
+{
+	return (s1 == s2 ? 0 : strcoll(*(const char **)s1, *(const char **)s2));
+}
+
 #ifndef WIN32
 #include <glob.h>
+#define PATHC_TYPE size_t
 #else
 
 /* This is Windows only, as POSIX systems have glob() implemented */
@@ -52,6 +58,8 @@ typedef struct {
 	char **gl_pathv;
 	int gl_flags;
 } glob_t;
+
+#define PATHC_TYPE int
 
 static void globfree(glob_t *pglob)
 {
@@ -130,11 +138,6 @@ static int glob_add_file(glob_t *pglob, char *buf)
 	if (!(pglob->gl_pathv[l++] = strdup(buf))) return (-1);
 	pglob->gl_pathv[pglob->gl_pathc = l] = NULL;
 	return (0);
-}
-
-static int glob_compare_names(const void *s1, const void *s2)
-{
-	return (s1 == s2 ? 0 : strcoll(*(const char **)s1, *(const char **)s2));
 }
 
 /* This implementation is strictly limited to mtPaint's needs, and tuned for
@@ -243,18 +246,104 @@ mfail:		globfree(pglob);
 
 	/* Sort the names */
 	qsort(pglob->gl_pathv + prevcnt, pglob->gl_pathc - prevcnt,
-		sizeof(char *), glob_compare_names);
+		sizeof(char *), compare_names);
 
 	return (0);
 }
 
 #endif
 
+static char **flist;
+int flist_len, flist_top;
+int warnmax;
+
+static int extend_flist(int n, int ntoo)
+{
+	char **tmp;
+
+	/* Limit the sum & guard against overflow */
+	n = n > FILES_MAX - ntoo ? FILES_MAX : n + ntoo;
+	n = n > FILES_MAX - flist_top ? FILES_MAX : n + flist_top;
+
+	if (n > flist_len)
+	{
+		n = (n + 1023) & ~1023; // Align
+		if ((tmp = realloc(flist, n * sizeof(char *))))
+		{
+			flist = tmp;
+			flist_len = n;
+		}
+	}
+	return (flist_len - flist_top);
+}
+
+#ifdef WIN32
+#define LSEP "\r\n"
+#else
+#define LSEP "\n"
+#endif
+
+static void add_filelist(char *name, int nf)
+{
+	char *what, *t, *err;
+	int i, l, lf = 0, a0 = 0;
+
+	if (warnmax |= flist_top >= FILES_MAX) return;
+	err = "Could not load list";
+	t = what = slurp_file_l(name, 0, &l); // Reads less than INT_MAX
+	while (what)
+	{
+		/* Let file be LF or NUL separated */
+		for (i = 0; i < l; i++)
+		{
+			lf += what[i] == '\n';
+			a0 += !what[i];
+		}
+		if (a0) lf = a0; // NUL has precedence
+		if (!lf) a0 = 1; // Take all file as single name
+
+		err = "Empty list";
+		if (lf >= l) break;
+		err = "Ignored too long list";
+		if (lf > FILES_MAX) break;
+
+		/* One extra as last name may be unterminated */
+		extend_flist(lf + 1, nf);
+
+		if (!a0) /* LF separated */
+		{
+			while (t - what < l)
+			{
+				t += strspn(t, LSEP);
+				if (t - what >= l) break;
+				if (warnmax |= flist_top >= flist_len) break;
+				flist[flist_top++] = t;
+				t += strcspn(t, LSEP);
+				*t++ = '\0';
+			}
+		}
+		else /* NUL separated */
+		{
+			while (t - what < l)
+			{
+				while (!*t && (++t - what < l));
+				if (t - what >= l) break;
+				if (warnmax |= flist_top >= flist_len) break;
+				flist[flist_top++] = t;
+				t += strlen(t) + 1;
+			}
+		}
+		return;
+	}
+	free(what);
+	printf("%s: %s\n", err, name);
+}
 
 int main( int argc, char *argv[] )
 {
 	glob_t globdata;
-	int i, j, l, file_arg_start, new_empty = TRUE, get_screenshot = FALSE;
+	int file_arg_start = argc, new_empty = TRUE, get_screenshot = FALSE;
+	int i, j, l, nf, nw, nl, w0, pass, fmode, dosort = FALSE;
 
 	if (argc > 1)
 	{
@@ -270,6 +359,8 @@ int main( int argc, char *argv[] )
 				"Options:\n"
 				"  --help          Output this help\n"
 				"  --version       Output version information\n"
+				"  --flist         Read a list of files\n"
+				"  --sort          Sort files passed as arguments\n"
 				"  --cmd           Commandline scripting mode, no GUI\n"
 				"  -s              Grab screenshot\n"
 				"  -v              Start in viewer mode\n"
@@ -343,71 +434,123 @@ int main( int argc, char *argv[] )
 	}
 #endif
 
-	for (file_arg_start = 1 + cmd_mode; file_arg_start < argc; file_arg_start++)
+	nf = nw = nl = w0 = pass = fmode = 0;
+	memset(&globdata, 0, sizeof(globdata));
+	for (i = 1 + cmd_mode; ; i++)
 	{
-		char *arg = argv[file_arg_start];
+		char *arg;
 
-		if (!strcmp(arg, "--"))		// End of options
+		if (i >= argc) // Pass is done
 		{
-			file_arg_start++;
-			break;
+			if (pass++) break; // Totally done
+
+			file_args = argv + file_arg_start;
+			files_passed = (warnmax = nf > FILES_MAX) ? FILES_MAX : nf;
+			if (!(nw | nl)) break; // Regular filenames are good to go
+
+			warnmax = 0; // Need to know WHEN limit gets hit
+
+			if (nl | nf) // List not needed for wildcards alone
+				extend_flist(nf, 1024); // Filenames and then some
+
+			/* Go forth and stuff filenames into the list */
+			i = 1 + cmd_mode;
+			fmode = 0;
 		}
-		else if (cmd_mode);		// One more script command
+
+		arg = argv[i];
+		if (fmode);	// Expect filename or wildcard
+		else if (!strcmp(arg, "--"))	// End of options
+		{
+			fmode |= 2;	// Files only, no wildcards
+			continue;
+		}
+		else if (cmd_mode) continue;	// One more script command
 		else if (!strcmp(arg, "-g"))	// Loading GIF animation frames
 		{
-			if (++file_arg_start >= argc) break;
-			sscanf(argv[file_arg_start], "%i", &preserved_gif_delay);
+			if (++i >= argc) continue;
+			sscanf(argv[i], "%i", &preserved_gif_delay);
+			continue;
 		}
 		else if (!strcmp(arg, "-v"))	// Viewer mode
+		{
 			viewer_mode = TRUE;
+			continue;
+		}
 		else if (!strcmp(arg, "-s"))	// Screenshot
+		{
 			get_screenshot = TRUE;
-		else break;
-	}
-	if (strstr(argv[0], "mtv")) viewer_mode = TRUE;
+			continue;
+		}
+		else if (!strcmp(arg, "--flist"))	// Filelist
+		{
+			if (++i >= argc) continue;
+			nl++;
+			if (!pass) continue;
 
-	/* Something else got passed in */
-	l = argc - file_arg_start;
-	while (l)
-	{
-		/* First, process wildcarded args */
-		memset(&globdata, 0, sizeof(globdata));
+			add_filelist(argv[i], nf);
+			if (warnmax) break;
+			continue;
+		}
+		else if (!strcmp(arg, "--sort"))	// Sort names
+		{
+			dosort = TRUE;
+			continue;
+		}
+
 /* !!! I avoid GLOB_DOOFFS here, because glibc before version 2.2 mishandled it,
  * and quite a few copycats had cloned those buggy versions, some libc
  * implementors among them. So it is possible to encounter a broken function
  * in the wild, and playing it safe doesn't cost all that much - WJ */
-		for (i = file_arg_start , j = 0; i < argc; i++)
+		if ((fmode < 2) && !strcmp(arg, "-w"))	// Wildcard
 		{
-			if (strcmp(argv[i], "-w")) continue; j++;
-			if (++i >= argc) break; j++;
+			if (++i >= argc) continue;
+			nw++;
+			if (!pass) continue;
+
+			if (warnmax |= globdata.gl_pathc >= FILES_MAX) break;
 			// Ignore errors - be glad for whatever gets returned
-			glob(argv[i], (j > 2 ? GLOB_APPEND : 0), NULL, &globdata);
+			glob(argv[i], (globdata.gl_pathc ? GLOB_APPEND : 0),
+				NULL, &globdata);
+			if (!flist) continue; // Use gl_pathv
+
+			/* Add newfound filenames to flist */
+			if (globdata.gl_pathc <= (PATHC_TYPE)w0) continue; // Nothing new
+			l = (globdata.gl_pathc > FILES_MAX ? FILES_MAX :
+				(int)globdata.gl_pathc) - w0;
+			j = extend_flist(l, nf);
+			if (l > j) l = j;
+			memcpy(flist + flist_top, globdata.gl_pathv + w0,
+				l * sizeof(char *));
+			flist_top += l;
+			w0 += l;
+			if (warnmax |= globdata.gl_pathc > (PATHC_TYPE)w0) break;
+			continue;
 		}
-		files_passed = l - j + globdata.gl_pathc;
 
-		/* If no wildcarded args */
-		file_args = argv + file_arg_start;
-		if (!j) break;
-		/* If no normal args */
-		file_args = globdata.gl_pathv;
-		if (l <= j) break;
-
-		/* Allocate space for both kinds of args together */
-		file_args = calloc(files_passed + 1, sizeof(char *));
-		// !!! Die by SIGSEGV if this allocation fails
-
-		/* Copy normal args if any */
-		for (i = file_arg_start , j = 0; i < argc; i++)
+		// Believe this is a filename
+		fmode |= 1; // Only names and maybe wildcards past this point
+		if (file_arg_start > i) file_arg_start = i;
+		if (pass)
 		{
-			if (!strcmp(argv[i], "-w")) i++; // Skip the pair
-			else file_args[j++] = argv[i];
+			if (warnmax |= flist_top >= flist_len) break;
+			flist[flist_top++] = argv[i];
 		}
-
-		/* Copy globbed args after them */
-		if (globdata.gl_pathc) memcpy(file_args + j, globdata.gl_pathv,
-			globdata.gl_pathc * sizeof(char *));
-		break;
+		nf += 1 - pass * 2; // Counting back on second pass
 	}
+
+	/* Flist if exists, globs otherwise, commandline as default */
+	if (flist) file_args = flist , files_passed = flist_top;
+	else if (globdata.gl_pathc) file_args = globdata.gl_pathv ,
+		files_passed = globdata.gl_pathc > FILES_MAX ? FILES_MAX :
+			(int)globdata.gl_pathc;
+	if (warnmax) printf("Too many files, limiting to %d\n", files_passed);
+
+	/* Sort the list of names */
+	if (dosort && files_passed) qsort(file_args, files_passed,
+		sizeof(char *), compare_names);
+
+	if (strstr(argv[0], "mtv")) viewer_mode = TRUE;
 
 	string_init();				// Translate static strings
 	var_init();				// Load INI variables

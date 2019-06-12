@@ -397,8 +397,8 @@ size_t getmemx2(memx2 *mem, size_t length)
 		size_t l = mem->here + length, l2 = mem->size * 2;
 		unsigned char *tmp = NULL;
 
-		if (l2 > l) tmp = realloc(mem->buf, l2);
-		if (!tmp) tmp = realloc(mem->buf, l2 = l);
+		if ((l2 > l) && (l2 <= INT_MAX)) tmp = realloc(mem->buf, l2);
+		if (!tmp && (l <= INT_MAX)) tmp = realloc(mem->buf, l2 = l);
 		if (!tmp) return (s);
 		mem->buf = tmp;
 		mem->size = l2;

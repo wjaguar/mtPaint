@@ -1122,7 +1122,8 @@ void pressed_lasso(int cut)
 void update_menus()			// Update edit/undo menu
 {
 	static int memwarn;
-	int i, j, statemap;
+	unsigned int statemap;
+	int i, j;
 
 	if (mem_undo_fail && !memwarn) memwarn = alert_box(_("Warning"),
 		_("You have not allocated enough memory in the Preferences window to undo this action."),
@@ -1480,6 +1481,7 @@ typedef struct {
 	int jpeg_c, png_c, tga_c, jp2_c, xtrans[3], xx[3], xy[3];
 	int tiff_m, lzma_c, zstd_c;
 	int webp_p, webp_q, webp_c;
+	int lbm_c, lbm_p;
 	int gif_delay, undo, icc;
 	int w, h;
 	/* Note: filename is in system encoding */
@@ -1638,17 +1640,18 @@ static void change_image_format(fselector_dd *dt, void **wdata, int what,
 	void **where)
 {
 	int ftype;
-	unsigned int flags;
+	unsigned int xflags;
 
 	if (!dt->need_save) return; // no use
 	cmd_read(where, dt);
 	ftype = dt->ftypes[dt->ftype];
-	flags = ftype != FT_TIFF ? file_formats[ftype].flags :
-		tiff_formats[dt->tiff_m].flags;
-	if (ftype == FT_WEBP) flags |= dt->webp_p ? FF_COMPV8 : FF_COMPV8L;
+	xflags = ftype != FT_TIFF ? file_formats[ftype].xflags :
+		tiff_formats[dt->tiff_m].xflags;
+	if (ftype == FT_WEBP) xflags |= dt->webp_p ? XF_COMPV8 : XF_COMPV8L;
+	if ((ftype == FT_LBM) && (dt->fmask & FF_IDX)) xflags |= XF_PBM;
 
 	/* Hide/show name/value widget pairs */
-	cmd_setv(wdata, (void *)flags, WDATA_ACTMAP);
+	cmd_setv(wdata, (void *)xflags, WDATA_ACTMAP);
 }
 
 int ftype_selector(int mask, char *ext, int def, char **names, int *ftypes)
@@ -1728,6 +1731,8 @@ void init_ls_settings(ls_settings *settings, void **wdata)
 	settings->webp_preset = webp_preset;
 	settings->webp_quality = webp_quality;
 	settings->webp_compression = webp_compression;
+	settings->lbm_pack = lbm_pack;
+	settings->lbm_pbm = lbm_pbm;
 	settings->gif_delay = preserved_gif_delay;
 
 	/* Read in settings */
@@ -1747,6 +1752,8 @@ void init_ls_settings(ls_settings *settings, void **wdata)
 		settings->webp_preset = dt->webp_p;
 		settings->webp_quality = dt->webp_q;
 		settings->webp_compression = dt->webp_c;
+		settings->lbm_pack = dt->lbm_c;
+		settings->lbm_pbm = dt->lbm_p;
 		settings->gif_delay = dt->gif_delay;
 
 		settings->mode = dt->mode;
@@ -1771,15 +1778,15 @@ void init_ls_settings(ls_settings *settings, void **wdata)
 static void store_ls_settings(ls_settings *settings)
 {
 	int ftype = settings->ftype, ttype = settings->tiff_type;
-	unsigned int fflags = (ftype == FT_TIFF) && (ttype >= 0) ?
-		tiff_formats[ttype].flags : file_formats[ftype].flags;
+	unsigned int xflags = (ftype == FT_TIFF) && (ttype >= 0) ?
+		tiff_formats[ttype].xflags : file_formats[ftype].xflags;
 
 	switch (settings->mode)
 	{
 	case FS_PNG_SAVE:
-		if (fflags & FF_TRANS)
+		if (xflags & XF_TRANS)
 			mem_set_trans(settings->xpm_trans);
-		if (fflags & FF_SPOT)
+		if (xflags & XF_SPOT)
 		{
 			mem_xbm_hot_x = settings->hot_x;
 			mem_xbm_hot_y = settings->hot_y;
@@ -1787,26 +1794,26 @@ static void store_ls_settings(ls_settings *settings)
 		// Fallthrough
 	case FS_CHANNEL_SAVE:
 	case FS_COMPOSITE_SAVE:
-		if (fflags & FF_COMPJ)
+		if (xflags & XF_COMPJ)
 			jpeg_quality = settings->jpeg_quality;
-		if (fflags & (FF_COMPZ | FF_COMPZT))
+		if (xflags & (XF_COMPZ | XF_COMPZT))
 			png_compression = settings->png_compression;
-		if (fflags & FF_COMPLZ)
+		if (xflags & XF_COMPLZ)
 			lzma_preset = settings->lzma_preset;
-		if (fflags & FF_COMPZS)
+		if (xflags & XF_COMPZS)
 			zstd_level = settings->zstd_level;
-		if (fflags & FF_COMPR)
+		if (xflags & XF_COMPR)
 			tga_RLE = settings->tga_RLE;
-		if (fflags & FF_COMPJ2)
+		if (xflags & XF_COMPJ2)
 			jp2_rate = settings->jp2_rate;
-		if (fflags & FF_COMPW)
+		if (xflags & XF_COMPW)
 		{
 			webp_preset = settings->webp_preset;
 			if (webp_preset) webp_quality = settings->webp_quality;
 			else webp_compression = settings->webp_compression;
 		}
-		if (fflags & FF_COMPWT) webp_quality = settings->webp_quality;
-		if ((fflags & FF_COMPT) && (ttype >= 0))
+		if (xflags & XF_COMPWT) webp_quality = settings->webp_quality;
+		if ((xflags & XF_COMPT) && (ttype >= 0))
 		{
 			/* Remember selection for incompatible types separately;
 			 * image is not set up yet, so use the mode instead */
@@ -1816,6 +1823,10 @@ static void store_ls_settings(ls_settings *settings)
 				mem_img_bpp == 3 ? &tiff_rtype :
 				mem_cols > 2 ? &tiff_itype : &tiff_btype) = ttype;
 		}
+		if (xflags & XF_COMPRL) lbm_pack = settings->lbm_pack;
+		/* !!! XF_PBM is only for indexed LBMs, but a complicated check
+		 * for that like for TIFFs above would add nothing of value here */
+		if (ftype == FT_LBM) lbm_pbm = settings->lbm_pbm;
 		break;
 	case FS_EXPORT_GIF:
 		preserved_gif_delay = settings->gif_delay;
@@ -2043,36 +2054,37 @@ static void *fselector_code[] = {
 		OPTDe(ftnames, ftype, change_image_format), TRIGGER,
 	ENDIF(1),
 	IFx(need_save, 1),
-		VISMASK(~0),
-		MLABELr(_("Transparency index")), ACTMAP(FF_TRANS),
-			SPINa(xtrans), ACTMAP(FF_TRANS),
-		MLABELr(_("TIFF Compression")), ACTMAP(FF_COMPT),
-		OPTDe(tiffnames, tiff_m, change_image_format), ACTMAP(FF_COMPT),
-		MLABELr(_("JPEG Save Quality (100=High)")), ACTMAP(FF_COMPJ),
-			SPIN(jpeg_c, 0, 100), ACTMAP(FF_COMPJ),
-		MLABELr(_("ZIP Compression (0=None)")), ACTMAP(FF_COMPZT),
-		MLABELr(_("PNG Compression (0=None)")), ACTMAP(FF_COMPZ),
-			SPIN(png_c, 0, 9), ACTMAP(FF_COMPZ | FF_COMPZT),
+		VISMASK(~0), HEIGHTBAR,
+		MLABELr(_("Transparency index")), ACTMAP(XF_TRANS),
+			SPINa(xtrans), ACTMAP(XF_TRANS),
+		MLABELr(_("TIFF Compression")), ACTMAP(XF_COMPT),
+		OPTDe(tiffnames, tiff_m, change_image_format), ACTMAP(XF_COMPT),
+		MLABELr(_("JPEG Save Quality (100=High)")), ACTMAP(XF_COMPJ),
+			SPIN(jpeg_c, 0, 100), ACTMAP(XF_COMPJ),
+		MLABELr(_("ZIP Compression (0=None)")), ACTMAP(XF_COMPZT),
+		MLABELr(_("PNG Compression (0=None)")), ACTMAP(XF_COMPZ),
+			SPIN(png_c, 0, 9), ACTMAP(XF_COMPZ | XF_COMPZT),
 			ALTNAME("ZIP Compression (0=None)"),
-		MLABELr(_("LZMA2 Compression (0=None)")), ACTMAP(FF_COMPLZ),
-			SPIN(lzma_c, 0, 9), ACTMAP(FF_COMPLZ),
-		MLABELr(_("ZSTD Compression Level")), ACTMAP(FF_COMPZS),
-			SPIN(zstd_c, ZSTD_MIN, ZSTD_MAX), ACTMAP(FF_COMPZS),
-		MLABELr(_("TGA RLE Compression")), ACTMAP(FF_COMPR),
-			SPIN(tga_c, 0, 1), ACTMAP(FF_COMPR),
-		MLABELr(_("JPEG2000 Compression (0=Lossless)")), ACTMAP(FF_COMPJ2),
-			SPIN(jp2_c, 0, 100), ACTMAP(FF_COMPJ2),
-		MLABELr(_("WebP Compression")), ACTMAP(FF_COMPW),
-		OPTe(webp_presets, 0, webp_p, change_image_format), ACTMAP(FF_COMPW),
-		MLABELr(_("WebP Save Quality (100=High)")), ACTMAP(FF_COMPWT),
-		MLABELr(_("V8 Save Quality (100=High)")), ACTMAP(FF_COMPV8),
-			SPIN(webp_q, 0, 100), ACTMAP(FF_COMPV8 | FF_COMPWT),
-		MLABELr(_("V8L Compression (0=None)")), ACTMAP(FF_COMPV8L),
-			SPIN(webp_c, 0, 9), ACTMAP(FF_COMPV8L),
-		MLABELr(_("Hotspot at X =")), ACTMAP(FF_SPOT),
-			SPINa(xx), ACTMAP(FF_SPOT),
-		MLABELr(_("Y =")), ACTMAP(FF_SPOT),
-			SPINa(xy), ACTMAP(FF_SPOT),
+		MLABELr(_("LZMA2 Compression (0=None)")), ACTMAP(XF_COMPLZ),
+			SPIN(lzma_c, 0, 9), ACTMAP(XF_COMPLZ),
+		MLABELr(_("ZSTD Compression Level")), ACTMAP(XF_COMPZS),
+			SPIN(zstd_c, ZSTD_MIN, ZSTD_MAX), ACTMAP(XF_COMPZS),
+		CHECK(_("TGA RLE Compression"), tga_c), ACTMAP(XF_COMPR),
+		CHECK("PBM", lbm_p), ACTMAP(XF_PBM),
+		CHECK(_("LBM PackBits Compression"), lbm_c), ACTMAP(XF_COMPRL),
+		MLABELr(_("JPEG2000 Compression (0=Lossless)")), ACTMAP(XF_COMPJ2),
+			SPIN(jp2_c, 0, 100), ACTMAP(XF_COMPJ2),
+		MLABELr(_("WebP Compression")), ACTMAP(XF_COMPW),
+		OPTe(webp_presets, 0, webp_p, change_image_format), ACTMAP(XF_COMPW),
+		MLABELr(_("WebP Save Quality (100=High)")), ACTMAP(XF_COMPWT),
+		MLABELr(_("V8 Save Quality (100=High)")), ACTMAP(XF_COMPV8),
+			SPIN(webp_q, 0, 100), ACTMAP(XF_COMPV8 | XF_COMPWT),
+		MLABELr(_("V8L Compression (0=None)")), ACTMAP(XF_COMPV8L),
+			SPIN(webp_c, 0, 9), ACTMAP(XF_COMPV8L),
+		MLABELr(_("Hotspot at X =")), ACTMAP(XF_SPOT),
+			SPINa(xx), ACTMAP(XF_SPOT),
+		MLABELr(_("Y =")), ACTMAP(XF_SPOT),
+			SPINa(xy), ACTMAP(XF_SPOT),
 	ENDIF(1),
 	IFx(need_anim, 1),
 		MLABEL(_("Animation delay")),
