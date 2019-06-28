@@ -1,5 +1,5 @@
 /*	csel.c
-	Copyright (C) 2006-2011 Dmitry Groshev
+	Copyright (C) 2006-2019 Dmitry Groshev
 
 	This file is part of mtPaint.
 
@@ -401,6 +401,14 @@ static double get_vect(int col)
 	return ((c2 + c2 + c1) * 255 + midc * 255 / (double)maxc);
 }
 
+#if defined(U_THREADS) && defined(HAVE__SFA)
+/* Hope this and __sync_fetch_and_add() always come as a package */
+#define SETBIT(A,B) __sync_fetch_and_or(&(A), (B))
+#else
+#define SETBIT(A,B) (A) |= (B)
+#endif
+
+
 /* Answer which pixels are masked through selectivity */
 int csel_scan(int start, int step, int cnt, unsigned char *mask,
 	unsigned char *img, csel_info *info)
@@ -408,10 +416,12 @@ int csel_scan(int start, int step, int cnt, unsigned char *mask,
 	unsigned char res = 0;
 	double d, dist = 0.0, lxn[3];
 	int i, j, k, l, jj, st3 = step * 3;
+#ifndef HAVE__SFA
 	DEF_MUTEX(csel_lock); // To prevent concurrent writes to *info
 
 
 	LOCK_MUTEX(csel_lock);
+#endif
 	cnt = start + step * (cnt - 1) + 1;
 	if (!mask)
 	{
@@ -426,7 +436,6 @@ int csel_scan(int start, int step, int cnt, unsigned char *mask,
 			k = PNG_2_INT(mem_pal[j]);
 			if (info->pcache[j] != k)
 			{
-				info->pcache[j] = k;
 				if (info->mode == 0) /* Sphere mode */
 				{
 					get_lxn(lxn, k);
@@ -451,7 +460,8 @@ int csel_scan(int start, int step, int cnt, unsigned char *mask,
 					dist = l > jj ? l : jj;
 				}
 				if (dist <= info->range2)
-					info->pmap[j >> 5] |= 1 << (j & 31);
+					SETBIT(info->pmap[j >> 5], 1 << (j & 31));
+				info->pcache[j] = k;
 			}
 			if (((info->pmap[j >> 5] >> (j & 31)) ^ info->invert) & 1)
 				mask[i] |= 255;
@@ -489,7 +499,7 @@ int csel_scan(int start, int step, int cnt, unsigned char *mask,
 					(lxn[2] - info->clxn[2]) *
 					(lxn[2] - info->clxn[2]);
 				l = dist <= info->range2 ? 3 : 2;
-				info->colormap[j] |= l << k;
+				SETBIT(info->colormap[j], l << k);
 			}
 			if ((l ^ info->invert) & 1) mask[i] |= 255;
 		}
@@ -517,7 +527,7 @@ int csel_scan(int start, int step, int cnt, unsigned char *mask,
 					if (dist > 765.0) dist = 1530.0 - dist;
 					if (dist <= info->range2) l += jj;
 				}
-				info->colormap[j >> 3] |= (l + 8) << ((j & 7) << 2);
+				SETBIT(info->colormap[j >> 3], (l + 8) << ((j & 7) << 2));
 			}
 			if (((l >> k) ^ info->invert) & 1) mask[i] |= 255;
 		}
@@ -537,7 +547,9 @@ int csel_scan(int start, int step, int cnt, unsigned char *mask,
 				mask[i] |= 255;
 		}
 	}
+#ifndef HAVE__SFA
 	UNLOCK_MUTEX(csel_lock);
+#endif
 	return (res);
 }
 

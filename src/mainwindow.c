@@ -3169,15 +3169,17 @@ static int paint_canvas(void *dt, void **wdata, int what, void **where,
 		nt2 = ceil_div(vpix, kpix_threads * 1024);
 		if (nt2 > nt) nt2 = nt;
 
-		/* !!! csel_scan() cannot share its color cache and takes 50%+ of
-		 * per-row time, so 2 threads can interleave calls to it but more
+#ifndef HAVE__SFA
+		/* csel_scan() takes 50%+ of per-row time, so when it cannot share
+		 * its color cache, 2 threads can interleave calls to it but more
 		 * than 2 only waste even more time on lock contention - WJ */
 		if ((nt2 > 2) && (u.m.overlay_s || (mem_cselect &&
 			(u.tflag | u.xflag | u.gflag | u.pflag)))) nt2 = 2;
+#endif
 
 		u.tdata = talloc(MA_SKIP_ZEROSIZE | MA_FLAG_NONE, nt2,
 			&u, sizeof(u), NULL,
-#else
+#else /* ifndef U_THREADS */
 		u.tdata = multialloc(MA_SKIP_ZEROSIZE | MA_FLAG_NONE,
 #endif
 			&u.m.rgb, u.m.rgb_s,

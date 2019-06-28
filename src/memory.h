@@ -507,15 +507,12 @@ static inline unsigned int bitcount(unsigned int n)
 	n -= (n >> 1) & 0x5555555555555555ULL;
 	m = n & 0xCCCCCCCCCCCCCCCCULL; n = (n ^ m) + (m >> 2);
 	n = (n + (n >> 4)) & 0x0F0F0F0F0F0F0F0FULL;
-	n = (n + (n >> 8)) & 0x00FF00FF00FF00FFULL;
-	n = (n + (n >> 16)) & 0x0000FFFF0000FFFFULL;
-	n = (n + (n >> 32)) & 0x00000000FFFFFFFFULL;
+	n = (n * 0x0101010101010101ULL) >> 56;
 #else
 	n -= (n >> 1) & 0x55555555;
 	m = n & 0x33333333; n = m + ((n ^ m) >> 2);
 	n = (n + (n >> 4)) & 0x0F0F0F0F;
-	n = (n + (n >> 8)) & 0x00FF00FF;
-	n = (n + (n >> 16)) & 0x0000FFFF;
+	n = (n * 0x01010101) >> 24;
 #endif
 	return (n);
 }

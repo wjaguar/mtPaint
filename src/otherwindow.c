@@ -2982,7 +2982,7 @@ static void xhold_changed(xhold_dd *dt, void **wdata, int what, void **where)
 	if (xhold_preview) update_stuff(UPD_RENDER);
 }
 
-static void xhold_evt(seg_dd *dt, void **wdata, int what, void **where)
+static void xhold_evt(xhold_dd *dt, void **wdata, int what, void **where)
 {
 	int update = 0;
 
