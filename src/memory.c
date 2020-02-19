@@ -3793,6 +3793,61 @@ void mem_invert()			// Invert the palette
 	}
 }
 
+void mem_normalize()		// Normalize contrast in image or palette
+{
+	unsigned char map[256], *img = NULL;
+	png_color *col;
+	int i, uninit_(j), k, k0, k1;
+
+	memset(map, 0, 256);
+	if ((mem_channel == CHN_IMAGE) && (mem_img_bpp == 1))
+	{
+		for (i = 0 , col = mem_pal; i < mem_cols; i++ , col++)
+		{
+			map[col->red] = 1;
+			map[col->green] = 1;
+			map[col->blue] = 1;
+		}
+	}
+	else
+	{
+		j = mem_width * mem_height;
+		if (mem_channel == CHN_IMAGE) j *= 3;
+		img = mem_img[mem_channel];
+		for (i = 0; i < j; i++) map[img[i]] = 1;
+	}
+
+	/* Range */
+	for (i = 0; (i < 255) && !map[i]; i++);
+	k0 = k1 = i;
+	for (; i < 256; i++) if (map[i]) k1 = i;
+	/* Table */
+	map[k0] = k0; // Default
+	k = k1 - k0;
+	if (k) for (i = k0; i <= k1; i++) map[i] = 255 * (i - k0) / k;
+
+	if (img)
+	{
+		unsigned char *mask = calloc(1, mem_width);
+
+		do_xlate(map, img, j);
+		if (mask)
+		{
+			mask_merge(mem_undo_previous(mem_channel), mem_channel, mask);
+			free(mask);
+		}
+	}
+	else
+	{
+		for (i = 0 , col = mem_pal; i < mem_cols; i++ , col++)
+		{
+			col->red = map[col->red];
+			col->green = map[col->green];
+			col->blue = map[col->blue];
+		}
+	}
+}
+
 /* !!! The rectangles here exclude bottom & right border */
 int clip(int *rxy, int x0, int y0, int x1, int y1, const int *vxy)
 {

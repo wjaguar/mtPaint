@@ -1,5 +1,5 @@
 /*	mainwindow.h
-	Copyright (C) 2004-2019 Mark Tyler and Dmitry Groshev
+	Copyright (C) 2004-2020 Mark Tyler and Dmitry Groshev
 
 	This file is part of mtPaint.
 
@@ -148,6 +148,7 @@ enum { // To let constants renumber themselves when adding new ones
 	FILT_THRES,
 	FILT_UALPHA,
 	FILT_KUWAHARA,
+	FILT_NORM,
 
 	ACT_TEST /* Reserved for testing things */
 };
@@ -301,6 +302,8 @@ int	drag_index_vals[2], cursor_corner, use_gamma, view_vsplit;
 int	files_passed, cmd_mode, tablet_working;
 char **file_args, **script_cmds;
 #define FILES_MAX (1024 * 1024) /* A million+ files should be enough */
+
+int perim_wx, perim_wy;	// Cursor position
 
 extern char mem_clip_file[];
 

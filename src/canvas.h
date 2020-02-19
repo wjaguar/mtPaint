@@ -203,7 +203,7 @@ void pressed_copy(int cut);
 void pressed_paste(int centre);
 void pressed_greyscale(int mode);
 void pressed_convert_rgb();
-void pressed_invert();
+void pressed_inv(int what);
 void pressed_rectangle(int filled);
 void pressed_ellipse(int filled);
 

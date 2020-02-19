@@ -731,6 +731,7 @@ void mem_find_dither(int red, int green, int blue);
 //	Convert image to Indexed Palette using quantize
 int mem_quantize( unsigned char *old_mem_image, int target_cols, int type );
 void mem_invert();			// Invert the palette
+void mem_normalize();			// Normalize contrast in image or palette
 
 //	Clear/set protection (what = NULL - color n, n = -1 - all colors)
 void mem_mask_setv(int *what, int n, int state);

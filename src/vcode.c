@@ -1,5 +1,5 @@
 /*	vcode.c
-	Copyright (C) 2013-2019 Dmitry Groshev
+	Copyright (C) 2013-2020 Dmitry Groshev
 
 	This file is part of mtPaint.
 
@@ -1227,6 +1227,38 @@ static clipform_dd *clip_format(GtkSelectionData *sel, clipform_data *cd)
 
 #define CLIPMASK 3 /* 2 clipboards */
 
+enum {
+	TEXT_STRING = 0,
+	TEXT_TEXT,
+	TEXT_COMPOUND,
+	TEXT_CNT
+};
+
+static GtkTargetEntry text_targets[] = {
+	{ "STRING", 0, TEXT_STRING },
+	{ "TEXT", 0, TEXT_TEXT }, 
+	{ "COMPOUND_TEXT", 0, TEXT_COMPOUND }
+};
+static GtkTargetList *text_tlist;
+
+typedef struct {
+	char *what;
+	int where;
+} text_offer;
+static text_offer text_on_offer[2];
+
+static void clear_text_offer(int nw)
+{
+	int i;
+
+	for (i = 0; i < 2; i++)
+	{
+		if (text_on_offer[i].where &= ~nw) continue;
+		free(text_on_offer[i].what);
+		text_on_offer[i].what = NULL;
+	}
+}
+
 static void selection_callback(GtkWidget *widget, GtkSelectionData *sel,
 	guint time, gpointer user_data)
 {
@@ -1281,7 +1313,31 @@ static void selection_get_callback(GtkWidget *widget, GtkSelectionData *sel,
 {
 	void **slot = g_dataset_get_data(main_window,
 		gdk_atom_name(sel->selection));
-	if (slot) clip_evt(sel, info, slot);
+	/* Text clipboard is handled right here */
+	if (slot == (void *)text_on_offer)
+	{
+		char *s;
+		int i, which;
+
+		which = sel->selection == gdk_atom_intern("PRIMARY", FALSE) ? 2 : 1;
+		for (i = 0; i < 2; i++) if (text_on_offer[i].where & which) break;
+		if (i > 1) return; // No text for this clipboard
+		s = text_on_offer[i].what;
+		if (!s) return; // Paranoia
+		if (info == TEXT_STRING)
+			gtk_selection_data_set(sel, sel->target, 8, s, strlen(s));
+		else if ((info == TEXT_TEXT) || (info == TEXT_COMPOUND))
+		{
+			guchar *ns;
+			GdkAtom target;
+			gint format, len;
+			gdk_string_to_compound_text(s, &target, &format, &ns, &len);
+			gtk_selection_data_set(sel, target, format, ns, len);
+			gdk_free_compound_text(ns);
+		}
+	}
+	/* Other kinds get handled outside */
+	else if (slot) clip_evt(sel, info, slot);
 }
 
 static void selection_clear_callback(GtkWidget *widget, GdkEventSelection *event,
@@ -1289,7 +1345,9 @@ static void selection_clear_callback(GtkWidget *widget, GdkEventSelection *event
 {
 	void **slot = g_dataset_get_data(main_window,
 		gdk_atom_name(event->selection));
-	if (slot) clip_evt(NULL, 0, slot);
+	if (slot == (void *)text_on_offer) clear_text_offer(
+		event->selection == gdk_atom_intern("PRIMARY", FALSE) ? 2 : 1);
+	else if (slot) clip_evt(NULL, 0, slot);
 }
 
 // !!! GTK+ 1.2 internal type (gtk/gtkselection.c)
@@ -1298,16 +1356,20 @@ typedef struct {
 	GtkTargetList *list;
 } GtkSelectionTargetList;
 
-static int offer_clipboard(void **slot)
+static int offer_clipboard(void **slot, int text)
 {
 	static int connected;
 	void **desc = slot[1];
 	clipform_data *cd = slot[0];
+	GtkTargetEntry *targets = cd->ent;
+	gpointer info = slot;
 	GtkSelectionTargetList *slist;
 	GList *list, *tmp;
 	GdkAtom sel;
-	int which, res = FALSE, nw = (int)desc[2] & CLIPMASK;
+	int which, res = FALSE, nw = (int)desc[2] & CLIPMASK, ntargets = cd->n;
 
+
+	if (text) targets = text_targets , ntargets = TEXT_CNT , info = text_on_offer;
 	for (which = 0; (1 << which) <= nw; which++)
 	{
 		if (!((1 << which) & nw)) continue;
@@ -1331,8 +1393,7 @@ static int offer_clipboard(void **slot)
 			"gtk-selection-handlers", list);
 
 		// !!! Have to resort to this to allow for multiple X clipboards
-		g_dataset_set_data(main_window, which ? "PRIMARY" : "CLIPBOARD",
-			(gpointer)slot);
+		g_dataset_set_data(main_window, which ? "PRIMARY" : "CLIPBOARD", info);
 		if (!connected)
 		{
 			gtk_signal_connect(GTK_OBJECT(main_window), "selection_get",
@@ -1342,11 +1403,26 @@ static int offer_clipboard(void **slot)
 			connected = TRUE;
 		}
 
-		gtk_selection_add_targets(main_window, sel, cd->ent, cd->n);
+		gtk_selection_add_targets(main_window, sel, targets, ntargets);
 		res = TRUE;
 	}
 
 	return (res);
+}
+
+static void offer_text(void **slot, char *s)
+{
+	void **desc = slot[1];
+	int i, nw = (int)desc[2] & CLIPMASK;
+
+	clear_text_offer(nw);
+	i = !!text_on_offer[0].what;
+	text_on_offer[i].what = strdup(s);
+	text_on_offer[i].where = nw;
+
+	if (!text_tlist) text_tlist = gtk_target_list_new(text_targets, TEXT_CNT);
+
+	offer_clipboard(slot, TRUE);
 }
 
 #else /* if GTK_MAJOR_VERSION == 2 */
@@ -1426,7 +1502,7 @@ static void clip_clear(GtkClipboard *clipboard, gpointer user_data)
 	clip_evt(NULL, 0, user_data);
 }
 
-static int offer_clipboard(void **slot)
+static int offer_clipboard(void **slot, int unused)
 {
 	void **desc = slot[1];
 	clipform_data *cd = slot[0];
@@ -1447,6 +1523,19 @@ static int offer_clipboard(void **slot)
 		}
 	}
 	return (res);
+}
+
+static void offer_text(void **slot, char *s)
+{
+	void **desc = slot[1];
+	int which, nw = (int)desc[2] & CLIPMASK;
+
+	for (which = 0; (1 << which) <= nw; which++)
+	{
+		if (!((1 << which) & nw)) continue;
+		gtk_clipboard_set_text(gtk_clipboard_get(which ?
+			GDK_SELECTION_PRIMARY : GDK_SELECTION_CLIPBOARD), s, -1);
+	}
 }
 
 #endif
@@ -8643,6 +8732,9 @@ void cmd_setv(void **slot, void *res, int idx)
 			pp[0], pp[1] - pp[0]);
 		break;
 	}
+	case op_CLIPBOARD:
+		offer_text(slot, res);
+		break;
 #if GTK_MAJOR_VERSION == 2
 	case op_FONTSEL:
 	{
@@ -8722,7 +8814,7 @@ int cmd_checkv(void **slot, int idx)
 		(op == op_MENURITEM) || (op == op_uMENURITEM));
 	if (op == op_CLIPBOARD)
 	{
-		if (idx == CLIP_OFFER) return (offer_clipboard(slot));
+		if (idx == CLIP_OFFER) return (offer_clipboard(slot, FALSE));
 		if (idx == CLIP_PROCESS) return (process_clipboard(slot));
 	}
 	else if (op == op_EV_MOUSE)

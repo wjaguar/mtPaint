@@ -1,5 +1,5 @@
 /*	spawn.h
-	Copyright (C) 2007-2016 Mark Tyler and Dmitry Groshev
+	Copyright (C) 2007-2020 Mark Tyler and Dmitry Groshev
 
 	This file is part of mtPaint.
 
@@ -22,7 +22,7 @@
 #define FACTION_PRESETS_TOTAL 15
 		// This number must exactly match the number of menu items declared
 
-
+char *interpolate_line(char *pattern, int cmd);		// Percent variable interpolation
 
 int spawn_process(char *argv[], char *directory);	// argv must be NULL terminated!
 int spawn_expansion(char *cline, char *directory);

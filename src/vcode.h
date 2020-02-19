@@ -1,5 +1,5 @@
 /*	vcode.h
-	Copyright (C) 2013-2019 Dmitry Groshev
+	Copyright (C) 2013-2020 Dmitry Groshev
 
 	This file is part of mtPaint.
 
@@ -1175,6 +1175,9 @@ enum {
 
 //	Extra data of EV_COPY
 #define COPY_DATA	0
+
+//	Extra data of CLIPBOARD
+#define CLIP_TEXT	0
 
 //	Extra state of CLIPBOARD
 #define CLIP_OFFER	0

@@ -358,13 +358,14 @@ void iso_trans(int mode)
 	else memory_errors(i);
 }
 
-void pressed_invert()
+void pressed_inv(int what)
 {
 	spot_undo(UNDO_INV);
 
-	mem_invert();
-	mem_undo_prepare();
+	if (what == FILT_INVERT) mem_invert();
+	else mem_normalize();
 
+	mem_undo_prepare();
 	update_stuff(UPD_COL);
 }
 

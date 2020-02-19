@@ -1,5 +1,5 @@
 /*	mainwindow.c
-	Copyright (C) 2004-2019 Mark Tyler and Dmitry Groshev
+	Copyright (C) 2004-2020 Mark Tyler and Dmitry Groshev
 
 	This file is part of mtPaint.
 
@@ -215,7 +215,7 @@ typedef struct {
 } perim_info;
 
 static perim_info perim_state;	// Tool perimeter
-static int perim_wx, perim_wy;	// Cursor position
+int perim_wx, perim_wy;	// Cursor position
 
 #define perim_status	perim_state.mode
 #define perim_x		perim_state.x
@@ -4037,6 +4037,55 @@ static void do_script(int what)
 	cmd_run_script(where, script_cmds);
 }
 
+/* Script mode image info */
+typedef struct {
+	char *str;
+	int dest;
+} sinf_dd;
+
+static char *info_dest[] = { "stdout", "standard output",
+	"stderr", "standard error", "clipboard" };
+#define DEST_STDERR 2
+#define DEST_CLIP 4
+
+#define WBbase sinf_dd
+static void *sinf_code[] = {
+	TOPVBOX,
+	XENTRY(str),
+	UNLESSv(cmd_mode), OPT(info_dest, DEST_CLIP + 1, dest),
+	IFv(cmd_mode), OPT(info_dest, DEST_CLIP, dest),
+		FLATTEN,
+	WSHOW
+};
+#undef WBbase
+
+static void interpolate_info()
+{
+	static sinf_dd tdata = { "", 0 };
+	sinf_dd *dt;
+	void **res;
+
+	if (!script_cmds) return;
+	res = run_create_(sinf_code, &tdata, sizeof(tdata), script_cmds);
+	run_query(res);
+	dt = GET_DDATA(res);
+	if (dt->str[0]) // Do nothing for empty string
+	{
+		char *s = interpolate_line(dt->str, FALSE);
+		if (!s); // Do nothing if could not interpolate
+		else if (dt->dest < DEST_CLIP)
+		{
+			FILE *f = dt->dest < DEST_STDERR ? stdout : stderr;
+			fputs(s, f);
+			fflush(f); // In case no LF at end of line
+		}
+		else cmd_setv(((main_dd *)GET_DDATA(main_window_))->clipboard,
+			s, CLIP_TEXT);
+		free(s);
+	}
+	run_destroy(res);
+}
+
 /* Script mode color picker */
 static int pick_pixel(multi_ext *mx, void **where, int ab)
 {
@@ -4806,7 +4855,9 @@ void action_dispatch(int action, int mode, int state, int kbd)
 	case DLG_ROTATE:
 		pressed_rotate_free(); break;
 	case DLG_INFO:
-		pressed_information(); break;
+		if (script_cmds) interpolate_info();
+		else pressed_information();
+		break;
 	case DLG_PREFS:
 		pressed_preferences(); break;
 	case DLG_COLORS:
@@ -4863,7 +4914,8 @@ void action_dispatch(int action, int mode, int state, int kbd)
 		else if (script_cmds) spot_undo(UNDO_PAL);
 		break;
 	case FILT_INVERT:
-		pressed_invert(); break;
+	case FILT_NORM:
+		pressed_inv(action); break;
 	case FILT_GREY:
 		pressed_greyscale(mode); break;
 	case FILT_EDGE:
@@ -5361,7 +5413,7 @@ static void *main_menu_code[] = {
 	MENUITEM(_("///Configure"), ACTMOD(DLG_SCRIPT, 0)),
 	WDONE,
 	MENUSEP, //
-	MENUITEM(_("//Information ..."), ACTMOD(DLG_INFO, 0)),
+	MENUITEMs(_("//Information ..."), ACTMOD(DLG_INFO, 0)),
 		SHORTCUT(i, C),
 	REFv(menu_slots[MENU_PREFS]),
 	MENUITEMs(_("//Preferences ..."), ACTMOD(DLG_PREFS, 0)),
@@ -5456,6 +5508,7 @@ static void *main_menu_code[] = {
 		SHORTCUT(g, C),
 	MENUITEMs(_("//Greyscale (Gamma corrected)"), ACTMOD(FILT_GREY, 1)),
 		SHORTCUT(g, CS),
+	MENUITEMs(_("//Normalize"), ACTMOD(FILT_NORM, 0)),
 	MENUITEMs(_("//Threshold ..."), ACTMOD(DLG_XHOLD, 0)),
 	SUBMENU(_("//Isometric Transformation")),
 	MENUTEAR, ///

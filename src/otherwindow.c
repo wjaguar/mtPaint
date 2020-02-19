@@ -3004,6 +3004,7 @@ static void xhold_evt(xhold_dd *dt, void **wdata, int what, void **where)
 		unsigned char *dest, *xbuf, *mask;
 		int i, bpp = MEM_BPP;
 
+		run_query(wdata); // Update parameters
 		mask = malloc(mem_width * (bpp + 1));
 		if (!mask) break;
 		spot_undo(UNDO_FILT);

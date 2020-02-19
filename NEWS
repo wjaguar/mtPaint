@@ -4,7 +4,7 @@ mtPaint NEWS
 
 Here is a summary of the main changes in this release (see handbook for full details):
 
-3.50	2019-??-??
+3.50	2020-??-??
 	* Scripting added - "Image->Script" to enter or run a script : See handbook chapter 10 for details
 	* Commandline mode added - use "mtpaint --cmd" to run a script without GUI
 	* Keyboard shortcuts can now be reconfigured - "Help->Keyboard shortcuts"
@@ -20,6 +20,7 @@ Here is a summary of the main changes in this release (see handbook for full det
 	* Patterns for colours A and B can now be chosen separately (Preferences->General->Separate patterns for A&B)
 	* Builtin Bayer patterns now can be redefined : See handbook section A.6.1 for details
 	* Threshold effect with interactive preview added (see handbook section 6.6.7)
+	* Normalize effect added
 	* Colour transform and source selection added to blend mode options
 	* Threshold blend mode added
 	* "Saturate more" blend mode redefined to not ignore source (previous behaviour available with "Image" source selected)
@@ -35,6 +36,7 @@ Here is a summary of the main changes in this release (see handbook for full det
 	* Zoom is now up to 8000%
 	* "Hide image" and "View alpha as an overlay" can now be toggled separately for each layer (Preferences->General->Enable overlays by layer)
 	* Colours A and B now highlighted in palette window
+	* File actions can now enable and use an extended set of variable substitutions (see handbook section A.7)
 	* New image format PMM (Portable MultiMap) added for interoperable storage and exchange of images : See handbook section A.2.4 for details
 	* WebP file format save/load added
 	* LBM file format (ILBM/PBM) save/load added
@@ -83,6 +85,7 @@ Here is a summary of the main changes in this release (see handbook for full det
 	* BUGFIX - Background layer is now made large enough to accommodate all frames when loading animation into layers
 	* BUGFIX - Animation cycles are now properly updated when layers are reordered, duplicated or deleted
 	* BUGFIX - Command line switches beyond the first one are now parsed properly
+	* BUGFIX - Filenames with '$' or '%' in them now work properly in file actions
 	* BUGFIX - Listing a directory containing files with broken date/time in builtin file selector on Windows doesn't cause crash
 	* BUGFIX - Rare problem of undo system ignoring a changed pixel is now eliminated
 	* BUGFIX - Polygonal selections no longer skip some contour pixels in certain situations

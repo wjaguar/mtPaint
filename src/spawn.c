@@ -1,5 +1,5 @@
 /*	spawn.c
-	Copyright (C) 2007-2019 Mark Tyler and Dmitry Groshev
+	Copyright (C) 2007-2020 Mark Tyler and Dmitry Groshev
 
 	This file is part of mtPaint.
 
@@ -231,12 +231,92 @@ static char *get_temp_file(int type, int rgb)
 	return (remember_temp_file(buf, type, rgb));
 }
 
-static char *insert_temp_file(char *pattern, int where, int skip)
+static int escape_filename(char *buf, char *name)
 {
-	char *fname, *pat = pattern;
-	int i, l, rgb = mem_img_bpp == 3, fform = FT_NONE;
+	static char *spec = " !\"#$%&'()*+,:;<=>?@[]^`{|}~";
+	int cnt[256];
+	int i, lq = 0, l = 0, esc = 0, minus = 0;
+	char c, *p;
 
-	while (TRUE)
+	/* Let's just count everything, first */
+	memset(cnt, 0, sizeof(cnt));
+	while ((c = name[l++])) cnt[(unsigned char)c]++;
+
+	/* Let's be extra safe and quote most anything at all non-alphanumeric */
+	for (i = 0; i < ' '; i++) esc += cnt[i];
+	for (p = spec; *p; p++) esc += cnt[(unsigned char)*p];
+#ifndef WIN32
+	/* Backslashes need escaping too outside Windows */
+	esc += cnt['\\'];
+#endif
+	/* Minus sign as a first character is a special problem */
+	minus = name[0] == '-';
+
+	/* Shortest option is the unquoted string */
+	lq = l - 1;
+	/* Add to it quotes and what needs escaping within */
+#ifdef WIN32
+	/* !!! With delayed expansion '^' and '!' need extra '^' quoting them,
+	 * but I don't know how to detect if it's enabled globally, so if it is,
+	 * user is out of luck - WJ
+	 */
+	if (esc) esc = '"' , lq += cnt['%'] + 2; // Double quotes, escape '%'
+#else
+	if (esc) esc = '\'', lq += 3 * cnt['\''] + 2; // Single quotes, & escape them
+#endif
+	/* Add escaping initial minus */
+	lq += 2 * minus;
+
+	if (!buf) return (lq);
+
+	/* Do actual escaping - or not */
+	if (esc) *buf++ = esc;
+	if (minus) *buf++ = '.' , *buf++ = DIR_SEP;
+	while ((c = *name++))
+	{
+#ifdef WIN32
+		/* Double percent sign */
+		if (c == '%') *buf++ = '%';
+#else		/* Quote single quote with outquotes and backslash */
+		if (c == '\'') *buf++ = '\'' , *buf++ = '\\' , *buf++ = '\'';
+#endif
+		*buf++ = c;
+	}
+	if (esc) *buf++ = esc;
+	*buf = 0; // Terminate the string
+	return (lq);
+}
+
+static char *pat_chars = "%fNxywhXYWHCTBASM";
+enum
+{
+	PAT_percent = 0,
+	PAT_f,
+	PAT_N,
+	PAT_x,
+	PAT_y,
+	PAT_w,
+	PAT_h,
+	PAT_X,
+	PAT_Y,
+	PAT_W,
+	PAT_H,
+	PAT_C,
+	PAT_T,
+	PAT_B,
+	PAT_A,
+	PAT_S,
+	PAT_M,
+	PAT_NONE
+};
+
+char *interpolate_line(char *pattern, int cmd)
+{
+	char buf[64], *fname = NULL, *line = NULL, *pat = pattern;
+	int rgb = mem_img_bpp == 3, fform = FT_NONE, extend = !cmd;
+	int i, j, l, rect[4];
+
+	while (cmd)
 	{
 		/* Skip initial whitespace if any */
 		pat += strspn(pat, " \t");
@@ -244,6 +324,7 @@ static char *insert_temp_file(char *pattern, int where, int skip)
 		if (*pat != '>') break;
 		l = strcspn(++pat, "> \t");
 		if (!strncasecmp("RGB", pat, l)) rgb = TRUE;
+		else if (!strncmp("%", pat, l)) extend = TRUE;
 		else
 		{
 			for (i = FT_NONE + 1; i < NUM_FTYPES; i++)
@@ -260,8 +341,7 @@ static char *insert_temp_file(char *pattern, int where, int skip)
 		}
 		pat += l;
 	}
-	where -= pat - pattern;
-	if (where < 0) return (NULL); // Syntax error
+	if (!extend && !strstr(pattern, "%f")) return (pattern); // Leave alone
 
 	if (fform != FT_NONE)
 	{
@@ -272,10 +352,90 @@ static char *insert_temp_file(char *pattern, int where, int skip)
 		else fform = FT_NONE; // Give up
 	}
 
-	fname = get_temp_file(fform, rgb);
-	if (!fname) return (NULL); /* Temp save failed */
-	return (wjstrcat(NULL, 0, pat, where, "\"", fname, "\"",
-		pat + where + skip, NULL));
+	/* Current selection */
+	memset(rect, 0, sizeof(rect));
+	if (marq_status > MARQUEE_NONE) marquee_at(rect);
+
+	while (TRUE)
+	{
+		char c, *res, *p = pat;
+
+		l = 0;
+		while ((c = *p++))
+		{
+			i = PAT_NONE;
+			if ((c == '%') && *p && ((res = strchr(pat_chars, *p))) &&
+				(extend || (res == pat_chars + PAT_f)))
+				i = res - pat_chars;
+			switch (i)
+			{
+			/* Current file, quoted, for processing */
+			case PAT_f:
+				p++;
+				if (!cmd) continue; // No temp files in info mode
+				if (!fname)
+				{
+					fname = get_temp_file(fform, rgb);
+					/* Temp save failed */
+					if (!fname) return (NULL);
+				}
+				/* Add whatever quotes the filename needs */
+				j = escape_filename(line ? line + l : NULL, fname);
+				l += j;
+				continue;
+			/* Original filename, unquoted, for displaying &c. */
+			case PAT_N:
+				p++;
+				if (!mem_filename) continue;
+				j = strlen(mem_filename);
+				if (line) memcpy(line + l, mem_filename, j);
+				l += j;
+				continue;
+			/* Selected area */
+			case PAT_x:
+			case PAT_y:
+			case PAT_w:
+			case PAT_h:
+				j = rect[i - PAT_x];
+				break;
+			/* Cursor position */
+			case PAT_X: j = perim_wx; break;
+			case PAT_Y: j = perim_wy; break;
+			/* Image geometry */
+			case PAT_W: j = mem_width; break;
+			case PAT_H: j = mem_height; break;
+			/* Colors in palette */
+			case PAT_C: j = mem_cols; break;
+			/* Transparent index */
+			case PAT_T: j = mem_xpm_trans; break;
+			/* Bytes per pixel */
+			case PAT_B: j = mem_img_bpp; break;
+			/* Extra channels */
+			case PAT_A:
+			case PAT_S:
+			case PAT_M:
+				j = !!mem_img[CHN_ALPHA + i - PAT_A];
+				break;
+			/* Doubled percent sign */
+			case PAT_percent:
+				p++;
+				// Fallthrough
+			/* Everything else */
+			default:
+				if (line) line[l] = c;
+				l++;
+				continue;
+			}
+			/* Anything expanding to a number */
+			j = sprintf(buf, "%d", j);
+			if (line) memcpy(line + l, buf, j);
+			l += j;
+			p++;
+		}
+		if (line) return (line);
+		line = calloc(l + 1, 1);
+		if (!line) return (NULL); // No memory to expand this pattern
+	}
 }
 
 int spawn_expansion(char *cline, char *directory)
@@ -289,17 +449,13 @@ int spawn_expansion(char *cline, char *directory)
 	char *argv[4] = { "sh", "-c", cline, NULL };
 #endif
 
-	s1 = strstr( cline, "%f" );	// Has user included the current filename?
-	if (s1)
+	s1 = interpolate_line(cline, TRUE);
+	if (!s1) return (-1);
+	else if (s1 != cline)
 	{
-		s1 = insert_temp_file(cline, s1 - cline, 2);
-		if (s1)
-		{
-			argv[2] = s1;
-			res = spawn_process(argv, directory);
-			free(s1);
-		}
-		else return -1;
+		argv[2] = s1;
+		res = spawn_process(argv, directory);
+		free(s1);
 	}
 	else
 	{
