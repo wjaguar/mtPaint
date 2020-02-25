@@ -460,7 +460,7 @@ int csel_scan(int start, int step, int cnt, unsigned char *mask,
 					dist = l > jj ? l : jj;
 				}
 				if (dist <= info->range2)
-					SETBIT(info->pmap[j >> 5], 1 << (j & 31));
+					SETBIT(info->pmap[j >> 5], 1U << (j & 31));
 				info->pcache[j] = k;
 			}
 			if (((info->pmap[j >> 5] >> (j & 31)) ^ info->invert) & 1)
@@ -472,6 +472,7 @@ int csel_scan(int start, int step, int cnt, unsigned char *mask,
 		img += start * 3;
 		for (i = start; i < cnt; i += step , img += st3)
 		{
+			unsigned l;
 			k = MEM_2_INT(img, 0) - info->cbase;
 			if (k & 0xFFC0C0C0) /* Coarse map */
 			{
@@ -511,6 +512,7 @@ int csel_scan(int start, int step, int cnt, unsigned char *mask,
 		img += start * 3;
 		for (i = start; i < cnt; i += step , img += st3)
 		{
+			unsigned l;
 			k = img[2] < img[0] ? (img[1] < img[2] ? 2 : 0) :
 				(img[0] < img[1] ? 1 : 2);
 			j = (img[ixx[k]] << 8) + img[ixx[k + 1]] -

@@ -78,6 +78,9 @@
 #include "spawn.h"
 #include "thread.h"
 
+/* Macro for big-endian tags (IFF and BMP) */
+#define TAG4B(A,B,C,D) (((A) << 24) + ((B) << 16) + ((C) << 8) + (D))
+
 /* All-in-one transport container for animation save/load */
 typedef struct {
 	frameset fset;
@@ -612,21 +615,6 @@ static int palette_trans(ls_settings *settings, unsigned char ttb[256])
 	return (res);
 }
 
-/* Convenience wrapper - expand palette to RGB triples */
-static unsigned char *pal2rgb(unsigned char *rgb, png_color *pal)
-{
-	int i;
-
-	if (!pal) return (rgb + 768); // Nothing to expand
-	for (i = 0; i < 256; i++ , rgb += 3 , pal++)
-	{
-		rgb[0] = pal->red;
-		rgb[1] = pal->green;
-		rgb[2] = pal->blue;
-	}
-	return (rgb);
-}
-
 static void ls_init(char *what, int save)
 {
 	what = g_strdup_printf(save ? __("Saving %s image") : __("Loading %s image"), what);
@@ -732,7 +720,7 @@ static int load_png(char *file_name, ls_settings *settings, memFILE *mf)
 
 	if (setjmp(png_jmpbuf(png_ptr)))
 	{
-		res = FILE_LIB_ERROR;
+		res = settings->width ? FILE_LIB_ERROR : -1;
 		goto fail2;
 	}
 
@@ -1985,7 +1973,7 @@ static int load_jpeg(char *file_name, ls_settings *settings)
 	jerr.pub.error_exit = my_error_exit;
 	if (setjmp(jerr.setjmp_buffer))
 	{
-		res = FILE_LIB_ERROR;
+		res = settings->width ? FILE_LIB_ERROR : -1;
 		goto fail;
 	}
 	jpeg_stdio_src(&cinfo, fp);
@@ -2163,7 +2151,8 @@ static int parse_opj(opj_image_t *image, ls_settings *settings)
 {
 	opj_image_comp_t *comp;
 	unsigned char xtb[256], *dest;
-	int i, j, k, w, h, w0, nc, step, delta, shift;
+	int i, j, k, w, h, w0, nc, step, shift;
+	unsigned delta;
 	int *src, cmask = CMASK_IMAGE, res;
 
 	if (image->numcomps < 3) /* Guess this is paletted */
@@ -2200,7 +2189,7 @@ static int parse_opj(opj_image_t *image, ls_settings *settings)
 			step = 1;
 		}
 		w0 = comp->w;
-		delta = comp->sgnd ? 1 << (comp->prec - 1) : 0;
+		delta = comp->sgnd ? 1U << (comp->prec - 1) : 0;
 		shift = comp->prec > 8 ? comp->prec - 8 : 0;
 		set_xlate(xtb, comp->prec - shift);
 		for (j = 0; j < h; j++)
@@ -2516,7 +2505,8 @@ static int load_jpeg2000(char *file_name, ls_settings *settings)
 	char *fmt;
 	unsigned char xtb[256], *dest;
 	int nc, cspace, mode, slots[4];
-	int bits, shift, delta, chan, step;
+	int bits, shift, chan, step;
+	unsigned delta;
 	int i, j, k, n, nx, w, h, bpp, pr = 0, res = -1;
 
 
@@ -2629,7 +2619,7 @@ static int load_jpeg2000(char *file_name, ls_settings *settings)
 		}
 		chan = slots[i];
 		bits = jas_image_cmptprec(img, chan);
-		delta = jas_image_cmptsgnd(img, chan) ? 1 << (bits - 1) : 0;
+		delta = jas_image_cmptsgnd(img, chan) ? 1U << (bits - 1) : 0;
 		shift = bits > 8 ? bits - 8 : 0;
 		set_xlate(xtb, bits - shift);
 		for (j = 0; j < h; j++ , n++)
@@ -2638,7 +2628,7 @@ static int load_jpeg2000(char *file_name, ls_settings *settings)
 			src = jas_matrix_getref(mx, 0, 0);
 			for (k = 0; k < w; k++)
 			{
-				*dest = xtb[(unsigned)(src[k] + delta) >> shift];
+				*dest = xtb[(src[k] + delta) >> shift];
 				dest += step;
 			}
 			if (pr && ((n * 10) % nx >= nx - 10))
@@ -3608,13 +3598,16 @@ ffail:	fclose(fp);
 
 /* Macros for accessing values in Intel byte order */
 #define GET16(buf) (((buf)[1] << 8) + (buf)[0])
-#define GET32(buf) (((buf)[3] << 24) + ((buf)[2] << 16) + ((buf)[1] << 8) + (buf)[0])
+#define GET32(buf) (((signed char)(buf)[3] * 0x1000000) + ((buf)[2] << 16) + \
+	((buf)[1] << 8) + (buf)[0])
 #define PUT16(buf, v) (buf)[0] = (v) & 0xFF; (buf)[1] = (v) >> 8;
 #define PUT32(buf, v) (buf)[0] = (v) & 0xFF; (buf)[1] = ((v) >> 8) & 0xFF; \
 	(buf)[2] = ((v) >> 16) & 0xFF; (buf)[3] = (v) >> 24;
 
 /* Version 2 fields */
 #define BMP_FILESIZE  2		/* 32b */
+#define BMP_XHOT      6		/* 16b */
+#define BMP_YHOT      8		/* 16b */
 #define BMP_DATAOFS  10		/* 32b */
 #define BMP_HDR2SIZE 14		/* 32b */
 #define BMP_WIDTH    18		/* 32b */
@@ -3635,8 +3628,25 @@ ffail:	fclose(fp);
 #define BMP_AMASK    66		/* 32b */
 #define BMP_CSPACE   70		/* 32b */
 #define BMP4_HSIZE  122
+/* Version 5 fields */
+#define BMP_INTENT  122		/* 32b */
+#define BMP_ICCOFS  126		/* 32b */
+#define BMP_ICCSIZE 130		/* 32b */
 #define BMP5_HSIZE  138
 #define BMP_MAXHSIZE (BMP5_HSIZE + 256 * 4)
+
+/* OS/2 alternative fields */
+#define OS2BMP_WIDTH  18	/* 16b */
+#define OS2BMP_HEIGHT 20	/* 16b */
+#define OS2BMP_PLANES 22	/* 16b */
+#define OS2BMP_BPP    24	/* 16b */
+#define OS2BMP_HSIZE  26
+
+/* Colorspace tags */
+#define BMPCS_WIN   TAG4B('W', 'i', 'n', ' ')
+#define BMPCS_SRGB  TAG4B('s', 'R', 'G', 'B')
+#define BMPCS_LINK  TAG4B('L', 'I', 'N', 'K')
+#define BMPCS_EMBED TAG4B('M', 'B', 'E', 'D')
 
 static int load_bmp(char *file_name, ls_settings *settings, memFILE *mf)
 {
@@ -3661,16 +3671,30 @@ static int load_bmp(char *file_name, ls_settings *settings, memFILE *mf)
 	k = mfread(hdr, 1, BMP5_HSIZE, mf);
 
 	/* Check general validity */
-	if (k < BMP2_HSIZE) goto fail; /* Least supported header size */
+	if (k < OS2BMP_HSIZE) goto fail; /* Least supported header size */
 	if ((hdr[0] != 'B') || (hdr[1] != 'M')) goto fail; /* Signature */
 	l = GET32(hdr + BMP_HDR2SIZE) + BMP_HDR2SIZE;
 	if (k < l) goto fail;
 
+	/* Check format type: OS/2 or Windows */
+	if (l == OS2BMP_HSIZE)
+	{
+		w = GET16(hdr + OS2BMP_WIDTH);
+		h = GET16(hdr + OS2BMP_HEIGHT);
+		bpp = GET16(hdr + OS2BMP_BPP);
+		n = GET16(hdr + OS2BMP_PLANES);
+	}
+	else if (l >= BMP2_HSIZE)
+	{
+		w = GET32(hdr + BMP_WIDTH);
+		h = GET32(hdr + BMP_HEIGHT);
+		bpp = GET16(hdr + BMP_BPP);
+		n = GET16(hdr + BMP_PLANES);
+	}
+	else goto fail;
+
 	/* Check format */
-	if (GET16(hdr + BMP_PLANES) != 1) goto fail; /* Only one plane */
-	w = GET32(hdr + BMP_WIDTH);
-	h = GET32(hdr + BMP_HEIGHT);
-	bpp = GET16(hdr + BMP_BPP);
+	if (n != 1) goto fail; /* Only one plane */
 	if (l >= BMP3_HSIZE) comp = GET32(hdr + BMP_COMPRESS);
 	/* Only 1, 4, 8, 16, 24 and 32 bpp allowed */
 	switch (bpp)
@@ -3743,13 +3767,13 @@ static int load_bmp(char *file_name, ls_settings *settings, memFILE *mf)
 		j = 0;
 		if (l >= BMP_COLORS + 4) j = GET32(hdr + BMP_COLORS);
 		if (!j) j = 1 << bpp;
-		k = GET32(hdr + BMP_DATAOFS) - l;
-		k /= l < BMP3_HSIZE ? 3 : 4;
-		if (k < j) j = k;
-		if (!j || (j > 256)) goto fail; /* Wrong palette size */
+		n = GET32(hdr + BMP_DATAOFS) - l;
+		n /= k = l < BMP2_HSIZE ? 3 : 4;
+		if (n < j) j = n;
+		if (j < 1) goto fail; /* Wrong palette size */
+		if (j > 256) j = 256; /* Let overlarge palette be */
 		settings->colors = j;
 		mfseek(mf, l, SEEK_SET);
-		k = l < BMP3_HSIZE ? 3 : 4;
 		i = mfread(tbuf, 1, j * k, mf);
 		if (i < j * k) goto fail; /* Cannot read palette */
 		tmp = tbuf;
@@ -3776,11 +3800,32 @@ static int load_bmp(char *file_name, ls_settings *settings, memFILE *mf)
 		bl = GET32(hdr + BMP_FILESIZE) - GET32(hdr + BMP_DATAOFS);
 	/* Otherwise, only one row at a time */
 	else bl = rl;
+	/* Sanity check */
+	res = -1;
+	if (bl <= 0) goto fail;
 	/* To accommodate bitparser's extra step */
 	buf = malloc(bl + 1);
 	res = FILE_MEM_ERROR;
 	if (!buf) goto fail;
 	if ((res = allocate_image(settings, cmask))) goto fail2;
+
+#ifdef U_LCMS
+	/* V5 can have embedded ICC profile */
+	while (!settings->icc_size && (l == BMP5_HSIZE) &&
+		(GET32(hdr + BMP_CSPACE) == BMPCS_EMBED))
+	{
+		unsigned char *icc = NULL;
+		int n, size = GET32(hdr + BMP_ICCSIZE);
+		if (size <= 0) break; // Avoid the totally crazy
+		icc = malloc(size);
+		if (!icc) break;
+		mfseek(mf, GET32(hdr + BMP_ICCOFS) + BMP_HDR2SIZE, SEEK_SET);
+		n = mfread(icc, 1, size, mf);
+		if (n != size) free(icc); // Failed
+		else settings->icc_size = size , settings->icc = icc; // Got it
+		break;
+	}
+#endif
 
 	if (!settings->silent) ls_init("BMP", 0);
 
@@ -3838,7 +3883,7 @@ static int load_bmp(char *file_name, ls_settings *settings, memFILE *mf)
 				k = 1;
 			}
 			else tmp = settings->img[CHN_IMAGE] + i;
-			set_xlate(xlat, bpps[i]);
+			set_xlate(xlat, bpps[i] + !bpps[i]); // Let 0-wide fields be
 			n = w * h;
 			for (j = 0; j < n; j++ , tmp += k) *tmp = xlat[*tmp];
 		}
@@ -3924,8 +3969,9 @@ static int load_bmp(char *file_name, ls_settings *settings, memFILE *mf)
 			/* Row skip */
 			for (ii = 0; ii < dy; ii++ , i--)
 			{
-				if (skip > 1) memset(settings->img[CHN_ALPHA] +
-					w * i + j, 0, w - j);
+				if ((skip > 1) && (j < w))
+					memset(settings->img[CHN_ALPHA] + w * i + j,
+						0, w - j);
 				j = 0;
 				ls_progress(settings, h - i - 1, 10);
 			}
@@ -5936,13 +5982,13 @@ static int save_pcx(char *file_name, ls_settings *settings)
 
 /* Macros for accessing values in Motorola byte order */
 #define GET16B(buf) (((buf)[0] << 8) + (buf)[1])
-#define GET32B(buf) (((buf)[0] << 24) + ((buf)[1] << 16) + ((buf)[2] << 8) + (buf)[3])
+#define GET32B(buf) (((unsigned)(buf)[0] << 24) + ((buf)[1] << 16) + \
+	((buf)[2] << 8) + (buf)[3])
 #define PUT16B(buf, v) (buf)[0] = (v) >> 8; (buf)[1] = (v) & 0xFF;
 #define PUT32B(buf, v) (buf)[0] = (v) >> 24; (buf)[1] = ((v) >> 16) & 0xFF; \
 	(buf)[2] = ((v) >> 8) & 0xFF; (buf)[3] = (v) & 0xFF;
 
 /* Macros for IFF tags; big-endian too */
-#define TAG4B(A,B,C,D) (((A) << 24) + ((B) << 16) + ((C) << 8) + (D))
 #define TAG4B_FORM TAG4B('F', 'O', 'R', 'M')
 #define TAG4B_ILBM TAG4B('I', 'L', 'B', 'M')
 #define TAG4B_PBM  TAG4B('P', 'B', 'M', ' ')
@@ -6342,7 +6388,7 @@ static int load_lbm(char *file_name, ls_settings *settings)
 				int n, n16, v, i, j;
 				i = y - pstart;
 				j = (i >> 5) * 4;
-				if (!(((unsigned)GET32B(mpp + j) >> (~i & 0x1F)) & 1))
+				if (!((GET32B(mpp + j) >> (~i & 0x1F)) & 1))
 					break; // Nothing to do for this line
 				n16 = pr[1]; // Colors 16-31 for this many
 				n = pr[0] + n16; // Total indices

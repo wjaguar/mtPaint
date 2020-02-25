@@ -2995,15 +2995,15 @@ static int lookup_srgb(double *srgb)
 
 	/* Check if there is extended precision */
 	k = ((col[0] & 0xFC) << 10) + ((col[1] & 0xFC) << 4) + (col[2] >> 2);
-	if (ctp->lcmap[k >> 5] & (1 << (k & 31))) k = 64 * 64 * 64 +
+	if (ctp->lcmap[k >> 5] & (1U << (k & 31))) k = 64 * 64 * 64 +
 		ctp->cmap[k] * 64 + ((col[0] & 3) << 4) +
 		((col[1] & 3) << 2) + (col[2] & 3);
 	else n = 256; /* Use posterized values for 6-bit part */
 
 	/* Use colour cache if possible */
-	if (!(ctp->xcmap[k >> 5] & (1 << (k & 31))))
+	if (!(ctp->xcmap[k >> 5] & (1U << (k & 31))))
 	{
-		ctp->xcmap[k >> 5] |= 1 << (k & 31);
+		ctp->xcmap[k >> 5] |= 1U << (k & 31);
 		ctp->cmap[k] = find_nearest(col, n);
 	}
 
@@ -3050,7 +3050,7 @@ int mem_dither(unsigned char *old, int ncols, short *dither, int cspace,
 		k = ((mem_pal[i].red & 3) << 4) +
 			((mem_pal[i].green & 3) << 2) +
 			(mem_pal[i].blue & 3);
-		ctp->xcmap[l * 4 + (k & 1)] |= 1 << (k >> 1);
+		ctp->xcmap[l * 4 + (k & 1)] |= 1U << (k >> 1);
 	}
 	memset(ctp->cmap, 0, 64 * 64 * 64);
 	for (k = 0 , i = 4; i < 256 * 4; i += 4)
@@ -3061,7 +3061,7 @@ int mem_dither(unsigned char *old, int ncols, short *dither, int cspace,
 			continue;
 		rgb8b = TRUE; /* Force 8-bit precision */
 		j = ctp->xcmap[i + 2];
-		ctp->lcmap[j >> 5] |= 1 << (j & 31);
+		ctp->lcmap[j >> 5] |= 1U << (j & 31);
 		ctp->cmap[j] = k++;
 	}
 	memset(ctp->xcmap, 0, 257 * 4 * sizeof(guint32));
@@ -3848,6 +3848,53 @@ void mem_normalize()		// Normalize contrast in image or palette
 	}
 }
 
+void mem_remap_rgb(unsigned char *map, int what) // Remap V/R/G/B to color
+{
+	unsigned char *w, *img = mem_img[CHN_IMAGE];
+	int cnt = mem_width * mem_height;
+
+	/* Value */
+	if (!what) while (cnt-- > 0)
+	{
+		int n = img[0] > img[1] ? img[0] : img[1];
+		n = n > img[2] ? n : img[2];
+		w = map + n * 3;
+		*img++ = w[0];
+		*img++ = w[1];
+		*img++ = w[2];
+	}
+	/* R/G/B */
+	else while (cnt-- > 0)
+	{
+		w = map + img[what - 1] * 3;
+		*img++ = w[0];
+		*img++ = w[1];
+		*img++ = w[2];
+	}
+
+	w = calloc(1, mem_width);
+	if (w)
+	{
+		mask_merge(mem_undo_previous(CHN_IMAGE), CHN_IMAGE, w);
+		free(w);
+	}
+}
+
+/* Convenience wrapper - expand palette to RGB triples */
+unsigned char *pal2rgb(unsigned char *rgb, png_color *pal)
+{
+	int i;
+
+	if (!pal) return (rgb + 768); // Nothing to expand
+	for (i = 0; i < 256; i++ , rgb += 3 , pal++)
+	{
+		rgb[0] = pal->red;
+		rgb[1] = pal->green;
+		rgb[2] = pal->blue;
+	}
+	return (rgb);
+}
+
 /* !!! The rectangles here exclude bottom & right border */
 int clip(int *rxy, int x0, int y0, int x1, int y1, const int *vxy)
 {
@@ -4545,7 +4592,7 @@ static int wjfloodfill(int x, int y, int col, unsigned char *bmap)
 				}
 				/* Far map */
 				j = coords[(i & 2) ^ 3] & (QMINSIZE - 1);
-				maps[i] |= 1 << j;
+				maps[i] |= 1U << j;
 			}
 		}
 
@@ -7420,7 +7467,7 @@ int mem_count_all_cols_real(unsigned char *im, int w, int h)	// Count all colour
 	for (i = 0; i < k; i++)			// Scan each pixel
 	{
 		ix = (im[0] >> 5) + (im[1] << 3) + (im[2] << 11);
-		tab[ix] |= 1 << (im[0] & 31);
+		tab[ix] |= 1U << (im[0] & 31);
 		im += 3;
 	}
 

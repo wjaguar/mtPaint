@@ -71,18 +71,9 @@ void progress_end();					// Close progress window
 
 int alert_box(char *title, char *message, char *text1, ...);
 
-// Slider-spin combo (practically a new widget class)
+// Slider-spin combo (a decorated spinbutton)
 
 GtkWidget *mt_spinslide_new(int swidth, int sheight);
-void mt_spinslide_set_range(GtkWidget *spinslide, int minv, int maxv);
-int mt_spinslide_get_value(GtkWidget *spinslide);
-int mt_spinslide_read_value(GtkWidget *spinslide);
-void mt_spinslide_set_value(GtkWidget *spinslide, int value);
-/* void handler(GtkAdjustment *adjustment, gpointer user_data); */
-void mt_spinslide_connect(GtkWidget *spinslide, GtkSignalFunc handler,
-	gpointer user_data);
-#define SPINSLIDE_ADJUSTMENT(s) \
-	(GTK_SPIN_BUTTON(BOX_CHILD_1(s))->adjustment)
 #define ADJ2INT(a) ((int)rint((a)->value))
 
 // Self-contained package of radio buttons

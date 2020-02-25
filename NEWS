@@ -21,6 +21,7 @@ Here is a summary of the main changes in this release (see handbook for full det
 	* Builtin Bayer patterns now can be redefined : See handbook section A.6.1 for details
 	* Threshold effect with interactive preview added (see handbook section 6.6.7)
 	* Normalize effect added
+	* Map effect added: map image's value/red/green/blue to gradient/palette/clipboard
 	* Colour transform and source selection added to blend mode options
 	* Threshold blend mode added
 	* "Saturate more" blend mode redefined to not ignore source (previous behaviour available with "Image" source selected)
@@ -41,6 +42,8 @@ Here is a summary of the main changes in this release (see handbook for full det
 	* WebP file format save/load added
 	* LBM file format (ILBM/PBM) save/load added
 	* XPM files with 65-92 colours are now saved with smaller size
+	* ICC colour profiles embedded in BMP images now can be applied on load
+	* OS/2 BMP files now load properly
 	* Raw RGB palette files (6-bit PAL and 8-bit ACT) can now be loaded/saved via the Palette menu
 	* TIFF compression made configurable
 	* Dimensions can now be specified when loading SVG files
@@ -75,6 +78,8 @@ Here is a summary of the main changes in this release (see handbook for full det
 	* BUGFIX - Flood fill with pattern now works when starting on colour A
 	* BUGFIX - Saving LSS16 images no longer produces broken files in certain rare cases
 	* BUGFIX - Trying to load a broken LSS16 file (truncated to header or less) no longer causes crash
+	* BUGFIX - Loading certain broken BMP files no longer causes crash
+	* BUGFIX - JPEG and PNG files damaged beyond all hope now properly fail to load (instead of just a library error and 0x0 image)
 	* BUGFIX - PAM files with type BLACKANDWHITE are no longer loaded as grayscale (except if written as grayscale - ImageMagick does that)
 	* BUGFIX - Loading PAM files with unknown TUPLTYPE doesn't cause crash
 	* BUGFIX - SVG files starting with "<!DOCTYPE" no longer fail to load

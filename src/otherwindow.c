@@ -2909,7 +2909,7 @@ static void *seg_code[] = {
 	TABLE2(3),
 	REF(tspin), TFSPIN(_("Threshold"), threshold, 0, 500000),
 	EVENT(CHANGE, seg_spin_changed),
-	TSPIN(_("Level"), rank, 0, 32), EVENT(CHANGE, seg_spin_changed),
+	TSPIN(_("Level"), rank, 0, 30), EVENT(CHANGE, seg_spin_changed),
 	TSPINa(_("Minimum size"), size), EVENT(CHANGE, seg_spin_changed),
 	WDONE,
 	EQBOX,

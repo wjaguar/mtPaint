@@ -4934,6 +4934,8 @@ void action_dispatch(int action, int mode, int state, int kbd)
 		pressed_fx(mode); break;
 	case FILT_BACT:
 		pressed_bacteria(); break;
+	case FILT_MAP:
+		pressed_map(); break;
 	case FILT_THRES:
 		pressed_threshold(); break;
 	case FILT_UALPHA:
@@ -5510,6 +5512,8 @@ static void *main_menu_code[] = {
 		SHORTCUT(g, CS),
 	MENUITEMs(_("//Normalize"), ACTMOD(FILT_NORM, 0)),
 	MENUITEMs(_("//Threshold ..."), ACTMOD(DLG_XHOLD, 0)),
+	MENUITEMs(_("//Map ..."), ACTMOD(FILT_MAP, 0)),
+		ACTMAP(NEED_24),
 	SUBMENU(_("//Isometric Transformation")),
 	MENUTEAR, ///
 	MENUITEMs(_("///Left Side Down"), ACTMOD(ACT_ISOMETRY, 0)),

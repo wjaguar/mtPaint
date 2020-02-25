@@ -260,7 +260,7 @@ int alert_box(char *title, char *message, char *text1, ...)
 	return (res);
 }
 
-// Slider-spin combo (practically a new widget class)
+// Slider-spin combo (a decorated spinbutton)
 
 GtkWidget *mt_spinslide_new(int swidth, int sheight)
 {
@@ -280,45 +280,7 @@ GtkWidget *mt_spinslide_new(int swidth, int sheight)
 	gtk_box_pack_start(GTK_BOX(box), spin, swidth >= 0, TRUE, 2);
 
 	gtk_widget_show_all(box);
-	return (box);
-}
-
-void mt_spinslide_set_range(GtkWidget *spinslide, int minv, int maxv)
-{
-	GtkAdjustment *adj = SPINSLIDE_ADJUSTMENT(spinslide);
-
-	adj->lower = minv;
-	adj->upper = maxv;
-	gtk_adjustment_changed(adj);
-}
-
-int mt_spinslide_get_value(GtkWidget *spinslide)
-{
-	GtkSpinButton *spin = GTK_SPIN_BUTTON(BOX_CHILD_1(spinslide));
-
-	gtk_spin_button_update(spin);
-	return (gtk_spin_button_get_value_as_int(spin));
-}
-
-/* Different in that this doesn't force slider to integer-value position */
-int mt_spinslide_read_value(GtkWidget *spinslide)
-{
-	GtkSpinButton *spin = GTK_SPIN_BUTTON(BOX_CHILD_1(spinslide));
-	return (gtk_spin_button_get_value_as_int(spin));
-}
-
-void mt_spinslide_set_value(GtkWidget *spinslide, int value)
-{
-	GtkSpinButton *spin = GTK_SPIN_BUTTON(BOX_CHILD_1(spinslide));
-	gtk_spin_button_set_value(spin, value);
-}
-
-/* void handler(GtkAdjustment *adjustment, gpointer user_data); */
-void mt_spinslide_connect(GtkWidget *spinslide, GtkSignalFunc handler,
-	gpointer user_data)
-{
-	GtkAdjustment *adj = SPINSLIDE_ADJUSTMENT(spinslide);
-	gtk_signal_connect(GTK_OBJECT(adj), "value_changed", handler, user_data);
+	return (spin);
 }
 
 // Managing batches of radio buttons with minimum of fuss

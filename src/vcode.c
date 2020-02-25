@@ -4781,6 +4781,17 @@ void rw_pos(v_dd *vdata, int set)
 	}
 }
 
+static GtkWidget *get_wrap(void **slot)
+{
+	GtkWidget *w = slot[0];
+	int op = GET_OP(slot);
+	if ((op == op_SPINSLIDE) || (op == op_SPINSLIDEa) ||
+//		(op == op_CANVASIMG) || (op == op_CANVASIMGB) || // Leave frame be
+		(op == op_PATHs) || (op == op_PATH) || (op == op_TEXT))
+		w = w->parent;
+	return (w);
+}
+
 /* Prepare widget for packing according to settings */
 GtkWidget *do_prepare(GtkWidget *widget, int pk, int cw, int minw, int minh)
 {
@@ -5946,14 +5957,15 @@ void **run_create_(void **ifcode, void *ddata, int ddsize, char **script)
 			int z = lp > 3 ? (int)pp[4] : 0;
 			widget = mt_spinslide_new(z > 0xFFFF ? z >> 16 : -1,
 				z & 0xFFFF ? z & 0xFFFF : -1);
-			if (op == op_SPINSLIDEa) mt_spinslide_set_range(widget,
+			if (op == op_SPINSLIDEa) spin_set_range(widget,
 				((int *)v)[1], ((int *)v)[2]);
-			else mt_spinslide_set_range(widget, (int)pp[2], (int)pp[3]);
-			mt_spinslide_set_value(widget, *(int *)v);
+			else spin_set_range(widget, (int)pp[2], (int)pp[3]);
+			gtk_spin_button_set_value(GTK_SPIN_BUTTON(widget), *(int *)v);
 			tpad = GET_BORDER(SPINSLIDE);
 #if GTK_MAJOR_VERSION == 1
 			have_sliders = TRUE;
 #endif
+			pk |= pkf_PARENT;
 			break;
 		}
 		/* Add a named checkbox, fill from field/var/inifile */
@@ -6602,7 +6614,7 @@ void **run_create_(void **ifcode, void *ddata, int ddsize, char **script)
 		case op_WPWHEREVER: wpos = GTK_WIN_POS_NONE; continue;
 		/* Make last referrable widget hidden */
 		case op_HIDDEN:
-			gtk_widget_hide(*origin_slot(PREV_SLOT(r)));
+			gtk_widget_hide(get_wrap(origin_slot(PREV_SLOT(r))));
 			continue;
 		/* Make last referrable widget insensitive */
 		case op_INSENS:
@@ -6793,13 +6805,10 @@ void **run_create_(void **ifcode, void *ddata, int ddsize, char **script)
 // !!! Support only what actually used on, and their brethren
 			switch (what)
 			{
+			case op_SPINSLIDE: case op_SPINSLIDEa:
 			case op_SPIN: case op_SPINc: case op_SPINa:
 			case op_FSPIN:
 				spin_connect(*slot,
-					GTK_SIGNAL_FUNC(get_evt_1), r);
-				break;
-			case op_SPINSLIDE: case op_SPINSLIDEa:
-				mt_spinslide_connect(*slot,
 					GTK_SIGNAL_FUNC(get_evt_1), r);
 				break;
 			case op_CHECK: case op_CHECKb:
@@ -6983,7 +6992,7 @@ static void *do_query(char *data, void **wdata, int mode)
 	for (; (pp = wdata[1]); wdata = NEXT_SLOT(wdata))
 	{
 		op = (int)*pp++;
-		v = op & (~0 << WB_LSHIFT) ? pp[0] : NULL;
+		v = op & (~0U << WB_LSHIFT) ? pp[0] : NULL;
 		if (op & WB_FFLAG) v = data + (int)v;
 		if (op & WB_NFLAG) v = *(void **)v; // dereference
 		if (IS_UNREAL(wdata)) op = GET_UOP(wdata);
@@ -6996,6 +7005,7 @@ static void *do_query(char *data, void **wdata, int mode)
 		case op_uFPICK:
 			strncpy0(v, ((swdata *)*wdata)->strs, PATHBUF);
 			break;
+		case op_SPINSLIDE: case op_SPINSLIDEa:
 		case op_SPIN: case op_SPINc: case op_SPINa:
 			*(int *)v = mode & 1 ? gtk_spin_button_get_value_as_int(
 				GTK_SPIN_BUTTON(*wdata)) : read_spin(*wdata);
@@ -7011,10 +7021,6 @@ static void *do_query(char *data, void **wdata, int mode)
 			*(int *)v = rint((mode & 1 ?
 				GTK_SPIN_BUTTON(*wdata)->adjustment->value :
 				read_float_spin(*wdata)) * 100);
-			break;
-		case op_SPINSLIDE: case op_SPINSLIDEa:
-			*(int *)v = (mode & 1 ? mt_spinslide_read_value :
-				mt_spinslide_get_value)(*wdata);
 			break;
 		case op_CHECK: case op_CHECKb: case op_TOGGLE:
 		case op_TBTOGGLE: case op_TBBOXTOG:
@@ -7239,6 +7245,7 @@ void cmd_reset(void **slot, void *ddata)
 			if ((opf & WB_OPMASK) == op_uOP)
 				group = !group || (opf & WB_SFLAG);
 			break;
+		case op_SPINSLIDE: case op_SPINSLIDEa:
 		case op_SPIN: case op_SPINc: case op_SPINa:
 			gtk_spin_button_set_value(*wdata, *(int *)v);
 			break;
@@ -7261,9 +7268,6 @@ void cmd_reset(void **slot, void *ddata)
 			*vp = wdata; // Unlock
 			break;
 		}
-		case op_SPINSLIDE: case op_SPINSLIDEa:
-			mt_spinslide_set_value(*wdata, *(int *)v);
-			break;
 		case op_uSPIN: case op_uSPINa:
 		{
 			swdata *sd = *wdata;
@@ -7441,7 +7445,7 @@ void cmd_sensitive(void **slot, int state)
 	}
 	op = GET_OP(slot);
 	if (op >= op_EVT_0) return; // only widgets
-	gtk_widget_set_sensitive(slot[0], state);
+	gtk_widget_set_sensitive(get_wrap(slot), state);
 }
 
 static int midmatch(const char *s, const char *v, int l)
@@ -7929,7 +7933,7 @@ int cmd_run_script(void **slot, char **strs)
 
 void cmd_showhide(void **slot, int state)
 {
-	GtkWidget *ws = NULL;
+	GtkWidget *wrap, *ws = NULL;
 	void **keymap = NULL;
 	int raise = FALSE, unfocus = FALSE, mx = FALSE;
 
@@ -7946,7 +7950,8 @@ void cmd_showhide(void **slot, int state)
 		return;
 	}
 	if (GET_OP(slot) >= op_EVT_0) return; // only widgets
-	if (!GTK_WIDGET_VISIBLE(slot[0]) ^ !!state) return; // no use
+	wrap = get_wrap(slot); // For *some* pkf_PARENT widgets, hide/show their parent
+	if (!GTK_WIDGET_VISIBLE(wrap) ^ !!state) return; // no use
 	if (GET_OP(PREV_SLOT(slot)) == op_WDONE) // toplevels are special
 	{
 		v_dd *vdata = GET_VDATA(PREV_SLOT(slot));
@@ -8006,7 +8011,7 @@ void cmd_showhide(void **slot, int state)
 			gtk_window_set_transient_for(GTK_WINDOW(w), NULL);
 		}
 	}
-	widget_showhide(slot[0], state);
+	widget_showhide(wrap, state);
 	/* !!! Window must be visible, or maximize fails if either dimension is
 	 * already at max, with KDE3 & 4 at least - WJ */
 	if (mx) set_maximized(slot[0]);
@@ -8124,12 +8129,10 @@ void cmd_set(void **slot, int v)
 		gtk_widget_unref(w);
 		break;
 	}
-	case op_SPINSLIDE: case op_SPINSLIDEa:
-		mt_spinslide_set_value(slot[0], v);
-		break;
 	case op_NOSPIN:
 		spin_set_range(slot[0], v, v);
 		break;
+	case op_SPINSLIDE: case op_SPINSLIDEa:
 	case op_SPIN: case op_SPINc: case op_SPINa:
 		gtk_spin_button_set_value(slot[0], v);
 		break;
@@ -8512,12 +8515,6 @@ void cmd_setv(void **slot, void *res, int idx)
 		gtk_notebook_set_show_tabs(slot[0], (int)res);
 		break;
 	case op_SPINSLIDE: case op_SPINSLIDEa:
-	{
-		int *v = res, n = v[0];
-		mt_spinslide_set_range(slot[0], v[1], v[2]);
-		mt_spinslide_set_value(slot[0], n);
-		break;
-	}
 	case op_SPIN: case op_SPINc: case op_SPINa:
 	{
 		int *v = res, n = v[0];
@@ -8829,7 +8826,7 @@ int cmd_checkv(void **slot, int idx)
 	else if (op < op_EVT_0) // Regular widget
 	{
 		if (idx == SLOT_SENSITIVE)
-			return (GTK_WIDGET_SENSITIVE(slot[0]));
+			return (GTK_WIDGET_SENSITIVE(get_wrap(slot)));
 		if (idx == SLOT_FOCUSED)
 		{
 			GtkWidget *w = gtk_widget_get_toplevel(slot[0]);

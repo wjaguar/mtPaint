@@ -149,6 +149,7 @@ enum { // To let constants renumber themselves when adding new ones
 	FILT_UALPHA,
 	FILT_KUWAHARA,
 	FILT_NORM,
+	FILT_MAP,
 
 	ACT_TEST /* Reserved for testing things */
 };

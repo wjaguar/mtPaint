@@ -709,6 +709,7 @@ void mem_pal_load_def();		// Load default palette
 
 #define mem_pal_copy(A, B) memcpy((A), (B), SIZEOF_PALETTE)
 void mem_pal_init();			// Initialise whole of palette RGB
+unsigned char *pal2rgb(unsigned char *rgb, png_color *pal);	// Palette to image
 double pal2B(png_color *c);		// Linear brightness for palette color
 void mem_greyscale(int gcor);		// Convert image to greyscale
 void do_convert_rgb(int start, int step, int cnt, unsigned char *dest,
@@ -732,6 +733,7 @@ void mem_find_dither(int red, int green, int blue);
 int mem_quantize( unsigned char *old_mem_image, int target_cols, int type );
 void mem_invert();			// Invert the palette
 void mem_normalize();			// Normalize contrast in image or palette
+void mem_remap_rgb(unsigned char *map, int what); // Remap V/R/G/B to color
 
 //	Clear/set protection (what = NULL - color n, n = -1 - all colors)
 void mem_mask_setv(int *what, int n, int state);
