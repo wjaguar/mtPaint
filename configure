@@ -4,8 +4,8 @@
 
 echo
 
-MT_V="3.49.21"
-MT_DATE="2020-02-25"
+MT_V="3.49.22"
+MT_DATE="2020-03-01"
 
 MT_VERSION="mtPaint $MT_V"
 MT_LANG=NO
@@ -13,6 +13,7 @@ MT_MAN=NO
 MT_POD=NO
 MT_CPICK=mtpaint
 MT_FPICK=mtpaint
+MT_LISTS=2
 MT_ANIM=Gifsicle
 ICON_SET=icons1
 
@@ -88,6 +89,7 @@ do
 	"pod" )		MT_POD=YES;;
 	"gtkfilesel" )	MT_FPICK=gtkfilesel;;
 	"gtkcolsel" )	MT_CPICK=gtkcolsel;;
+	"oldlists" )	MT_LISTS=1;;
 	"imagick" )	MT_ANIM=ImageMagick;;
 	"icons"* )	ICON_SET=$A;;
 	"win" )		OS="MinGW/MSYS"
@@ -166,6 +168,7 @@ gtk2 ............. Configure for GTK+2
 gtk2.VER ......... Configure for GTK+2, minor version VER
 gtkfilesel ....... Use GtkFileSelection file picker
 gtkcolsel ........ Use GtkColorSelection colour picker
+oldlists ......... Use GtkList and GtkCList lists
 imagick .......... Use ImageMagick for GIF animation tasks
 
 thread ........... Use multithreading
@@ -669,17 +672,17 @@ then
 	GTKPREFIX=`PKGCONFIG gtk+ --variable=prefix`
 	INCLUDES="$INCLUDES `PKGCONFIG gtk+ $THREADS --cflags`"
 	LIBS="$LIBS `PKGCONFIG gtk+ $THREADS --libs`"
-elif [ "GTK" = 2 ] && [ "$OS" != "${OS%/MSYS}" ]
+elif [ "$GTK" = 2 ] && [ "$OS" != "${OS%/MSYS}" ]
 then # Windows system w/o working pkg-config
 	GTKPREFIX=/
 	INCLUDES="$INCLUDES -I/include/gtk-2.0 -I/lib/gtk-2.0/include -I/include/atk-1.0 -I/include/pango-1.0 -I/include/freetype2 -I/include/glib-2.0 -I/lib/glib-2.0/include"
 	LIBS="$LIBS -lgtk-win32-2.0 -lgdk-win32-2.0 -lpango-1.0 -lglib-2.0 -lgobject-2.0 -lgdk_pixbuf-2.0 ${THREADS:+-lgthread-2.0}"
-elif [ "GTK" = 1 ] && gtk-config --cflags > /dev/null
+elif [ "$GTK" = 1 ] && gtk-config --cflags > /dev/null
 then # Very old GNU/Linux system
 	GTKPREFIX=`gtk-config gtk --prefix`
 	INCLUDES="$INCLUDES `gtk-config gtk $THREADS --cflags`"
 	LIBS="$LIBS `gtk-config gtk $THREADS --libs | sed 's/-rdynamic//'`"
-elif [ "GTK" = 1 ]
+elif [ "$GTK" = 1 ]
 then # Even older GNU/Linux system
 	GTKPREFIX=/opt/gnome
 	GTK_INCLUDE="-I$GTKPREFIX/include/gtk-1.2 -I$GTKPREFIX/include/glib-1.2 -I$GTKPREFIX/lib/glib/include -I/usr/X11R6/include"
@@ -704,6 +707,11 @@ fi
 [ "$GTK" = 2 ] && [ "$LIBS" != "${LIBS#*gdk-x11}" ] && LIBS="$LIBS -lX11"
 # GTK+2 version to use
 DEFS="$DEFS${GTK2VERSION:+ -DGTK2VERSION=$GTK2VERSION}"
+# List widgets to use
+[ "$GTK" = 1 ] && MT_LISTS=1
+[ ${GTK2VERSION:-18} -lt 18 ] && MT_LISTS=1
+[ "$FOUND_GTK" != 2 ] || PKGCONFIG --atleast-version=2.18 gtk+-2.0 || MT_LISTS=1
+[ "$MT_LISTS" = 1 ] && DEFS="$DEFS -DU_LISTS_GTK1"
 
 ### 
 
@@ -772,6 +780,7 @@ General
     Version             $MT_V
     System              $OS
     Toolkit             GTK+$GTK${GTK2VERSION:+.$GTK2VERSION}
+    Lists               GTK+$MT_LISTS
     File Picker         $MT_FPICK
     Colour Picker       $MT_CPICK
     Animation Package   $MT_ANIM

@@ -2424,13 +2424,6 @@ static GtkWidget *mkpack(int mode, int d, int ref, char *ddata, void **r)
 		mode ? GTK_SIGNAL_FUNC(get_evt_1_t) : GTK_SIGNAL_FUNC(get_evt_1)));
 }
 
-//	COLORLIST widget
-
-typedef struct {
-	unsigned char *col;
-	int cnt, *idx;
-} colorlist_data;
-
 // !!! ref to RGB[3]
 static gboolean col_expose(GtkWidget *widget, GdkEventExpose *event,
 	unsigned char *col)
@@ -2446,6 +2439,14 @@ static gboolean col_expose(GtkWidget *widget, GdkEventExpose *event,
 	return (TRUE);
 }
 
+//	COLORLIST widget
+
+typedef struct {
+	unsigned char *col;
+	int cnt, *idx;
+} colorlist_data;
+
+#ifdef U_LISTS_GTK1
 static gboolean colorlist_click(GtkWidget *widget, GdkEventButton *event,
 	gpointer user_data)
 {
@@ -2569,6 +2570,134 @@ static void list_scroll_in(GtkWidget *widget, gpointer user_data)
 		adj->upper - adj->page_size : y;
 	gtk_adjustment_value_changed(adj);
 }
+#endif
+
+#ifndef U_LISTS_GTK1
+static gboolean colorlist_click(GtkWidget *widget, GdkEventButton *event,
+	gpointer user_data)
+{
+	void **slot = user_data;
+	void **base = slot[0], **desc = slot[1];
+	colorlist_ext xdata;
+	GtkTreePath *tp;
+
+	if ((event->type == GDK_BUTTON_PRESS) &&
+		(event->window == gtk_tree_view_get_bin_window(GTK_TREE_VIEW(widget))) &&
+		gtk_tree_view_get_path_at_pos(GTK_TREE_VIEW(widget), event->x, event->y,
+			&tp, NULL, NULL, NULL))
+	{
+		xdata.idx = gtk_tree_path_get_indices(tp)[0];
+		gtk_tree_path_free(tp);
+		xdata.button = event->button;
+		((evtx_fn)desc[1])(GET_DDATA(base), base,
+			(int)desc[0] & WB_OPMASK, slot, &xdata);
+	}
+
+	/* Let click processing continue */
+	return (FALSE);
+}
+
+static void colorlist_select(GtkTreeView *tree, gpointer user_data)
+{
+	void **orig = user_data, **slot = SLOT_N(orig, 2);
+	void **base = slot[0], **desc = slot[1];
+	colorlist_data *dt = orig[2];
+	GtkTreePath *tp;
+
+	/* Update the value */
+	gtk_tree_view_get_cursor(tree, &tp, NULL);
+	*dt->idx = gtk_tree_path_get_indices(tp)[0];
+	gtk_tree_path_free(tp);
+	/* Call the handler */
+	if (desc[1]) ((evt_fn)desc[1])(GET_DDATA(base), base,
+		(int)desc[0] & WB_OPMASK, slot);
+}
+
+// !!! And with inlining this, problem also
+GtkWidget *colorlist(void **r, char *ddata)
+{
+	GtkListStore *ls;
+	GtkCellRenderer *ren;
+	GtkTreePath *tp;
+	GtkWidget *w;
+	colorlist_data *dt = r[2];
+	void *v, **pp = r[1];
+	char txt[64], *t, **sp = NULL;
+	int i, cnt = 0, *idx = r[0];
+
+	// Fill datablock
+	v = ddata + (int)pp[2];
+	if (((int)pp[0] & WB_OPMASK) == op_COLORLIST) // array of names
+	{
+		sp = *(char ***)v;
+		while (sp[cnt]) cnt++;
+	}
+	else cnt = *(int *)v; // op_COLORLISTN - number
+	dt->cnt = cnt;
+	dt->col = (void *)(ddata + (int)pp[3]); // palette
+	dt->idx = idx;
+
+	ls = gtk_list_store_new(2, GDK_TYPE_PIXBUF, G_TYPE_STRING);
+	for (i = 0; i < cnt; i++)
+	{
+		GtkTreeIter it;
+		GdkPixbuf *p = gdk_pixbuf_new(GDK_COLORSPACE_RGB, FALSE, 8, 20, 20);
+		gdk_pixbuf_fill(p, ((unsigned)MEM_2_INT(dt->col, i * 3) << 8) + 0xFF);
+		gtk_list_store_append(ls, &it);
+		/* Name or index */
+		if (sp) t = _(sp[i]);
+		else sprintf(t = txt, "%d", i);
+		gtk_list_store_set(ls, &it, 0, p, 1, t, -1);
+		g_object_unref(p);
+	}
+	w = gtk_tree_view_new_with_model(GTK_TREE_MODEL(ls));
+	gtk_tree_view_set_enable_search(GTK_TREE_VIEW(w), FALSE);
+	gtk_tree_selection_set_mode(gtk_tree_view_get_selection(GTK_TREE_VIEW(w)),
+		GTK_SELECTION_BROWSE);
+	ren = gtk_cell_renderer_pixbuf_new();
+	g_object_set(ren, "width", 20 + 3, "xalign", 1.0, "ypad", 3, NULL);
+	gtk_tree_view_append_column(GTK_TREE_VIEW(w), 
+		gtk_tree_view_column_new_with_attributes("Color", ren,
+			"pixbuf", 0, NULL));
+	ren = gtk_cell_renderer_text_new();
+	g_object_set(ren, "xalign", 0.0, "yalign", 1.0, "xpad", 3, "ypad", 3, NULL);
+	gtk_tree_view_append_column(GTK_TREE_VIEW(w),
+		gtk_tree_view_column_new_with_attributes("Index", ren,
+			"text", 1, NULL));
+	gtk_tree_view_set_headers_visible(GTK_TREE_VIEW(w), FALSE);
+
+	tp = gtk_tree_path_new_from_indices(*idx, -1);
+	gtk_tree_view_set_cursor_on_cell(GTK_TREE_VIEW(w), tp, NULL, NULL, FALSE);
+	/* Seems safe to do w/o scrolledwindow too */
+	gtk_tree_view_scroll_to_cell(GTK_TREE_VIEW(w), tp, NULL, TRUE, 0.5, 0.0);
+	gtk_tree_path_free(tp);
+
+	if (pp[5]) g_signal_connect(w, "button_press_event", G_CALLBACK(colorlist_click), NEXT_SLOT(r));
+	g_signal_connect(w, "cursor_changed", G_CALLBACK(colorlist_select), r);
+
+	return (w);
+}
+
+static void colorlist_reset_color(void **slot, int idx)
+{
+	colorlist_data *dt = slot[2];
+	unsigned char *rgb = dt->col + idx * 3;
+	GtkTreeModel *tm = gtk_tree_view_get_model(GTK_TREE_VIEW(slot[0]));
+	GtkTreePath *tp = gtk_tree_path_new_from_indices(idx, -1);
+	GtkTreeIter it;
+
+	if (gtk_tree_model_get_iter(tm, &it, tp))
+	{
+		GdkPixbuf *p;
+		gtk_tree_model_get(tm, &it, 0, &p, -1);
+		gdk_pixbuf_fill(p, ((unsigned)MEM_2_INT(rgb, 0) << 8) + 0xFF);
+		g_object_unref(p); // !!! After get() ref'd it
+		/* Redraw the row displaying the color */
+		gtk_tree_model_row_changed(tm, tp, &it);
+	}
+	gtk_tree_path_free(tp);
+}
+#endif
 
 //	GRADBAR widget
 
@@ -2872,6 +3001,7 @@ static void *get_cell(col_data *c, int row, int col)
 	v = cp[1];
 	if (op & WB_FFLAG) v = c->ddata + (int)v;
 	if (op & WB_NFLAG) v = *(void **)v; // array dereference
+	if (!v) return (NULL); // Paranoia
 	v += ofs + row * (int)cp[2];
 	if (kind == col_PTR) v = *(char **)v; // cell dereference
 	else if (kind == col_REL) v += *(int *)v;
@@ -2905,6 +3035,7 @@ typedef struct {
 	col_data c;
 } listcc_data;
 
+#ifdef U_LISTS_GTK1
 static void listcc_select(GtkList *list, GtkWidget *widget, gpointer user_data)
 {
 	listcc_data *dt = user_data;
@@ -3118,6 +3249,252 @@ GtkWidget *listcc(void **r, char *ddata, col_data *c)
 
 	return (list);
 }
+#endif
+
+#ifndef U_LISTS_GTK1
+
+#define LISTCC_KEY "mtPaint.listcc"
+
+static void listcc_select(GtkTreeView *tree, gpointer user_data)
+{
+	listcc_data *dt = user_data;
+	void **base, **desc, **slot = NEXT_SLOT(dt->c.r);
+	GtkTreePath *tp;
+	int l;
+
+	if (dt->lock) return;
+	/* Update the value */
+	l = gtk_tree_model_iter_n_children(gtk_tree_view_get_model(tree), NULL);
+	gtk_tree_view_get_cursor(tree, &tp, NULL);
+	*dt->idx = l - 1 - gtk_tree_path_get_indices(tp)[0]; // Backward
+	gtk_tree_path_free(tp);
+
+	base = slot[0]; desc = slot[1];
+	/* Call the handler */
+	if (desc[1]) ((evt_fn)desc[1])(GET_DDATA(base), base,
+		(int)desc[0] & WB_OPMASK, slot);
+}
+
+static void listcc_select_item(void **slot)
+{
+	GtkTreeView *tr = slot[0];
+	GtkTreeModel *tm = gtk_tree_view_get_model(tr);
+	GtkTreePath *tp;
+	listcc_data *dt = slot[2];
+	int l, idx = *dt->idx; 
+
+	l = gtk_tree_model_iter_n_children(tm, NULL);
+	if ((idx < 0) || (idx >= l)) return;
+	dt->lock++; // this is strictly a visual update
+	tp = gtk_tree_path_new_from_indices(l - idx - 1, -1); // backward
+	gtk_tree_view_set_cursor_on_cell(tr, tp, NULL, NULL, FALSE);
+	gtk_tree_path_free(tp);
+	dt->lock--;
+
+	/* Signal must be reliable whatever happens */
+	listcc_select(tr, dt);
+}
+
+void listcc_toggled(GtkCellRendererToggle *ren, gchar *path, gpointer user_data)
+{
+	void **slot = g_object_get_data(G_OBJECT(ren), LISTCC_KEY);
+	void **base, **desc;
+	listcc_data *dt = slot[2];
+	GtkTreeView *tr = slot[0];
+	GtkTreeModel *tm;
+	GtkTreeIter it;
+	gint yf;
+	char *v;
+	int col, row;
+
+	if (dt->lock) return;
+	/* Find out what happened to what, and where */
+	tm = gtk_tree_view_get_model(tr);
+	if (!gtk_tree_model_get_iter_from_string(tm, &it, path)) return; // Paranoia
+	col = (int)user_data;
+	gtk_tree_model_get(tm, &it, col, &yf, -1);
+	gtk_list_store_set(GTK_LIST_STORE(tm), &it, col, yf ^= 1, -1); // Update list
+	row = yf >> 1;
+
+	/* Self-updating */
+	v = get_cell(&dt->c, row, col);
+	*(int *)v = yf & 1;
+	/* Now call the handler */
+	slot = dt->c.columns[col];
+	slot = NEXT_SLOT(slot);
+	base = slot[0]; desc = slot[1];
+	if (desc[1]) ((evtx_fn)desc[1])(GET_DDATA(base), base,
+		(int)desc[0] & WB_OPMASK, slot, (void *)row);
+}
+
+static void listcc_reset(void **slot, int row)
+{
+	GtkWidget *w = slot[0];
+	listcc_data *ld = slot[2];
+	GtkListStore *ls;
+	GtkTreeIter it;
+	char txt[64];
+	int j, n = 0, ncol = ld->c.ncol, cnt = *ld->cnt;
+
+	ld->lock = TRUE;
+	if (row >= 0) // specific row, not whole list
+	{
+		GtkTreePath *tp;
+		GtkTreeModel *tm = gtk_tree_view_get_model(GTK_TREE_VIEW(w));
+		int l = gtk_tree_model_iter_n_children(tm, NULL);
+
+		ls = GTK_LIST_STORE(tm);
+#if 0 /* LISTCC_RESET_ROW currently is NOT used on added/removed ones */
+	/* Add/remove existing rows; expecting one row only so let updates be */
+		if ((row >= cnt) && (row < l))
+		{
+			gtk_tree_model_get_iter_first(tm, &it);
+			while (row < l--) gtk_list_store_remove(ls, &it);
+		}
+		else if ((row < cnt) && (row >= l))
+		{
+			while (row >= l++) gtk_list_store_prepend(ls, &it);
+		}
+#endif
+		tp = gtk_tree_path_new_from_indices(l - 1 - row, -1);
+		if (!gtk_tree_model_get_iter(tm, &it, tp))
+			cnt = 0; // !!! Row out of range, do nothing
+		gtk_tree_path_free(tp);
+		n = row;
+	}
+	else // prepare new model
+	{
+		GType ctypes[MAX_COLS];
+
+		for (j = 0; j < ncol; j++)
+		{
+			void **cp = ld->c.columns[j][1];
+			int op = (int)cp[0] & WB_OPMASK;
+			ctypes[j] = op == op_CHKCOLUMN ? G_TYPE_INT : G_TYPE_STRING;
+		}
+		ls = gtk_list_store_newv(ncol, ctypes);
+	}
+
+	for (; n < cnt; n++)
+	{
+		if (row < 0) gtk_list_store_prepend(ls, &it);
+		for (j = 0; j < ncol; j++)
+		{
+			char *v = get_cell(&ld->c, n, j);
+			void **cp = ld->c.columns[j][1];
+			int op = (int)cp[0] & WB_OPMASK;
+
+			if (op == op_CHKCOLUMN) // index * 2 + flag
+				gtk_list_store_set(ls, &it, j, n * 2 + !!*(int *)v, -1);
+			else
+			{
+				if (op == op_IDXCOLUMN) // Constant
+					sprintf(v = txt, "%d", (int)cp[1] + (int)cp[2] * n);
+				// op_TXTCOLUMN/op_XTXTCOLUMN otherwise
+				gtk_list_store_set(ls, &it, j, v, -1);
+			}
+		}
+		if (row >= 0) break; // one row only
+	}
+
+	if (row < 0)
+	{
+		gtk_tree_view_set_model(GTK_TREE_VIEW(w), GTK_TREE_MODEL(ls));
+		listcc_select_item(slot); // only when full reset
+	}
+	ld->lock = FALSE;
+}
+
+static void listcc_chk(GtkTreeViewColumn *col, GtkCellRenderer *ren,
+	GtkTreeModel *tm, GtkTreeIter *it, gpointer data)
+{
+	gint yf;
+
+	gtk_tree_model_get(tm, it, (int)data, &yf, -1);
+	g_object_set(ren, "active", yf & 1, NULL);
+}
+
+static void listcc_scroll_in(GtkWidget *widget, gpointer user_data)
+{
+	GtkTreePath *tp;
+
+	gtk_tree_view_get_cursor(GTK_TREE_VIEW(widget), &tp, NULL);
+	if (!tp) return; // Paranoia
+	gtk_tree_view_scroll_to_cell(GTK_TREE_VIEW(widget), tp, NULL, FALSE, 0, 0);
+	gtk_tree_path_free(tp);
+}
+
+// !!! With inlining this, problem also
+GtkWidget *listcc(void **r, char *ddata, col_data *c)
+{
+	GtkWidget *w;
+	listcc_data *ld = r[2];
+	void **pp = r[1];
+	int j, h, *cnt, *idx = r[0];
+
+
+	cnt = (void *)(ddata + (int)pp[2]); // length pointer
+	h = (int)pp[3]; // max for variable length
+	if (h < *cnt) h = *cnt;
+
+	/* Fill datastruct */
+	ld->idx = idx;
+	ld->cnt = cnt;
+	ld->h = h;
+	set_columns(&ld->c, c, ddata, r);
+
+	w = gtk_tree_view_new();
+	gtk_tree_view_set_enable_search(GTK_TREE_VIEW(w), FALSE);
+	gtk_tree_selection_set_mode(gtk_tree_view_get_selection(GTK_TREE_VIEW(w)),
+		GTK_SELECTION_BROWSE);
+	for (j = 0; j < ld->c.ncol; j++)
+	{
+		GtkCellRenderer *ren;
+		GtkTreeViewColumn *col;
+		void **cp = ld->c.columns[j][1];
+		int op = (int)cp[0] & WB_OPMASK, jw = (int)cp[3];
+
+		if (op == op_CHKCOLUMN)
+		{
+			ren = gtk_cell_renderer_toggle_new();
+			/* To preserve spacing, need a height of a GtkLabel here;
+			 * but waiting for realize to get & set it is a hassle,
+			 * and the layers box looks perfectly OK as is - WJ */
+//			g_object_set(ren, "height", 10, NULL);
+			col = gtk_tree_view_column_new_with_attributes("", ren, NULL);
+			gtk_tree_view_column_set_cell_data_func(col, ren,
+				listcc_chk, (gpointer)j, NULL);
+			g_object_set_data(G_OBJECT(ren), LISTCC_KEY, r);
+			g_signal_connect(ren, "toggled",
+				G_CALLBACK(listcc_toggled), (gpointer)j);
+		}
+		else /* op_TXTCOLUMN/op_XTXTCOLUMN/op_IDXCOLUMN */
+		{
+			ren = gtk_cell_renderer_text_new();
+			gtk_cell_renderer_set_alignment(ren, ((jw >> 16) & 3) * 0.5, 0.5);
+			col = gtk_tree_view_column_new_with_attributes("", ren,
+				"text", j, NULL);
+			if (op == op_XTXTCOLUMN)
+				gtk_tree_view_column_set_expand(col, TRUE);
+		}
+		if (jw & 0xFFFF) g_object_set(ren, "width", jw & 0xFFFF, NULL);
+// !!! Maybe gtk_tree_view_column_set_fixed_width(col, jw & 0xFFFF) instead?
+		g_object_set(ren, "xpad", 2, NULL); // Looks good enough
+		gtk_tree_view_append_column(GTK_TREE_VIEW(w), col);
+	}
+	gtk_tree_view_set_headers_visible(GTK_TREE_VIEW(w), FALSE);
+
+	/* This will scroll selected row in on redisplay */
+	g_signal_connect(w, "map", G_CALLBACK(listcc_scroll_in), NULL);
+
+	r[0] = w; // Fix up slot
+	if (*cnt) listcc_reset(r, -1);
+
+	g_signal_connect(w, "cursor_changed", G_CALLBACK(listcc_select), ld);
+
+	return (w);
+}
+#endif
 
 //	LISTC widget
 
@@ -3132,12 +3509,15 @@ typedef struct {
 	int **map;		// row map vector field
 	void **change;		// slot for EVT_CHANGE
 	void **ok;		// slot for EVT_OK
+#ifdef U_LISTS_GTK1
 	GtkWidget *sort_arrows[MAX_COLS];
 	GdkPixmap *icons[2];
 	GdkBitmap *masks[2];
+#endif
 	col_data c;
 } listc_data;
 
+#ifdef U_LISTS_GTK1
 static gboolean listcx_key(GtkWidget *widget, GdkEventKey *event,
 	gpointer user_data)
 {
@@ -3277,6 +3657,16 @@ static int listc_collect(gchar **row_text, gchar **row_pix, col_data *c, int row
 	return (res);
 }
 
+static void listc_get_order(GtkCList *clist, int *res, int l)
+{
+	int i;
+
+	for (i = 0; i < l; i++) res[i] = -1; // nowhere by default
+	if (l > clist->rows) l = clist->rows;
+	for (i = 0; i < l; i++)
+		res[(int)gtk_clist_get_row_data(clist, i)] = i;
+}
+
 static int listc_sort(GtkCList *clist, listc_data *ld, int reselect)
 {
 	void **slot;
@@ -3361,6 +3751,32 @@ static int listc_sort(GtkCList *clist, listc_data *ld, int reselect)
 		}
 	}
 	return (0);
+}
+
+static void listc_select_index(GtkWidget *widget, int v)
+{
+	GtkCList *clist = GTK_CLIST(widget);
+	int row = gtk_clist_find_row_from_data(clist, (gpointer)v);
+
+	if (row < 0) return; // Paranoia
+	gtk_clist_select_row(clist, row, 0);
+	/* !!! Focus fails to follow selection in browse mode - have to
+	 * move it here, but a full redraw is necessary afterwards */
+	if (clist->focus_row == row) return;
+	clist->focus_row = row;
+	if (GTK_WIDGET_HAS_FOCUS(widget) && !clist->freeze_count)
+		gtk_widget_queue_draw(widget);
+}
+
+static void listc_reset_row(GtkCList *clist, listc_data *ld, int n)
+{
+	gchar *row_text[MAX_COLS];
+	int i, row, ncol = ld->c.ncol;
+
+	// !!! No support for anything but text columns
+	listc_collect(row_text, NULL, &ld->c, n);
+	row = gtk_clist_find_row_from_data(clist, (gpointer)n);
+	for (i = 0; i < ncol; i++) gtk_clist_set_text(clist, row, i, row_text[i]);
 }
 
 /* !!! Should not redraw old things while resetting - or at least, not refer
@@ -3460,6 +3876,13 @@ static void listc_column_button(GtkCList *clist, gint col, gpointer user_data)
 	/* Scroll to selected row */
 	dt->update |= 2;
 	listc_update((GtkWidget *)clist, dt);
+}
+
+static void listc_sort_by(GtkCList *clist, listc_data *ld, int n)
+{
+	if (!*ld->sort) return;
+	*ld->sort = n;
+	listc_column_button(clist, -1, ld);
 }
 
 static void listc_prepare(GtkWidget *w, gpointer user_data)
@@ -3619,6 +4042,581 @@ GtkWidget *listc(void **r, char *ddata, col_data *c)
 
 	return (list);
 }
+#endif
+
+#ifndef U_LISTS_GTK1
+static GQuark listc_key;
+
+/* Low 8 bits is column index, others denote type */
+#define CELL_TEXT  0x000
+#define CELL_FTEXT 0x100
+#define CELL_ICON  0x200
+#define CELL_TMASK 0xF00
+#define CELL_XMASK 0x0FF
+
+static gboolean listcx_click(GtkWidget *widget, GdkEventButton *event,
+	gpointer user_data)
+{
+	listc_data *dt = user_data;
+	GtkTreeView *tree = GTK_TREE_VIEW(widget);
+	GtkTreePath *tp, *tp0;
+	void **slot, **base, **desc;
+	int row;
+
+	if (dt->lock) return (FALSE); // Paranoia
+	if ((event->button != 3) || (event->type != GDK_BUTTON_PRESS) ||
+		(event->window != gtk_tree_view_get_bin_window(tree)) ||
+		!gtk_tree_view_get_path_at_pos(tree, event->x, event->y, &tp,
+			NULL, NULL, NULL)) return (FALSE);
+
+	row = gtk_tree_path_get_indices(tp)[0];
+	gtk_tree_view_get_cursor(tree, &tp0, NULL);
+	/* Move cursor to where the click was */
+	if (!tp0 || (row != gtk_tree_path_get_indices(tp0)[0]))
+		gtk_tree_view_set_cursor_on_cell(tree, tp, NULL, NULL, FALSE);
+	gtk_tree_path_free(tp0);
+	gtk_tree_path_free(tp);
+
+	slot = SLOT_N(dt->c.r, 2);
+	base = slot[0]; desc = slot[1];
+	if (desc[1]) ((evtx_fn)desc[1])(GET_DDATA(base), base,
+		(int)desc[0] & WB_OPMASK, slot, (void *)row);
+
+	return (TRUE);
+}
+
+static void listcx_done(GtkTreeView *tree, listc_data *ld)
+{
+	int j;
+
+	/* Remember column widths */
+	for (j = 0; j < ld->c.ncol; j++)
+	{
+		void **cp = ld->c.columns[j][1];
+		int op = (int)cp[0];
+		int l = WB_GETLEN(op); // !!! -2 for each extra ref
+
+		if (l > 4) inifile_set_gint32(cp[5], gtk_tree_view_column_get_width(
+			gtk_tree_view_get_column(tree, j)));
+	}
+}
+
+static void listcx_act(GtkTreeView *tree, GtkTreePath *tp,
+	GtkTreeViewColumn *col, gpointer user_data)
+{
+	listc_data *dt = user_data;
+
+	if (dt->lock) return; // Paranoia
+	if (dt->ok) get_evt_1(NULL, dt->ok);
+}
+
+static void listc_select_row(GtkTreeView *tree, gpointer user_data)
+{
+	listc_data *dt = user_data;
+	void **slot = NEXT_SLOT(dt->c.r), **base = slot[0], **desc = slot[1];
+	GtkTreeModel *tm;
+	GtkTreePath *tp;
+	GtkTreeIter it;
+	gint row;
+
+	if (dt->lock) return;
+	/* Update the value */
+	gtk_tree_view_get_cursor(tree, &tp, NULL);
+	tm = gtk_tree_view_get_model(tree);
+	row = tp && gtk_tree_model_get_iter(tm, &it, tp);
+	gtk_tree_path_free(tp);
+	if (!row) return; // Paranoia
+	gtk_tree_model_get(tm, &it, 0, &row, -1);
+	*dt->idx = row;
+
+	/* Call the handler */
+	if (desc[1]) ((evt_fn)desc[1])(GET_DDATA(base), base,
+		(int)desc[0] & WB_OPMASK, slot);
+}
+
+static void listc_select_item(GtkTreeView *tree, int idx)
+{
+	GtkTreePath *tp = gtk_tree_path_new_from_indices(idx, -1);
+	gtk_tree_view_set_cursor_on_cell(tree, tp, NULL, NULL, FALSE);
+	gtk_tree_view_scroll_to_cell(tree, tp, NULL, TRUE, 0.5, 0.0);
+	gtk_tree_path_free(tp);
+}
+
+/* If no such index, return row 0 with its index */
+static void listc_find_index(GtkTreeModel *tm, int idx, int *whatwhere)
+{
+	GtkTreeIter it;
+	int n = 0;
+	gint pos;
+
+	whatwhere[0] = whatwhere[1] = 0;
+	if (!gtk_tree_model_get_iter_first(tm, &it)) return;
+	gtk_tree_model_get(tm, &it, 0, &pos, -1);
+	whatwhere[0] = pos;
+	if (idx < 0) return;
+	while (pos != idx)
+	{
+		if (!gtk_tree_model_iter_next(tm, &it)) return;
+		gtk_tree_model_get(tm, &it, 0, &pos, -1);
+		n++;
+	}
+	/* Found! */
+	whatwhere[0] = idx;
+	whatwhere[1] = n;
+}
+
+static void listc_select_index(GtkTreeView *tree, int idx)
+{
+	GtkTreeModel *tm = gtk_tree_view_get_model(tree);
+	int whatwhere[2];
+
+	listc_find_index(tm, idx, whatwhere);
+	listc_select_item(tree, whatwhere[1]);
+}
+
+static void listc_get_order(GtkTreeView *tree, int *res, int l)
+{
+	GtkTreeModel *tm = gtk_tree_view_get_model(tree);
+	GtkTreeIter it;
+	int i, n = gtk_tree_model_iter_n_children(tm, NULL);
+	gint pos;
+
+	for (i = 0; i < l; i++) res[i] = -1; // nowhere by default
+	if (l > n) l = n;
+	if (!gtk_tree_model_get_iter_first(tm, &it)) return;
+	for (i = 0; i < l; i++)
+	{
+		gtk_tree_model_get(tm, &it, 0, &pos, -1);
+		res[pos] = i;
+		if (!gtk_tree_model_iter_next(tm, &it)) return;
+	}
+}
+
+static gint listc_sort_func(GtkTreeModel *tm, GtkTreeIter *a, GtkTreeIter *b,
+	gpointer user_data)
+{
+	listc_data *ld = user_data;
+	char *v0, *v1;
+	int n, dir, cell, sort = *ld->sort;
+	gint row0, row1;
+
+	sort += !sort; // Default is column 0 in ascending order
+	dir = sort > 0 ? 1 : -1;
+	cell = sort * dir - 1;
+	gtk_tree_model_get(tm, a, 0, &row0, -1);
+	gtk_tree_model_get(tm, b, 0, &row1, -1);
+	v0 = get_cell(&ld->c, row0, cell);
+	v1 = get_cell(&ld->c, row1, cell);
+	n = strcmp(v0 ? v0 : "", v1 ? v1 : ""); // Better safe than sorry
+	if (!n) n = row0 - row1;
+	return (n * dir);
+}
+
+static int listc_sort(GtkTreeView *tree, listc_data *ld, int reselect)
+{
+	GtkTreeModel *tm = gtk_tree_view_get_model(tree);
+	GtkListStore *ls;
+	GtkTreePath *tp;
+	GtkTreeIter it;
+	void **slot;
+	int whatwhere[2];
+	int i, have_pos, cnt = *ld->cnt, *map = NULL;
+	gint pos = 0;
+
+	/* Do nothing if empty */
+	if (!cnt) return (0);
+
+	ls = GTK_LIST_STORE(tm);
+	/* Get current position if any */
+	gtk_tree_view_get_cursor(tree, &tp, NULL);
+	if ((have_pos = tp && gtk_tree_model_get_iter(tm, &it, tp)))
+		gtk_tree_model_get(tm, &it, 0, &pos, -1);
+	gtk_tree_path_free(tp);
+
+	/* Call & apply external sort */
+	if ((slot = ld->change))
+	{
+		/* Call the EVT_CHANGE handler, to sort map vector */
+		get_evt_1(NULL, slot);
+
+		/* Rearrange rows */ // !!! On unfreezed widget
+		cnt = *ld->cnt;
+		map = *ld->map;
+		gtk_tree_model_get_iter_first(tm, &it);
+		for (i = 0; i < cnt; i++)
+		{
+			gtk_list_store_set(ls, &it, 0, map[i], -1);
+			gtk_tree_model_iter_next(tm, &it);
+		}
+	}
+	/* Do builtin sort */
+	else
+	{
+		// Tell it it's unsorted, first
+		gtk_tree_sortable_set_sort_column_id(GTK_TREE_SORTABLE(tm),
+			GTK_TREE_SORTABLE_UNSORTED_SORT_COLUMN_ID, GTK_SORT_ASCENDING);
+		// Then set to sorted again; real sort order is in *ld->sort
+		gtk_tree_sortable_set_sort_column_id(GTK_TREE_SORTABLE(tm),
+			1, GTK_SORT_ASCENDING);
+	}
+
+	/* Relocate existing position (visual update) */
+	if (reselect && have_pos)
+	{
+		listc_find_index(tm, pos, whatwhere);
+		ld->lock++;
+		listc_select_item(tree, whatwhere[1]);
+		ld->lock--;
+	}
+	/* Set position anew */
+	else
+	{
+		listc_find_index(tm, *ld->idx, whatwhere);
+		*ld->idx = whatwhere[0];
+		listc_select_item(tree, whatwhere[1]);
+	}
+	/* Done rearranging rows */
+	return (!!slot);
+}
+
+/* !!! This will brutally recalculate the entire list; may be slow if large */
+static void listc_optimal_width(GtkTreeView *tree, listc_data *ld)
+{
+	GtkTreeModel *tm = gtk_tree_view_get_model(tree);
+	int i, j;
+
+	for (j = 0; j < ld->c.ncol; j++)
+	{
+		GtkTreeViewColumn *col = gtk_tree_view_get_column(tree, j);
+		GtkTreeIter it;
+		gint width;
+
+		gtk_tree_view_column_queue_resize(col); // Reset width
+		if (!gtk_tree_model_get_iter_first(tm, &it)) continue;
+		for (i = 0; i < 500; i++) // Stop early if overlarge
+		{
+			gtk_tree_view_column_cell_set_cell_data(col, tm, &it,
+				FALSE, FALSE);
+			gtk_tree_view_column_cell_get_size(col, NULL, NULL, NULL,
+				&width, NULL); // It returns max of all
+			if (!gtk_tree_model_iter_next(tm, &it)) break;
+		}
+		gtk_tree_view_column_set_fixed_width(col, width);
+	}
+}
+
+/* GtkTreeView here displays everything by reference, refill not needed */
+#define listc_reset_row(A,B,C) gtk_widget_queue_draw(A)
+
+/* !!! Should not redraw old things while resetting - or at least, not refer
+ * outside of new data if doing it */
+static void listc_reset(GtkTreeView *tree, listc_data *ld)
+{
+	GtkTreeModel *tm;
+	int i, cnt = *ld->cnt, sort = *ld->sort;
+
+
+	ld->lock = TRUE;
+	tm = gtk_tree_view_get_model(tree);
+
+	/* Rebuild the index vector, unless it surely stays the same */
+	if (!tm || (gtk_tree_model_iter_n_children(tm, NULL) != cnt) ||
+		(ld->kind == op_LISTCd) || ld->map)
+	{
+		GtkListStore *ls = gtk_list_store_new(1, G_TYPE_INT);
+		GtkTreeIter it;
+		int m, n, *map = ld->map ? *ld->map : NULL;
+
+		for (m = i = 0; i < cnt; i++)
+		{
+			n = map ? map[i] : i;
+			if (m < n) m = n;
+			gtk_list_store_append(ls, &it);
+			gtk_list_store_set(ls, &it, 0, n, -1);
+		}
+		tm = GTK_TREE_MODEL(ls);
+		ld->cntmax = m;
+
+		/* Let it sit there in case it's needed */
+		gtk_tree_sortable_set_sort_func(GTK_TREE_SORTABLE(ls), 1,
+			listc_sort_func, ld, NULL);
+	}
+	gtk_tree_view_set_model(tree, tm);
+
+	/* !!! Sort arrow gets lost after resetting model */
+	if (sort)
+	{
+		GtkTreeViewColumn *col = gtk_tree_view_get_column(tree, abs(sort) - 1);
+		gtk_tree_view_column_set_sort_indicator(col, TRUE); // Show sort arrow
+	}
+
+	/* Adjust column widths (not for draggable list) */
+	if ((ld->kind != op_LISTCd) && (ld->kind != op_LISTCX))
+	{
+		if (gtk_widget_get_mapped(GTK_WIDGET(tree)))
+			listc_optimal_width(tree, ld);
+		else ld->update |= 1; // Do it later
+	}
+
+	i = *ld->idx;
+	if (i >= cnt) i = cnt - 1;
+	if (!cnt) *ld->idx = 0;	/* Safer than -1 for empty list */
+	/* Draggable and unordered lists aren't sorted */
+	else if ((ld->kind == op_LISTCd) || (ld->kind == op_LISTCu))
+	{
+		if (i < 0) i = 0;
+		listc_select_item(tree, i);
+		*ld->idx = i;
+	}
+	else
+	{
+		*ld->idx = i;
+		listc_sort(tree, ld, FALSE);
+	}
+
+	/* !!! Sometimes it shows the wrong part and redraw doesn't help */
+	gtk_adjustment_value_changed(gtk_tree_view_get_vadjustment(tree));
+
+	ld->lock = FALSE;
+}
+
+void listc_getcell(GtkTreeViewColumn *col, GtkCellRenderer *ren, GtkTreeModel *tm,
+	GtkTreeIter *it, gpointer data)
+{
+	listc_data *dt = g_object_get_qdata(G_OBJECT(ren), listc_key);
+	char *s;
+	int cell = (int)data;
+	gint row;
+
+	gtk_tree_model_get(tm, it, 0, &row, -1);
+	s = get_cell(&dt->c, row, cell & CELL_XMASK);
+	if (!s) s = "\0"; // NULL is used for empty cells in some places
+	cell &= CELL_TMASK;
+	/* TEXT/FTEXT */
+	if (cell != CELL_ICON)
+		g_object_set(ren, "text", s + (cell == CELL_FTEXT), NULL);
+	/* ICON */
+	else g_object_set(ren, "visible", s[0] != ' ',
+#if GTK_MAJOR_VERSION == 2
+		"stock-id", (s[0] == 'D' ? GTK_STOCK_DIRECTORY : GTK_STOCK_FILE), NULL);
+#else
+		"icon-name", (s[0] == 'D' ? "folder" : "text-x-generic"), NULL);
+#endif
+}
+
+#if GTK_MAJOR_VERSION == 2
+#define gtk_tree_view_column_get_button(A) ((A)->button)
+#endif
+
+/* Use of sort arrows should NOT cause sudden redirect of keyboard input */
+static void listc_defocus(GObject *obj, GParamSpec *pspec, gpointer user_data)
+{
+	GtkWidget *button = gtk_tree_view_column_get_button(GTK_TREE_VIEW_COLUMN(obj));
+	if (!button || !gtk_widget_get_can_focus(button)) return;
+	gtk_widget_set_can_focus(button, FALSE);
+}
+
+static void listc_column_button(GtkTreeViewColumn *col, gpointer user_data)
+{
+	listc_data *dt = g_object_get_qdata(G_OBJECT(col), listc_key);
+	GtkTreeView *tree = GTK_TREE_VIEW(gtk_tree_view_column_get_tree_view(col));
+	int sort = *dt->sort, idx = (int)user_data;
+
+	if (idx > CELL_XMASK); /* Sort as is */
+	else if (abs(sort) == idx + 1) sort = -sort; /* Reverse same column */
+	else /* Select another column */
+	{
+		GtkTreeViewColumn *col0 = gtk_tree_view_get_column(tree, abs(sort) - 1);
+		gtk_tree_view_column_set_sort_indicator(col0, FALSE);
+		gtk_tree_view_column_set_sort_indicator(col, TRUE);
+		sort = idx + 1;
+	}
+	*dt->sort = sort;
+
+	gtk_tree_view_column_set_sort_order(col, sort > 0 ?
+			GTK_SORT_ASCENDING : GTK_SORT_DESCENDING);
+
+	/* Sort and maybe redraw */
+	listc_sort(tree, dt, TRUE);
+}
+
+static void listc_sort_by(GtkTreeView *tree, listc_data *ld, int n)
+{
+	GtkTreeViewColumn *col;
+
+	if (!*ld->sort) return;
+	col = gtk_tree_view_get_column(tree, abs(*ld->sort) - 1);
+	*ld->sort = n;
+	listc_column_button(col, (gpointer)CELL_XMASK + 1); // Impossible index as flag
+}
+
+static void listc_update(GtkWidget *widget, gpointer user_data)
+{
+	listc_data *ld = user_data;
+	int what = ld->update;
+
+	ld->update = 0;
+	if (what & 1) listc_optimal_width(GTK_TREE_VIEW(widget), ld);
+}
+
+static void listc_prepare(GtkWidget *widget, gpointer user_data)
+{
+	listc_data *ld = user_data;
+	GtkTreeView *tree = GTK_TREE_VIEW(widget);
+	PangoContext *context = gtk_widget_create_pango_context(widget);
+	PangoLayout *layout = pango_layout_new(context);
+	int j;
+
+	for (j = 0; j < ld->c.ncol; j++)
+	{
+		void **cp = ld->c.columns[j][1];
+		int op = (int)cp[0];
+		int l = WB_GETLEN(op); // !!! -2 for each extra ref
+		GtkTreeViewColumn *col = gtk_tree_view_get_column(tree, j);
+		GtkWidget *button = gtk_tree_view_column_get_button(col);
+		gint width, lw;
+
+		/* Prevent sort buttons' narrowing down */
+		if (ld->kind == op_LISTCS) widget_set_keepsize(button, FALSE);
+		/* Adjust width for columns which use sample text */
+		if (l < 6) continue;
+		pango_layout_set_text(layout, cp[6], -1);
+		pango_layout_get_pixel_size(layout, &lw, NULL);
+		gtk_tree_view_column_cell_get_size(col, NULL, NULL, NULL, &width, NULL);
+		if (width < lw) gtk_tree_view_column_set_fixed_width(col, lw);
+	}
+	g_object_unref(layout);
+	g_object_unref(context);
+
+	/* To avoid repeating after unrealize (likely won't happen anyway) */
+//	g_signal_handlers_disconnect_by_func(widget, listc_prepare, user_data);
+}
+
+#define LISTC_XPAD 2
+
+GtkWidget *listc(void **r, char *ddata, col_data *c)
+{
+	static int zero = 0;
+	GtkWidget *w;
+	GtkTreeView *tree;
+	listc_data *ld = r[2];
+	void **pp = r[1];
+	int *cntv, *sort = &zero, **map = NULL;
+	int j, sm, kind, heads = 0;
+
+
+	listc_key = g_quark_from_static_string(LISTCC_KEY);
+
+	cntv = (void *)(ddata + (int)pp[2]); // length var
+	kind = (int)pp[0] & WB_OPMASK; // kind of list
+	if ((kind == op_LISTCS) || (kind == op_LISTCX))
+	{
+		sort = (void *)(ddata + (int)pp[3]); // sort mode
+		if (kind == op_LISTCX)
+			map = (void *)(ddata + (int)pp[4]); // row map
+	}
+
+	w = gtk_tree_view_new();
+	gtk_tree_view_set_enable_search(GTK_TREE_VIEW(w), FALSE);
+	gtk_tree_selection_set_mode(gtk_tree_view_get_selection(GTK_TREE_VIEW(w)),
+		GTK_SELECTION_BROWSE);
+
+	/* Fill datastruct */
+	ld->kind = kind;
+	ld->idx = r[0];
+	ld->cnt = cntv;
+	ld->sort = sort;
+	ld->map = map;
+	set_columns(&ld->c, c, ddata, r);
+
+	sm = *sort;
+	tree = GTK_TREE_VIEW(w);
+	for (j = 0; j < ld->c.ncol; j++)
+	{
+		GtkCellRenderer *ren;
+		GtkTreeViewColumn *col = gtk_tree_view_column_new();
+		void **cp = ld->c.columns[j][1];
+		int op = (int)cp[0], jw = (int)cp[3];
+		int width, l = WB_GETLEN(op); // !!! -2 for each extra ref
+
+		op &= WB_OPMASK;
+		gtk_tree_view_column_set_resizable(col, kind == op_LISTCX);
+		if (kind == op_LISTCX) gtk_tree_view_column_set_sizing(col,
+			GTK_TREE_VIEW_COLUMN_FIXED);
+		if ((width = jw & 0xFFFF))
+		{
+			if (l > 4) width = inifile_get_gint32(cp[5], width);
+			gtk_tree_view_column_set_fixed_width(col, width);
+		}
+		/* Left/center/right justification */
+		jw = (jw >> 16) & 3;
+		gtk_tree_view_column_set_alignment(col, jw * 0.5);
+		gtk_tree_view_column_set_title(col, (l > 3) && *(char *)cp[4] ?
+			_(cp[4]) : "");
+		heads += l > 3;
+		gtk_tree_view_column_set_expand(col, op == op_XTXTCOLUMN);
+		if (sm)
+		{
+			g_signal_connect(col, "notify", G_CALLBACK(listc_defocus), NULL);
+			g_signal_connect(col, "clicked",
+				G_CALLBACK(listc_column_button), (gpointer)j);
+			g_object_set_qdata(G_OBJECT(col), listc_key, ld);
+		}
+		if (op == op_FILECOLUMN)
+		{
+			ren = gtk_cell_renderer_pixbuf_new();
+			g_object_set(ren, "stock-size", GTK_ICON_SIZE_SMALL_TOOLBAR,
+				"xpad", LISTC_XPAD, NULL);
+//			g_object_set(col, "spacing", 2); // !!! If ever needed
+			gtk_tree_view_column_pack_start(col, ren, FALSE);
+			gtk_tree_view_column_set_cell_data_func(col, ren, listc_getcell,
+				(gpointer)(CELL_ICON + j), NULL);
+			g_object_set_qdata(G_OBJECT(ren), listc_key, ld);
+		}
+		ren = gtk_cell_renderer_text_new();
+		gtk_cell_renderer_set_alignment(ren, jw * 0.5, 0.5);
+		g_object_set(ren, "xpad", LISTC_XPAD, NULL);
+		gtk_tree_view_column_pack_start(col, ren, TRUE);
+		gtk_tree_view_column_set_cell_data_func(col, ren, listc_getcell,
+			(gpointer)((op == op_FILECOLUMN ? CELL_FTEXT : CELL_TEXT) + j), NULL);
+		g_object_set_qdata(G_OBJECT(ren), listc_key, ld);
+
+		gtk_tree_view_append_column(GTK_TREE_VIEW(w), col);
+	}
+
+	if (sm)
+	{
+		GtkTreeViewColumn *col = gtk_tree_view_get_column(tree, abs(sm) - 1);
+		gtk_tree_view_column_set_sort_indicator(col, TRUE); // Show sort arrow
+		gtk_tree_view_column_set_sort_order(col, sm > 0 ?
+			GTK_SORT_ASCENDING : GTK_SORT_DESCENDING);
+		gtk_tree_view_set_headers_clickable(tree, TRUE);
+	}
+
+	gtk_tree_view_set_headers_visible(tree, sm || heads); // Hide if useless
+
+	if (kind == op_LISTCX)
+	{
+		g_signal_connect(w, "button_press_event", G_CALLBACK(listcx_click), ld);
+		g_signal_connect(w, "row-activated", G_CALLBACK(listcx_act), ld);
+	}
+
+	/* For some finishing touches */
+	g_signal_connect(w, "realize", G_CALLBACK(listc_prepare), ld);
+	/* This will apply delayed updates when they can take effect */
+	g_signal_connect(w, "map", G_CALLBACK(listc_update), ld);
+
+	if (*cntv) listc_reset(tree, ld);
+
+	g_signal_connect(w, "cursor_changed", G_CALLBACK(listc_select_row), ld);
+
+	gtk_tree_view_set_reorderable(tree, kind == op_LISTCd); // draggable rows
+
+	gtk_widget_show(w); /* !!! Need this for sizing-on-realize */
+
+	return (w);
+}
+#endif
 
 //	uLISTC widget
 
@@ -4838,7 +5836,7 @@ enum {
 int do_pack(GtkWidget *widget, ctslot *ct, void **pp, int n, int tpad)
 {
 	GtkScrolledWindow *sw;
-	GtkAdjustment *adj;
+	GtkAdjustment *adj = adj;
 	GtkWidget *box = ct->widget;
 	int what = ct->type;
 	int y, l = WB_GETLEN((int)pp[0]);
@@ -4875,16 +5873,18 @@ int do_pack(GtkWidget *widget, ctslot *ct, void **pp, int n, int tpad)
 		break;
 	case pk_SCROLLVP: case pk_SCROLLVPv: case pk_SCROLLVPm: case pk_SCROLLVPn:
 		sw = GTK_SCROLLED_WINDOW(box);
-		adj = gtk_scrolled_window_get_vadjustment(sw);
 
 		gtk_scrolled_window_add_with_viewport(sw, widget);
-		if (n == pk_SCROLLVPv) gtk_container_set_focus_vadjustment(
-			GTK_CONTAINER(widget), adj);
-		else if (n == pk_SCROLLVPm)
+#ifdef U_LISTS_GTK1
+		adj = gtk_scrolled_window_get_vadjustment(sw);
+		if ((n == pk_SCROLLVPv) || (n == pk_SCROLLVPm))
+			gtk_container_set_focus_vadjustment(GTK_CONTAINER(widget), adj);
+		if (n == pk_SCROLLVPm)
 		{
 			gtk_signal_connect_after(GTK_OBJECT(widget), "map",
 				GTK_SIGNAL_FUNC(list_scroll_in), adj);
 		}
+#endif
 		if (n == pk_SCROLLVPn)
 		{
 			/* Set viewport to shadowless */
@@ -6110,7 +7110,11 @@ void **run_create_(void **ifcode, void *ddata, int ddsize, char **script)
 		case op_COLORLIST: case op_COLORLISTN:
 			widget = colorlist(r, ddata);
 			if ((CT_WHAT(wp) == ct_SCROLL) && (pk <= pk_DEF))
+#ifdef U_LISTS_GTK1
 				pk = pk_SCROLLVPm;
+#else
+				pk = pk_BIN; // auto-connects to scrollbars
+#endif
 			break;
 		/* Add a buttonbar for gradient */
 		case op_GRADBAR:
@@ -6125,9 +7129,17 @@ void **run_create_(void **ifcode, void *ddata, int ddsize, char **script)
 		/* Add a list with pre-defined columns */
 		case op_LISTCCr:
 			widget = listcc(r, ddata, &c);
+			/* !!! For GtkTreeView this does not do anything in GTK+2
+			 * and produces background-colored border in GTK+3;
+			 * need to fix the coloring OR ignore the border: list in
+			 * "Configure Animation" looks good without it too - WJ */
 			cw = GET_BORDER(LISTCC);
 			if ((CT_WHAT(wp) == ct_SCROLL) && (pk <= pk_DEF))
+#ifdef U_LISTS_GTK1
 				pk = pk_SCROLLVPv;
+#else
+				pk = pk_BIN; // auto-connects to scrollbars
+#endif
 			break;
 		/* Add a clist with pre-defined columns */
 		case op_LISTC: case op_LISTCd: case op_LISTCu:
@@ -6978,7 +7990,7 @@ static void do_destroy(void **wdata)
 			get_evt_1(where[0], NEXT_SLOT(where));
 			break;
 		}
-		case op_LISTCX: listcx_done(GTK_CLIST(*wdata), wdata[2]); break;
+		case op_LISTCX: listcx_done(*wdata, wdata[2]); break;
 		case op_MAINWINDOW: gtk_main_quit(); break;
 		}
 	}
@@ -7309,9 +8321,11 @@ void cmd_reset(void **slot, void *ddata)
 		}
 		case op_LISTCCr:
 			listcc_reset(wdata, -1);
+#ifdef U_LISTS_GTK1
 			/* !!! Or the changes will be ignored if the list wasn't
 			 * yet displayed (as in inactive dock tab) - WJ */
 			gtk_widget_queue_resize(*wdata);
+#endif
 			break;
 		/* op_uLISTCC needs no resetting */
 		case op_LISTC: case op_LISTCd: case op_LISTCu:
@@ -8247,21 +9261,8 @@ void cmd_set(void **slot, int v)
 	}
 	case op_LISTC: case op_LISTCd: case op_LISTCu:
 	case op_LISTCS: case op_LISTCX:
-	{
-		GtkWidget *widget = slot[0];
-		GtkCList *clist = slot[0];
-		int row = gtk_clist_find_row_from_data(clist, (gpointer)v);
-
-		if (row < 0) break; // Paranoia
-		gtk_clist_select_row(clist, row, 0);
-		/* !!! Focus fails to follow selection in browse mode - have to
-		 * move it here, but a full redraw is necessary afterwards */
-		if (clist->focus_row == row) break;
-		clist->focus_row = row;
-		if (GTK_WIDGET_HAS_FOCUS(widget) && !clist->freeze_count)
-			gtk_widget_queue_draw(widget);
+		listc_select_index(slot[0], v);
 		break;
-	}
 	}
 }
 
@@ -8373,18 +9374,9 @@ void cmd_peekv(void **slot, void *res, int size, int idx)
 	}
 	case op_LISTC: case op_LISTCd: case op_LISTCu:
 	case op_LISTCS: case op_LISTCX:
-	{
-		GtkCList *clist = slot[0];
 		/* if (idx == LISTC_ORDER) */
-		int i, l = size / sizeof(int);
-
-		for (i = 0; i < l; i++)
-			((int *)res)[i] = -1; // nowhere by default
-		if (l > clist->rows) l = clist->rows;
-		for (i = 0; i < l; i++)
-			((int *)res)[(int)gtk_clist_get_row_data(clist, i)] = i;
+		listc_get_order(slot[0], res, size / sizeof(int));
 		break;
-	}
 #if 0 /* Getting raw selection - not needed for now */
 		*(int *)res = (clist->selection ? (int)clist->selection->data : 0);
 #endif
@@ -8666,37 +9658,19 @@ void cmd_setv(void **slot, void *res, int idx)
 	}
 	case op_LISTCCr:
 		listcc_reset(slot, (int)res);
-// !!! May be needed if LISTCC_RESET_ROW gets used to display an added row
+// !!! May be needed if LISTCC_RESET_ROW w/GtkList gets used to display an added row
 //		gtk_widget_queue_resize(slot[0]);
 		break;
 	case op_LISTC: case op_LISTCd: case op_LISTCu:
 	case op_LISTCS: case op_LISTCX:
-	{
-		GtkCList *clist = slot[0];
-		listc_data *ld = slot[2];
-
 		if (idx == LISTC_RESET_ROW)
-		{
-			gchar *row_text[MAX_COLS];
-			int i, row, n = (int)res, ncol = ld->c.ncol;
-
-			// !!! No support for anything but text columns
-			listc_collect(row_text, NULL, &ld->c, n);
-			row = gtk_clist_find_row_from_data(clist, (gpointer)n);
-			for (i = 0; i < ncol; i++) gtk_clist_set_text(clist,
-				row, i, row_text[i]);
-		}
+			listc_reset_row(slot[0], slot[2], (int)res);
 		else if (idx == LISTC_SORT)
-		{
-			if (!ld->sort) break;
-			*ld->sort = (int)res;
-			listc_column_button(clist, -1, ld);
-		}
+			listc_sort_by(slot[0], slot[2], (int)res);
 		break;
 #if 0 /* Moving raw selection - not needed for now */
 		gtk_clist_select_row(slot[0], (int)res, 0);
 #endif
-	}
 	case op_KEYMAP:
 		if (idx == KEYMAP_KEY) keymap_find(slot[2], res);
 		else /* if (idx == KEYMAP_MAP) */

@@ -1,5 +1,5 @@
 /*	mygtk.c
-	Copyright (C) 2004-2019 Mark Tyler and Dmitry Groshev
+	Copyright (C) 2004-2020 Mark Tyler and Dmitry Groshev
 
 	This file is part of mtPaint.
 
@@ -761,7 +761,8 @@ void gtk_init_bugfixes()
 	wc->key_press_event = gtk_entry_key_press_fixed;
 }
 
-#elif defined GDK_WINDOWING_WIN32
+#else /* if GTK_MAJOR_VERSION == 2 */
+#if defined GDK_WINDOWING_WIN32
 
 static int win_last_vk;
 static guint32 win_last_lp;
@@ -779,11 +780,6 @@ static GdkFilterReturn win_keys_peek(GdkXEvent *xevent, GdkEvent *event, gpointe
 	return (GDK_FILTER_CONTINUE);
 }
 
-void gtk_init_bugfixes()
-{
-	gdk_window_add_filter(NULL, (GdkFilterFunc)win_keys_peek, NULL);
-}
-
 #else /* if defined GDK_WINDOWING_X11 */
 
 /* Gtk-Qt's author was deluded when he decided he knows how to draw focus;
@@ -793,8 +789,21 @@ static void fake_draw_focus()
 	return;
 }
 
+#endif
+
+static void do_shutup(const gchar *log_domain, GLogLevelFlags log_level,
+	const gchar *message, gpointer user_data)
+{
+	char *s = "Invalid UTF-8"; // The words to never utter
+	if (strncmp(message, s, strlen(s))) g_log_default_handler(log_domain,
+		log_level, message, user_data);
+}
+
 void gtk_init_bugfixes()
 {
+#if defined GDK_WINDOWING_WIN32
+	gdk_window_add_filter(NULL, (GdkFilterFunc)win_keys_peek, NULL);
+#else /* if defined GDK_WINDOWING_X11 */
 	GtkWidget *bt;
 	GtkStyleClass *sc;
 	GType qtt;
@@ -809,9 +818,23 @@ void gtk_init_bugfixes()
 		sc->draw_focus = fake_draw_focus;
 	}
 	gtk_object_sink(GTK_OBJECT(bt)); /* Destroy a floating-ref thing */
-}
+#endif /* X11 */
+	/* Cut spam from Pango about bad UTF8 */
+	g_log_set_handler("Pango", G_LOG_LEVEL_WARNING, (GLogFunc)do_shutup, NULL);
 
+#ifndef U_LISTS_GTK1
+	/* Remove crazier keybindings from GtkTreeView */
+	{
+		GtkBindingSet *bs = gtk_binding_set_by_class(g_type_class_ref(
+			GTK_TYPE_TREE_VIEW));
+		gtk_binding_entry_remove(bs, GDK_space, 0); // Activate
+		gtk_binding_entry_remove(bs, GDK_KP_Space, 0);
+		gtk_binding_entry_remove(bs, GDK_f, GDK_CONTROL_MASK); // Search
+		gtk_binding_entry_remove(bs, GDK_F, GDK_CONTROL_MASK);
+	}
 #endif
+}
+#endif /* GTK+2 */
 
 // Whatever is needed to move mouse pointer 
 
