@@ -2463,6 +2463,11 @@ typedef struct {
 	threaddata *tdata; // For simplicity
 } u_render_state;
 
+/* Filter preview modes */
+#define XF_NONE  0
+#define XF_XHOLD 1
+#define XF_NOISE 2
+
 static void main_render_req(u_render_state *u)
 {
 	main_render_state r = u->r;
@@ -2490,8 +2495,8 @@ static void main_render_req(u_render_state *u)
 		else u->m.rgb_s = r.lx * 3;
 	}
 
-	/* Threshold preview */
-	else if ((u->xflag = xhold_preview))
+	/* Filter preview */
+	else if ((u->xflag = xhold_preview ? XF_XHOLD : noise_preview ? XF_NOISE : 0))
 	{
 		u->m.mask_s = r.lx;
 		u->m.channel_s = r.lx * MEM_BPP;
@@ -2579,12 +2584,14 @@ static void main_render(u_render_state *u, int py, int ph)
 					r.mask0 ? r.mask0 + l : NULL, img);
 				if (u->tflag) do_transform(0, r.zoom, r.pww,
 					r.pvm, r.pvi, src, 255);
-				else
+				else if (u->xflag == XF_XHOLD)
 				{
 					bpp = MEM_BPP;
 					src = mem_img[mem_channel] + l * bpp;
 					do_xhold(0, r.zoom, r.pww, r.pvm, r.pvi, src);
 				}
+				else /* if (u->xflag == XF_NOISE) */
+					do_perlin(0, r.zoom, r.pww, r.pvm, r.pvi, r.dx, j);
 				process_img(0, r.zoom, r.pww, r.pvm,
 					r.pvi, r.pvi, src, NULL, bpp, BLENDF_SET);
 			}
@@ -4908,6 +4915,8 @@ void action_dispatch(int action, int mode, int state, int kbd)
 		keys_selector(); break;
 	case DLG_XHOLD:
 		pressed_xhold(); break;
+	case DLG_NOISE:
+		pressed_noise(); break;
 	case FILT_2RGB:
 		if (mem_img_bpp == 1) pressed_convert_rgb();
 		// Allow a noop in script mode
@@ -5543,6 +5552,7 @@ static void *main_menu_code[] = {
 	MENUITEMs(_("//Erode"), ACTMOD(FILT_FX, FX_ERODE)),
 		ACTMAP(NEED_NOIDX),
 	MENUSEP, //
+	MENUITEMs(_("//Solid Noise ..."), ACTMOD(DLG_NOISE, 0)),
 	MENUITEMs(_("//Bacteria ..."), ACTMOD(FILT_BACT, 0)),
 		ACTMAP(NEED_IDX),
 	WDONE,
@@ -5624,7 +5634,7 @@ static int dock_esc(main_dd *dt, void **wdata, int what, void **where,
 	key_ext *keydata)
 {
 	/* Pressing Escape moves focus out of dock - to nowhere */
-	if (keydata->key == GDK_Escape)
+	if (keydata->key == KEY(Escape))
 	{
 		cmd_setv(main_window_, NULL, WINDOW_FOCUS);
 		return (TRUE);

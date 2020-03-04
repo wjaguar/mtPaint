@@ -1,5 +1,5 @@
 /*	memory.c
-	Copyright (C) 2004-2019 Mark Tyler and Dmitry Groshev
+	Copyright (C) 2004-2020 Mark Tyler and Dmitry Groshev
 
 	This file is part of mtPaint.
 
@@ -3844,6 +3844,40 @@ void mem_normalize()		// Normalize contrast in image or palette
 			col->red = map[col->red];
 			col->green = map[col->green];
 			col->blue = map[col->blue];
+		}
+	}
+}
+
+void mem_prepare_map(unsigned char *map, int how)
+{
+	int i, n, wrk[3];
+
+	memset(map, 0, 768); // Init
+	/* Greyscale */
+	if (how == MAP_GREY) for (i = 0; i < 256; i++ , map += 3)
+		map[0] = map[1] = map[2] = i;
+	/* Gradient */
+	else if (how == MAP_GRAD) for (i = 0; i < 256; i++ , map += 3)
+	{
+		if (!grad_value(wrk, CHN_IMAGE, i / 255.0)) continue;
+		map[0] = wrk[0] >> 8;
+		map[1] = wrk[1] >> 8;
+		map[2] = wrk[2] >> 8;
+	}
+	/* Palette */
+	else if (how == MAP_PAL) pal2rgb(map, mem_pal);
+	/* Clipboard */
+	else if (how == MAP_CLIP)
+	{
+		n = mem_clip_w * mem_clip_h;
+		if (n > 256) n = 256;
+		if (mem_clip_bpp == 3) memcpy(map, mem_clipboard, 768);
+		else for (i = 0; i < n; i++ , map += 3)
+		{
+			png_color *c = mem_pal + mem_clipboard[i];
+			map[0] = c->red;
+			map[1] = c->green;
+			map[2] = c->blue;
 		}
 	}
 }
@@ -10764,3 +10798,194 @@ double mem_seg_threshold(seg_state *s)
 #undef FRACTAL_DIM
 #undef FRACTAL_THR
 #undef THRESHOLD_MULT
+
+/// NOISE
+
+/*
+ * This code implements classical Perlin noise, with the added tweak that nodes
+ * of every octave are offset against all the others, so that you won't observe
+ * N successively smaller copies of same thing over one another at the upper left
+ */
+
+static uint32_t ran_seed[2];
+
+void ran_init(uint32_t seed)
+{
+	ran_seed[1] = (ran_seed[0] = seed ^ 0xC0FFEE) * 0x10450405 + 1;
+}
+
+#define ROL(V,N) (((V) << (N)) | (V) >> (32 - (N)))
+
+/* xoroshiro64** 1.0 PRNG */
+uint32_t ran()
+{
+	uint32_t r, s0 = ran_seed[0], s1 = ran_seed[1];
+
+	r = s0 * 0x9E3779BB;
+	r = ROL(r, 5) * 5;
+	s1 ^= s0;
+	ran_seed[0] = ROL(s0, 26) ^ s1 ^ (s1 << 9);
+	ran_seed[1] = ROL(s1, 13);
+	return (r);
+}
+
+static struct {
+	int xstep, ystep, lvl;
+	float grad[256 * 2];
+	unsigned char p[256], map[768];
+} perlin_info;
+
+void init_perlin(int seed, int xstep, int ystep, int lvl, int maptype)
+{
+	float *fp = perlin_info.grad;
+	int i, j;
+
+	mem_prepare_map(perlin_info.map, maptype);
+
+	perlin_info.xstep = xstep;
+	perlin_info.ystep = ystep;
+
+	/* Limit lvl to max of log2(xstep,ystep) */
+	i = nlog2(xstep);
+	j = nlog2(ystep);
+	if (i < j) i = j;
+	i += !i; // Allow for useless setup of 1/1
+	if (lvl > i) lvl = i;
+	perlin_info.lvl = lvl;
+
+	ran_init(seed);
+
+	/* Random gradient vectors, equidistributed on unit circle */
+	for (i = 0; i < 256; i++)
+	{
+		double a = (2 * M_PI / 0x1000000) * (int)(ran() >> 8); // 24 random bits
+		*fp++ = sin(a);
+		*fp++ = cos(a);
+	}
+	/* Permutation table */
+	for (i = 0; i < 256; i++) perlin_info.p[i] = i;
+	for (i = 0; i < 255; i++)
+	{
+		unsigned char v = perlin_info.p[i];
+		int n = ran() % (256 - i) + i;
+		perlin_info.p[i] = perlin_info.p[n];
+		perlin_info.p[n] = v;
+	}
+}
+
+void do_perlin(int start, int step, int cnt, unsigned char *mask,
+	unsigned char *imgr, int x, int y)
+{
+	double sum, tx, ty, yb, d, dx, dy, sc, wyy[8], ybb[8];
+	int i, k, lvl, a, b, yp0[8], yp1[8], mstep = step, bpp = MEM_BPP;
+
+	/* Y-dependent values stay same for whole row */
+	dy = 0;
+	ty = (double)y / perlin_info.ystep;
+	for (lvl = 0; lvl < perlin_info.lvl; lvl++)
+	{
+		yb = ty + dy;
+		ybb[lvl] = yb -= (b = (int)yb);
+		wyy[lvl] = ((yb * 6.0 - 15.0) * yb + 10.0) * yb * yb * yb;
+		k = perlin_info.p[lvl] * lvl;
+		yp0[lvl] = perlin_info.p[(b + k) & 255]; 
+		yp1[lvl] = perlin_info.p[(b + 1 + k) & 255];
+		ty *= 2;
+		dy = 0.5; // Dealign levels' anchor grid
+	}
+
+	/* Normalization factor */
+	i = 1 << perlin_info.lvl;
+	sc = 255 * i / (M_SQRT2 * 2 * (i - 1));
+
+	x += start - step;
+	start *= bpp; step *= bpp;
+	imgr += start - step;
+
+	while (cnt-- > 0)
+	{
+		imgr += step; x += mstep;
+		if (mask[x] == 255) continue;
+		sum = dx = 0;
+		tx = (double)x / perlin_info.xstep;
+		d = 1;
+		for (lvl = 0; lvl < perlin_info.lvl; lvl++)
+		{
+			float *xp0, *xp1, *xp2, *xp3;
+			double xa, yb, wx, wy, dd, dd1;
+
+			xa = tx + dx;
+			xa -= (a = (int)xa);
+			wx = ((xa * 6.0 - 15.0) * xa + 10.0) * xa * xa * xa;
+			yb = ybb[lvl];
+			wy = wyy[lvl];
+			a += perlin_info.p[lvl] * lvl;
+			b = a + yp0[lvl];
+			xp0 = perlin_info.grad + perlin_info.p[b & 255] * 2;
+			dd = xp0[0] * xa + xp0[1] * yb;
+			xp1 = perlin_info.grad + perlin_info.p[(b + 1) & 255] * 2;
+			dd += wx * (xp1[0] * (xa - 1) + xp1[1] * yb - dd);
+			b = a + yp1[lvl];
+			xp2 = perlin_info.grad + perlin_info.p[b & 255] * 2;
+			dd1 = xp2[0] * xa + xp2[1] * (yb - 1);
+			xp3 = perlin_info.grad + perlin_info.p[(b + 1) & 255] * 2;
+			dd1 += wx * (xp3[0] * (xa - 1) + xp3[1] * (yb - 1) - dd1);
+			sum += (dd + (dd1 - dd) * wy) * d;
+			tx += tx;
+			d *= 0.5;
+			dx = 0.5; // Dealign levels' anchor grid
+		}
+		k = rint(sum * sc + 0.5 * 255.0);
+		if (bpp == 1) *imgr = k;
+		else
+		{
+			k *= 3;
+			imgr[0] = perlin_info.map[k + 0];
+			imgr[1] = perlin_info.map[k + 1];
+			imgr[2] = perlin_info.map[k + 2];
+		}
+	}
+}
+
+typedef struct {
+	unsigned char *buf, *mask;
+} noised;
+
+static void perlin_noise(tcb *thread)
+{
+	noised *nd = thread->data;
+	unsigned char *dest, *buf = nd->buf, *mask = nd->mask;
+	int i, ii, cnt = thread->nsteps, bpp = MEM_BPP;
+
+	for (i = thread->step0 , ii = 0; ii < cnt; i++ , ii++)
+	{
+		row_protected(0, i, mem_width, mask);
+		do_perlin(0, 1, mem_width, mask, buf, 0, i);
+		dest = mem_img[mem_channel] + i * mem_width * bpp;
+		process_img(0, 1, mem_width, mask, dest, dest, buf,
+			NULL, bpp, BLENDF_SET | BLENDF_INVM);
+		if (thread_step(thread, ii + 1, cnt, 10)) break;
+	}
+	thread_done(thread);
+}
+
+void mem_perlin()
+{
+	noised nd;
+	threaddata *tdata;
+
+	tdata = talloc(MA_ALIGN_DEFAULT,
+		image_threads(mem_width, mem_height),
+		&nd, sizeof(nd),
+		NULL, 
+		&nd.buf, mem_width * MEM_BPP,
+		&nd.mask, mem_width,
+		NULL);
+	if (!tdata)
+	{
+		memory_errors(1);
+		return;
+	}
+	launch_threads(perlin_noise, tdata, _("Solid Noise"), mem_height);
+	free(tdata);
+}

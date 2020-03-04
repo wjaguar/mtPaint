@@ -92,11 +92,14 @@ static void fpick_btn(fpick_dd *dt, void **wdata, int what, void **where);
 
 #elif (GTK_MAJOR_VERSION == 2) && (GTK2VERSION < 4) /* GTK+ 2.0/2.2 */
 #define fpick_fnmatch(mask, str) wjfnmatch(mask, str, TRUE)
+
+#else
+#define HAVE_FILEFILTER
 #endif
 
 static void filter_dir(fpick_dd *dt, const char *pattern)
 {
-#if GTK2VERSION >= 4 /* GTK+ 2.4+ */
+#ifdef HAVE_FILEFILTER
 	GtkFileFilter *filt = gtk_file_filter_new();
 	GtkFileFilterInfo info;
 	gtk_file_filter_add_pattern(filt, pattern);
@@ -112,7 +115,7 @@ static void filter_dir(fpick_dd *dt, const char *pattern)
 		/* Filter files, let directories pass */
 		if (pattern[0] && (s[0] == 'F'))
 		{
-#if GTK2VERSION >= 4 /* GTK+ 2.4+ */
+#ifdef HAVE_FILEFILTER
 			info.display_name = s + 1;
 			if (!gtk_file_filter_filter(filt, &info)) continue;
 #else
@@ -123,7 +126,7 @@ static void filter_dir(fpick_dd *dt, const char *pattern)
 	}
 	dt->cntx = map - dt->fmap;	
 
-#if GTK2VERSION >= 4 /* GTK+ 2.4+ */
+#ifdef HAVE_FILEFILTER
 	gtk_object_sink(GTK_OBJECT(filt));
 #endif
 }
@@ -815,7 +818,7 @@ static int fpick_wildcard(fpick_dd *dt, int button)
 static int fpick_entry_key(fpick_dd *dt, void **wdata, int what, void **where,
 	key_ext *keydata)
 {
-	if (keydata->key != GDK_Tab) return (FALSE);
+	if (keydata->key != KEY(Tab)) return (FALSE);
 	fpick_wildcard(dt, FALSE);
 	return (TRUE);
 }
@@ -1030,7 +1033,7 @@ GtkWidget *fpick(GtkWidget **box, char *title, int flags, void **r)
 
 #if GTK_MAJOR_VERSION == 1 /* No builtin accelerators - add our own */
 	gtk_widget_add_accelerator(fs->cancel_button,
-		"clicked", ag, GDK_Escape, 0, (GtkAccelFlags)0);
+		"clicked", ag, KEY(Escape), 0, (GtkAccelFlags)0);
 	gtk_window_add_accel_group(GTK_WINDOW(fp), ag);
 #endif
 	return (fp);

@@ -3064,3 +3064,99 @@ void pressed_xhold()
 	}
 	run_create_(xhold_code, &tdata, sizeof(tdata), script_cmds);
 }
+
+/// NOISE WINDOW
+
+int noise_preview;
+static int noise_seed, noise_map;
+static int noise_xs = 256, noise_ys = 256, noise_lvl = 1;
+
+typedef struct {
+	int xs, ys, lvl, seed, map, preview;
+	int rgb;
+	char **ncp, *nc[5];
+	void **sspin, **xspin, **yspin, **lspin, **copt, **pbutton;
+} noise_dd;
+
+static void noise_changed(noise_dd *dt, void **wdata, int what, void **where)
+{
+	cmd_read(where, dt);
+	if (!noise_preview) return;
+	init_perlin(dt->seed, dt->xs, dt->ys, dt->lvl, dt->map);
+	update_stuff(UPD_RENDER);
+}
+
+static void noise_evt(noise_dd *dt, void **wdata, int what, void **where)
+{
+	int update = 0;
+
+	if (what == op_EVT_OK)
+	{
+		/* Update parameters */
+		run_query(wdata);
+		noise_seed = dt->seed;
+		noise_map = dt->map;
+		noise_xs = dt->xs;
+		noise_ys = dt->ys;
+		noise_lvl = dt->lvl;
+	}
+
+	if (what != op_EVT_CANCEL)
+		init_perlin(dt->seed, dt->xs, dt->ys, dt->lvl, dt->map);
+
+	if (what == op_EVT_CHANGE) // Toggle preview
+	{
+		cmd_read(where, dt);
+		if (dt->preview ^ !noise_preview) return; // Nothing to do
+		noise_preview = dt->preview;
+		update_stuff(UPD_RENDER);
+		return;
+	}
+
+	/* First, disable preview */
+	if (noise_preview) update = UPD_RENDER;
+	noise_preview = FALSE;
+
+	while (what == op_EVT_OK)
+	{
+		spot_undo(UNDO_FILT);
+		mem_perlin();
+		mem_undo_prepare();
+		update |= UPD_IMG;
+		break;
+	}
+
+	run_destroy(wdata); // Finished
+	update_stuff(update);
+}
+
+#define WBbase noise_dd
+static void *noise_code[] = {
+	WINDOWm(_("Solid Noise")), DEFW(300),
+	TABLE2(5),
+	REF(sspin), TSPIN(_("Seed"), seed, 0, INT_MAX),
+		EVENT(CHANGE, noise_changed), TRIGGER,
+	REF(xspin), TSPIN(_("X span"), xs, 1, MAX_WIDTH), EVENT(CHANGE, noise_changed),
+	REF(yspin), TSPIN(_("Y span"), ys, 1, MAX_HEIGHT), EVENT(CHANGE, noise_changed),
+	REF(lspin), TSPIN(_("Octaves"), lvl, 1, 8), EVENT(CHANGE, noise_changed),
+	IFx(rgb, 1),
+		REF(copt), TOPTDe(_("Colours"), ncp, map, noise_changed),
+	ENDIF(1),
+	WDONE,
+	HSEP,
+	EQBOX,
+	CANCELBTN(_("Cancel"), noise_evt),
+	REF(pbutton), TOGGLE(_("Preview"), preview, noise_evt),
+	OKBTN(_("OK"), noise_evt),
+	WSHOW
+};
+#undef WBbase
+
+void pressed_noise()
+{
+	noise_dd tdata = { noise_xs, noise_ys, noise_lvl, noise_seed, noise_map,
+		FALSE, MEM_BPP == 3, tdata.nc, { _("Greyscale"), _("Gradient"),
+		_("Palette"), mem_clipboard ? _("Clipboard") : "", NULL } };
+
+	run_create_(noise_code, &tdata, sizeof(tdata), script_cmds);
+}

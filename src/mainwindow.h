@@ -133,6 +133,7 @@ enum { // To let constants renumber themselves when adding new ones
 	DLG_LASSO,
 	DLG_KEYS,
 	DLG_XHOLD,
+	DLG_NOISE,
 
 	FILT_2RGB,
 	FILT_INVERT,

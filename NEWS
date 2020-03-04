@@ -22,6 +22,7 @@ Here is a summary of the main changes in this release (see handbook for full det
 	* Threshold effect with interactive preview added (see handbook section 6.6.7)
 	* Normalize effect added
 	* Map effect added: map image's value/red/green/blue to gradient/palette/clipboard
+	* Solid Noise effect with interactive preview added (Perlin noise generation)
 	* Colour transform and source selection added to blend mode options
 	* Threshold blend mode added
 	* "Saturate more" blend mode redefined to not ignore source (previous behaviour available with "Image" source selected)

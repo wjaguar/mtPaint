@@ -1,5 +1,5 @@
 /*	canvas.c
-	Copyright (C) 2004-2019 Mark Tyler and Dmitry Groshev
+	Copyright (C) 2004-2020 Mark Tyler and Dmitry Groshev
 
 	This file is part of mtPaint.
 
@@ -379,38 +379,11 @@ typedef struct {
 static int do_map(map_dd *dt, void **wdata)
 {
 	unsigned char map[768];
-	int i, n, wrk[3];
 
 	run_query(wdata);
 
-	/* Prepare conversion table */
-	memset(map, 0, 768);
-	/* Gradient */
-	if (!map_from) for (i = 0; i < 256; i++)
-	{
-		if (!grad_value(wrk, CHN_IMAGE, i / 255.0)) continue;
-		map[i * 3 + 0] = wrk[0] >> 8;
-		map[i * 3 + 1] = wrk[1] >> 8;
-		map[i * 3 + 2] = wrk[2] >> 8;
-	}
-	/* Palette */
-	else if (map_from == 1) pal2rgb(map, mem_pal);
-	/* Clipboard */
-	else
-	{
-		n = mem_clip_w * mem_clip_h;
-		if (n > 256) n = 256;
-		if (mem_clip_bpp == 3) memcpy(map, mem_clipboard, 768);
-		else for (i = 0; i < n; i++)
-		{
-			png_color *c = mem_pal + mem_clipboard[i];
-			map[i * 3 + 0] = c->red;
-			map[i * 3 + 1] = c->green;
-			map[i * 3 + 2] = c->blue;
-		}
-	}
-	/* Convert image */
 	spot_undo(UNDO_FILT);
+	mem_prepare_map(map, map_from + MAP_GRAD);
 	mem_remap_rgb(map, map_to);
 	mem_undo_prepare();
 

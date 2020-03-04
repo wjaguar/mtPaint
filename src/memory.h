@@ -1,5 +1,5 @@
 /*	memory.h
-	Copyright (C) 2004-2019 Mark Tyler and Dmitry Groshev
+	Copyright (C) 2004-2020 Mark Tyler and Dmitry Groshev
 
 	This file is part of mtPaint.
 
@@ -498,16 +498,33 @@ static inline unsigned int nextpow2(unsigned int n)
 	return (n + 1);
 }
 
-// Number of set bits
+/// Binary logarithm, rounding up
+
+static inline unsigned int nlog2(unsigned int n)
+{
+	unsigned int m;
+#if UINT_MAX > 0xFFFFFFFFUL
+	m = (n >= 0x100000000U) << 5;
+	m += (n >> m >= 0x10000) << 4;
+#else
+	m = (n >= 0x10000) << 4;
+#endif
+	m += (n >> m >= 0x100) << 3;
+	m += (n >> m >= 0x10) << 2;
+	m += (0xFFFFAA50U >> ((n >> m) << 1)) & 3;
+	return (m + (n > 1U << m));
+}
+
+/// Number of set bits
 
 static inline unsigned int bitcount(unsigned int n)
 {
 	unsigned int m;
 #if UINT_MAX > 0xFFFFFFFFUL
-	n -= (n >> 1) & 0x5555555555555555ULL;
-	m = n & 0xCCCCCCCCCCCCCCCCULL; n = (n ^ m) + (m >> 2);
-	n = (n + (n >> 4)) & 0x0F0F0F0F0F0F0F0FULL;
-	n = (n * 0x0101010101010101ULL) >> 56;
+	n -= (n >> 1) & 0x5555555555555555U;
+	m = n & 0xCCCCCCCCCCCCCCCCU; n = (n ^ m) + (m >> 2);
+	n = (n + (n >> 4)) & 0x0F0F0F0F0F0F0F0FU;
+	n = (n * 0x0101010101010101U) >> 56;
 #else
 	n -= (n >> 1) & 0x55555555;
 	m = n & 0x33333333; n = m + ((n ^ m) >> 2);
@@ -733,7 +750,6 @@ void mem_find_dither(int red, int green, int blue);
 int mem_quantize( unsigned char *old_mem_image, int target_cols, int type );
 void mem_invert();			// Invert the palette
 void mem_normalize();			// Normalize contrast in image or palette
-void mem_remap_rgb(unsigned char *map, int what); // Remap V/R/G/B to color
 
 //	Clear/set protection (what = NULL - color n, n = -1 - all colors)
 void mem_mask_setv(int *what, int n, int state);
@@ -965,6 +981,25 @@ double mem_seg_threshold(seg_state *s);
 void mem_seg_scan(unsigned char *dest, int y, int x, int w, int zoom,
 	const seg_state *s);
 void mem_seg_render(unsigned char *img, const seg_state *s);
+
+/// REMAPPING COLORS
+
+enum {
+	MAP_GREY = 0,
+	MAP_GRAD,
+	MAP_PAL,
+	MAP_CLIP
+};
+
+void mem_prepare_map(unsigned char *map, int how); // Set up colors for mapping
+void mem_remap_rgb(unsigned char *map, int what); // Remap V/R/G/B to color
+
+/// NOISE
+
+void init_perlin(int seed, int xstep, int ystep, int lvl, int maptype);
+void do_perlin(int start, int step, int cnt, unsigned char *mask,
+	unsigned char *imgr, int x, int y);
+void mem_perlin();
 
 #define IF_IN_RANGE( x, y ) if ( x>=0 && y>=0 && x<mem_width && y<mem_height )
 

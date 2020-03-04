@@ -55,6 +55,7 @@ int sharper_reduce;
 int spal_mode;
 seg_state *seg_preview;
 int xhold_preview;
+int noise_preview;
 
 void generic_new_window(int type);
 
@@ -86,3 +87,5 @@ void bkg_setup();
 void pressed_segment();
 
 void pressed_xhold();
+
+void pressed_noise();

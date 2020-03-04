@@ -1,5 +1,5 @@
 /*	cpick.c
-	Copyright (C) 2008-2014 Mark Tyler and Dmitry Groshev
+	Copyright (C) 2008-2020 Mark Tyler and Dmitry Groshev
 
 	This file is part of mtPaint.
 
@@ -577,9 +577,9 @@ static gboolean dropper_key_press(GtkWidget *widget, GdkEventKey *event,
 	int x, y;
 
 	if (arrow_key(event, &x, &y, 20)) move_mouse_relative(x, y);
-	else if (event->keyval == GDK_Escape) dropper_terminate(widget, user_data);
-	else if ((event->keyval == GDK_Return) || (event->keyval == GDK_KP_Enter) ||
-		(event->keyval == GDK_space) || (event->keyval == GDK_KP_Space))
+	else if (event->keyval == KEY(Escape)) dropper_terminate(widget, user_data);
+	else if ((event->keyval == KEY(Return)) || (event->keyval == KEY(KP_Enter)) ||
+		(event->keyval == KEY(space)) || (event->keyval == KEY(KP_Space)))
 	{
 #if GTK_MAJOR_VERSION == 1
 		gdk_window_get_pointer((GdkWindow *)&gdk_root_parent,
@@ -611,7 +611,7 @@ static void click_eyedropper(GtkButton *button, gpointer user_data)
 	static GdkCursor *cursor;
 	/* !!! If button itself is used for grab widget, it will receive mouse
 	 * clicks, with obvious result */
-	GtkWidget *grab_widget = GTK_WIDGET(button)->parent;
+	GtkWidget *grab_widget = gtk_widget_get_parent(GTK_WIDGET(button));
 
 	if (!cursor) cursor = make_cursor(xbm_picker_bits, xbm_picker_mask_bits,
 		xbm_picker_width, xbm_picker_height, xbm_picker_x_hot, xbm_picker_y_hot);
@@ -702,22 +702,8 @@ static void hex_size_req(GtkWidget *widget, GtkRequisition *requisition,
 
 GtkWidget *eyedropper(void **r)
 {
-	GtkWidget *button, *iconw;
-	GdkPixmap *icon, *mask;
-
-	button = gtk_button_new();
-
-	icon = gdk_pixmap_create_from_data(main_window->window, xbm_picker_bits,
-		xbm_picker_width, xbm_picker_height,
-		-1, &main_window->style->white, &main_window->style->black);
-	mask = gdk_bitmap_create_from_data(main_window->window, xbm_picker_mask_bits,
-		xbm_picker_width, xbm_picker_height );
-
-	iconw = gtk_pixmap_new(icon, mask);
-	gtk_widget_show(iconw);
-	gdk_pixmap_unref( icon );
-	gdk_pixmap_unref( mask );
-	gtk_container_add( GTK_CONTAINER (button), iconw );
+	GtkWidget *button = gtk_button_new();
+	gtk_container_add(GTK_CONTAINER(button), xpm_image(XPM_ICON(picker)));
 
 	gtk_signal_connect(GTK_OBJECT(button), "clicked",
 		GTK_SIGNAL_FUNC(click_eyedropper), NEXT_SLOT(r));

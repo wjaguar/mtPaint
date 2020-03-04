@@ -84,6 +84,7 @@ DEF_XPM_ICON(undo);
 DEF_XPM_ICON(up);
 DEF_XPM_ICON(cline);
 DEF_XPM_ICON(layers);
+DEF_XPM_ICON(picker);
 //DEF_XPM_ICON(config);
 
 extern unsigned char

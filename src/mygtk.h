@@ -41,11 +41,15 @@
 
 #if GTK_MAJOR_VERSION == 1
 #define U_LISTS_GTK1
+
 #else /* GTK_MAJOR_VERSION == 2 */
 #if GTK2VERSION < 18
 #define U_LISTS_GTK1
 #endif
 #endif
+
+#define gtk_widget_get_parent(A) ((A)->parent)
+#define KEY(A) GDK_##A
 
 ///	Icon descriptor type
 
@@ -53,6 +57,7 @@ typedef void *xpm_icon_desc[2];
 
 #if GTK_MAJOR_VERSION == 1
 #define XPM_TYPE char**
+
 #else /* if GTK_MAJOR_VERSION == 2 */
 #define XPM_TYPE void**
 #endif
@@ -367,8 +372,8 @@ unsigned sys_mem_size();
 #ifdef WIN32
 #define XINE_FAKERY(key) 0
 #else
-#define XINE_FAKERY(key) (((key) == GDK_Shift_L) || ((key) == GDK_Control_L) \
-	|| ((key) == GDK_Scroll_Lock) || ((key) == GDK_Num_Lock))
+#define XINE_FAKERY(key) (((key) == KEY(Shift_L)) || ((key) == KEY(Control_L)) \
+	|| ((key) == KEY(Scroll_Lock)) || ((key) == KEY(Num_Lock)))
 #endif
 
 // Workaround for stupid GTK1 typecasts

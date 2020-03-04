@@ -102,11 +102,12 @@
 #include "graphics/xpm_up.xpm"
 #include "graphics/xpm_cline.xpm"
 #include "graphics/xpm_layers.xpm"
+#include "graphics/xpm_picker.xpm"
 //#include "graphics/xpm_config.xpm"
 
 #undef static
 
-#if GTK_MAJOR_VERSION == 2
+#if GTK_MAJOR_VERSION >= 2
 /* Create icon descriptors */
 #define DEFINE_ICONS
 #include "icons.h"
