@@ -5,6 +5,7 @@ mtPaint NEWS
 Here is a summary of the main changes in this release (see handbook for full details):
 
 3.50	2020-??-??
+        * GTK 3 support
 	* Scripting added - "Image->Script" to enter or run a script : See handbook chapter 10 for details
 	* Commandline mode added - use "mtpaint --cmd" to run a script without GUI
 	* Keyboard shortcuts can now be reconfigured - "Help->Keyboard shortcuts"
