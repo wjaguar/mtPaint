@@ -1,5 +1,5 @@
 /*	prefs.h
-	Copyright (C) 2005-2015 Mark Tyler and Dmitry Groshev
+	Copyright (C) 2005-2020 Mark Tyler and Dmitry Groshev
 
 	This file is part of mtPaint.
 
@@ -22,6 +22,7 @@
 #define DEFAULT_PAL_INI "defaultPalette"
 #define DEFAULT_PAT_INI "defaultPatterns"
 #define DEFAULT_THEME_INI "defaultTheme"
+#define DEFAULT_CSS_INI "defaultCSS"
 
 #define MAX_TF 100 /* Tablet tool factor scale */
 

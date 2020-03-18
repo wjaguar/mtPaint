@@ -49,14 +49,38 @@
 #define U_LISTS_GTK1
 #endif
 
+#else /* GTK_MAJOR_VERSION == 3 */
+#undef U_LISTS_GTK1
 #endif
 
+///	Meaningless differences to hide
+
+#if GTK_MAJOR_VERSION == 3
+#define g_thread_init(A) /* Not needed anymore */
+#define GtkSignalFunc GCallback
+#define GTK_SIGNAL_FUNC(A) G_CALLBACK(A)
+#define GTK_OBJECT(A) G_OBJECT(A)
+#define gtk_object_sink(A) g_object_ref_sink(A)
+#define gtk_signal_connect(A,B,C,D) g_signal_connect(A,B,C,D)
+#define gtk_signal_connect_object(A,B,C,D) g_signal_connect_swapped(A,B,C,D)
+#define gtk_signal_disconnect_by_data(A,B) g_signal_handlers_disconnect_by_data(A,B)
+#define gtk_signal_emit_by_name g_signal_emit_by_name
+
+#define KEY(A) GDK_KEY_##A
+
+#else
 #define gtk_widget_get_parent(A) ((A)->parent)
 #define gtk_widget_get_window(A) ((A)->window)
 #define gdk_device_get_name(A) ((A)->name)
 #define gdk_device_get_n_axes(A) ((A)->num_axes)
 #define gdk_device_get_mode(A) ((A)->mode)
 #define KEY(A) GDK_##A
+#endif
+
+#ifndef G_GNUC_BEGIN_IGNORE_DEPRECATIONS
+#define G_GNUC_BEGIN_IGNORE_DEPRECATIONS
+#define G_GNUC_END_IGNORE_DEPRECATIONS
+#endif
 
 ///	Icon descriptor type
 
@@ -103,6 +127,25 @@ GdkDevice *tablet_device;
 void init_tablet();
 void conf_tablet(void **slot);
 void conf_done(void *cause);
+
+// GTK+3 specific support code
+
+#if GTK_MAJOR_VERSION == 3
+void cairo_surface_fdestroy(cairo_surface_t *s);
+cairo_surface_t *cairo_upload_rgb(cairo_surface_t *ref, GdkWindow *win,
+	unsigned char *src, int w, int h, int len);
+void cairo_set_rgb(cairo_t *cr, int c);
+void css_restyle(GtkWidget *w, char *css, char *class, char *name);
+void add_css_class(GtkWidget *w, char *class);
+/* Add CSS, builtin and user-provided, to default screen */
+void init_css(char *cssfile);
+/* Find button widget of a GtkComboBox with entry */
+GtkWidget *combobox_button(GtkWidget *cbox);
+/* Find out which set of bugs & breakages is active */
+int gtk3version;
+#else
+#define add_css_class(A,B)
+#endif
 
 // Slider-spin combo (a decorated spinbutton)
 
@@ -223,9 +266,15 @@ GtkWidget *wj_combo_box(char **names, int cnt, int u, int idx, void **r,
 	GtkSignalFunc handler);
 int wj_combo_box_get_history(GtkWidget *combobox);
 
+#if GTK_MAJOR_VERSION == 3
+// Bin widget with customizable size handling
+
+GtkWidget *wjsizebin_new(GCallback get_size, GCallback size_alloc, gpointer user_data);
+#else
 // Box widget with customizable size handling
 
 GtkWidget *wj_size_box();
+#endif
 
 // Disable visual updates while tweaking container's contents
 
@@ -240,12 +289,20 @@ void set_maximized(GtkWidget *window);
 #define is_maximized(W) \
 	(!!(gdk_window_get_state((W)->window) & GDK_WINDOW_STATE_MAXIMIZED))
 #define set_maximized(W) gtk_window_maximize(W)
+#else /* if GTK_MAJOR_VERSION == 3 */
+#define is_maximized(W) gtk_window_is_maximized(GTK_WINDOW(W))
+#define set_maximized(W) gtk_window_maximize(W)
 #endif
 
 // Drawable to RGB
 
+#if GTK_MAJOR_VERSION == 3
+unsigned char *wj_get_rgb_image(GdkWindow *window, cairo_surface_t *s,
+	unsigned char *buf, int x, int y, int width, int height);
+#else /* if GTK_MAJOR_VERSION <= 2 */
 unsigned char *wj_get_rgb_image(GdkWindow *window, GdkPixmap *pixmap,
 	unsigned char *buf, int x, int y, int width, int height);
+#endif
 
 // Clipboard
 
@@ -258,7 +315,11 @@ typedef unsigned long XID_type;
 typedef struct {
 	int w, h, depth;
 	XID_type xid;
+#if GTK_MAJOR_VERSION == 3
+	cairo_surface_t *pm;
+#else /* if GTK_MAJOR_VERSION <= 2 */
 	GdkPixmap *pm;
+#endif
 } pixmap_info;
 
 #if (GTK_MAJOR_VERSION == 1) || defined GDK_WINDOWING_X11
@@ -300,11 +361,22 @@ void wjcanvas_size(GtkWidget *widget, int width, int height);
 void wjcanvas_get_vport(GtkWidget *widget, int *vport);
 int wjcanvas_scroll_in(GtkWidget *widget, int x, int y);
 int wjcanvas_bind_mouse(GtkWidget *widget, GdkEventMotion *event, int x, int y);
+#if GTK_MAJOR_VERSION == 3
+void wjcanvas_uncache(GtkWidget *widget, int *rxy);
+void wjcanvas_draw_rgb(GtkWidget *widget, int x, int y, int w, int h,
+	unsigned char *rgb, int step, int fill, int repaint);
+#else /* if GTK_MAJOR_VERSION <= 2 */
+#define wjcanvas_uncache(A,B)
+#endif
 
 // Focusable pixmap widget
 
 GtkWidget *wjpixmap_new(int width, int height);
+#if GTK_MAJOR_VERSION == 3
+cairo_surface_t *wjpixmap_pixmap(GtkWidget *widget);
+#else /* if GTK_MAJOR_VERSION <= 2 */
 GdkPixmap *wjpixmap_pixmap(GtkWidget *widget);
+#endif
 void wjpixmap_draw_rgb(GtkWidget *widget, int x, int y, int w, int h,
 	unsigned char *rgb, int step);
 void wjpixmap_move_cursor(GtkWidget *widget, int x, int y);
@@ -457,7 +529,14 @@ guint threads_timeout_add(guint32 interval, GSourceFunc function, gpointer data)
 #define THREADS_ENTER() gdk_threads_enter()
 #define THREADS_LEAVE() gdk_threads_leave()
 #else
+#if GTK_MAJOR_VERSION == 3
+#define GTK_PRIORITY_REDRAW GDK_PRIORITY_REDRAW
+#define GtkFunction GSourceFunc
+#define threads_idle_add_priority(X,Y,Z) g_idle_add_full(X,Y,Z,NULL)
+#define gtk_idle_remove(A) g_source_remove(A)
+#else
 #define threads_idle_add_priority(X,Y,Z) gtk_idle_add_priority(X,Y,Z)
+#endif
 #define threads_timeout_add(X,Y,Z) g_timeout_add(X,Y,Z)
 #define THREADS_ENTER()
 #define THREADS_LEAVE()

@@ -585,8 +585,10 @@ static gboolean dropper_key_press(GtkWidget *widget, GdkEventKey *event,
 		gdk_window_get_pointer((GdkWindow *)&gdk_root_parent,
 			&x, &y, NULL);
 #else /* #if GTK_MAJOR_VERSION >= 2 */
+G_GNUC_BEGIN_IGNORE_DEPRECATIONS
 		gdk_display_get_pointer(gtk_widget_get_display(widget),	NULL,
 			&x, &y, NULL);
+G_GNUC_END_IGNORE_DEPRECATIONS
 #endif
 		dropper_grab_colour(widget, x, y, user_data);
 	}
@@ -602,6 +604,10 @@ static gboolean dropper_mouse_press(GtkWidget *widget, GdkEventButton *event,
 	gpointer user_data)
 {
 	if (event->type != GDK_BUTTON_RELEASE) return (FALSE);
+#if GTK_MAJOR_VERSION == 3
+	/* GTK+3 sends the release event from button press to grab widget, too */
+	if (event->window != gtk_widget_get_window(widget)) return (FALSE);
+#endif
 	dropper_grab_colour(widget, event->x_root, event->y_root, user_data);
 	return (TRUE);
 }
@@ -1025,6 +1031,8 @@ void cpick_set_colour_previous(GtkWidget *w, int rgb, int opacity)
 
 #ifdef U_CPICK_GTK		/* GtkColorSelection dialog */
 
+G_GNUC_BEGIN_IGNORE_DEPRECATIONS /* Obviously */
+
 GtkWidget *cpick_create(int opacity)
 {
 	GtkWidget *w = gtk_color_selection_new();
@@ -1115,7 +1123,8 @@ void cpick_set_colour_previous(GtkWidget *w, int rgb, int opacity)
 	gtk_color_selection_set_previous_alpha(GTK_COLOR_SELECTION(w), opacity * 257);
 }
 
-#endif
+#endif /* GTK+2&3 */
 
+G_GNUC_END_IGNORE_DEPRECATIONS
 
 #endif		/* GtkColorSelection dialog */
