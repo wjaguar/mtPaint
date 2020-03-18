@@ -169,7 +169,7 @@ static char *isort_key(char *src)
 #define strkeycmp strcoll
 #define strcollcmp strcoll
 
-#else /* if GTK_MAJOR_VERSION == 2 */
+#else /* if GTK_MAJOR_VERSION >= 2 */
 
 static char *isort_key(char *src)
 {
@@ -472,7 +472,7 @@ static void scan_dir(fpick_dd *dt, DIR *dp, char *select)
 		// Field #6 - alphabetic (case-sensitive) sort key
 #if GTK_MAJOR_VERSION == 1
 		addstr(&mem, nm, 0);
-#else /* if GTK_MAJOR_VERSION == 2 */
+#else /* if GTK_MAJOR_VERSION >= 2 */
 		src = g_utf8_collate_key(nm, -1);
 		addstr(&mem, src, 0);
 		g_free(src);

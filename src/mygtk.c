@@ -37,6 +37,7 @@
 #include <X11/Xlib.h>
 #include <X11/Xatom.h>
 #include <gdk/gdkx.h>
+
 #elif defined GDK_WINDOWING_WIN32
 #define WIN32_LEAN_AND_MEAN
 #include <windows.h>
@@ -47,7 +48,9 @@ GtkWidget *main_window;
 
 ///	GENERIC WIDGET PRIMITIVES
 
-static GtkWidget *spin_new_x(GtkObject *adj, int fpart);
+#define GtkAdjustment_t GtkObject
+
+static GtkWidget *spin_new_x(GtkAdjustment_t *adj, int fpart);
 
 GtkWidget *add_a_window(GtkWindowType type, char *title, GtkWindowPosition pos)
 {
@@ -79,7 +82,7 @@ static void console_printf(char *format, ...)
 #if GTK_MAJOR_VERSION == 1
 	/* Same encoding as console */
 	fputs(txt, stdout);
-#else /* if GTK_MAJOR_VERSION == 2 */
+#else /* if GTK_MAJOR_VERSION >= 2 */
 	/* UTF-8 */
 #ifdef WIN32
 	if (!codepage[0]) sprintf(codepage, "cp%d", GetConsoleCP());
@@ -260,19 +263,211 @@ int alert_box(char *title, char *message, char *text1, ...)
 	return (res);
 }
 
+//	Tablet handling
+
+#if GTK_MAJOR_VERSION == 1
+GdkDeviceInfo *tablet_device;
+#else /* #if GTK_MAJOR_VERSION >= 2 */
+GdkDevice *tablet_device;
+#endif
+
+void init_tablet()
+{
+	GList *devs;
+	char *name, buf[64];
+	int i, n, mode;
+
+	/* Do nothing if tablet wasn't working the last time */
+	if (!inifile_get_gboolean("tablet_USE", FALSE)) return;
+
+	name = inifile_get("tablet_name", "?");
+	mode = inifile_get_gint32("tablet_mode", 0);
+
+#if GTK_MAJOR_VERSION == 1
+	for (devs = gdk_input_list_devices(); devs; devs = devs->next)
+	{
+		GdkDeviceInfo *device = devs->data;
+		GdkAxisUse *u;
+
+		if (strcmp(device->name, name)) continue;
+		/* Found the one that was working the last time */
+		tablet_device = device;
+		gdk_input_set_mode(device->deviceid, mode);
+		n = device->num_axes;
+		u = calloc(n, sizeof(*u));
+		for (i = 0; i < n; i++)
+		{
+			sprintf(buf, "tablet_axes_v%d", i);
+			u[i] = inifile_get_gint32(buf, GDK_AXIS_IGNORE);
+		}
+		gdk_input_set_axes(device->deviceid, u);
+		free(u);
+		break;
+	}
+#else /* #if GTK_MAJOR_VERSION >= 2 */
+	devs = gdk_devices_list();
+	for (; devs; devs = devs->next)
+	{
+		GdkDevice *device = devs->data;
+
+		if (strcmp(gdk_device_get_name(device), name)) continue;
+		/* Found the one that was working the last time */
+		tablet_device = device;
+		gdk_device_set_mode(device, mode);
+		n = gdk_device_get_n_axes(device);
+		for (i = 0; i < n; i++)
+		{
+			sprintf(buf, "tablet_axes_v%d", i);
+			gdk_device_set_axis_use(device, i,
+				inifile_get_gint32(buf, GDK_AXIS_IGNORE));
+		}
+		break;
+	}
+#endif
+
+	inifile_set_gboolean("tablet_USE", !!tablet_device);
+}
+
+//	TABLETBTN widget
+
+static void **tablet_slot;
+static void *tablet_dlg;
+
+
+#if GTK_MAJOR_VERSION == 1
+
+static GdkDeviceInfo *tablet_find(gint deviceid)
+{
+	GList *devs;
+
+	for (devs = gdk_input_list_devices(); devs; devs = devs->next)
+	{
+		GdkDeviceInfo *device = devs->data;
+		if (device->deviceid == deviceid) return (device);
+	}
+	return (NULL);
+}
+
+#endif
+
+void conf_done(void *cause)
+{
+	char buf[64];
+	int i, n;
+
+	if (!tablet_slot) return;
+
+	/* Use last selected device if it's active */
+	{
+#if GTK_MAJOR_VERSION == 1
+		GdkDeviceInfo *dev = tablet_find(GTK_INPUT_DIALOG(tablet_dlg)->current_device);
+#elif GTK_MAJOR_VERSION == 2
+		GdkDevice *dev = GTK_INPUT_DIALOG(tablet_dlg)->current_device;
+#endif
+		if (dev && (gdk_device_get_mode(dev) != GDK_MODE_DISABLED))
+		{
+			tablet_device = dev;
+			// Skip event if within do_destroy()
+			if (cause) cmd_event(tablet_slot, op_EVT_CHANGE);
+		}
+	}
+
+	if (tablet_device)
+	{
+		inifile_set("tablet_name", (char *)gdk_device_get_name(tablet_device));
+		inifile_set_gint32("tablet_mode", gdk_device_get_mode(tablet_device));
+
+		n = gdk_device_get_n_axes(tablet_device);
+		for (i = 0; i < n; i++)
+		{
+			sprintf(buf, "tablet_axes_v%d", i);
+			inifile_set_gint32(buf,
+#if GTK_MAJOR_VERSION == 1
+				tablet_device->axes[i]);
+#elif GTK_MAJOR_VERSION == 2
+				tablet_device->axes[i].use);
+#endif
+		}
+	}
+	inifile_set_gboolean("tablet_USE", !!tablet_device);
+
+	gtk_widget_destroy(tablet_dlg);
+	tablet_slot = NULL;
+}
+
+/* Use GtkInputDialog on GTK+1&2 */
+#if GTK_MAJOR_VERSION == 1
+
+static void tablet_toggle(GtkInputDialog *inputdialog, gint deviceid,
+	gpointer user_data)
+{
+	GdkDeviceInfo *dev = tablet_find(deviceid);
+	tablet_device = !dev || (dev->mode == GDK_MODE_DISABLED) ? NULL : dev;
+	cmd_event(user_data, op_EVT_CHANGE);
+}
+
+#else /* #if GTK_MAJOR_VERSION == 2 */
+
+static void tablet_toggle(GtkInputDialog *inputdialog, GdkDevice *deviceid,
+	gpointer user_data)
+{
+	tablet_device = gdk_device_get_mode(deviceid) == GDK_MODE_DISABLED ?
+		NULL : deviceid;
+	cmd_event(user_data, op_EVT_CHANGE);
+}
+
+#endif
+
+static gboolean conf_del(GtkWidget *widget)
+{
+	conf_done(widget);
+	return (TRUE);
+}
+
+void conf_tablet(void **slot)
+{
+	GtkWidget *inputd;
+	GtkInputDialog *inp;
+	GtkAccelGroup *ag;
+
+	if (tablet_slot) return;	// There can be only one
+	tablet_slot = slot;
+	tablet_dlg = inputd = gtk_input_dialog_new();
+	gtk_window_set_position(GTK_WINDOW(inputd), GTK_WIN_POS_CENTER);
+	inp = GTK_INPUT_DIALOG(inputd);
+
+	ag = gtk_accel_group_new();
+	gtk_signal_connect(GTK_OBJECT(inp->close_button), "clicked",
+		GTK_SIGNAL_FUNC(conf_done), NULL);
+	gtk_widget_add_accelerator(inp->close_button, "clicked", ag,
+		GDK_Escape, 0, (GtkAccelFlags)0);
+	gtk_signal_connect(GTK_OBJECT(inputd), "delete_event",
+		GTK_SIGNAL_FUNC(conf_del), NULL);
+
+	gtk_signal_connect(GTK_OBJECT(inputd), "enable-device",
+		GTK_SIGNAL_FUNC(tablet_toggle), slot);
+	gtk_signal_connect(GTK_OBJECT(inputd), "disable-device",
+		GTK_SIGNAL_FUNC(tablet_toggle), slot);
+
+	if (inp->keys_list) gtk_widget_hide(inp->keys_list);
+	if (inp->keys_listbox) gtk_widget_hide(inp->keys_listbox);
+	gtk_widget_hide(inp->save_button);
+
+	gtk_window_add_accel_group(GTK_WINDOW(inputd), ag);
+	gtk_widget_show(inputd);
+}
+
 // Slider-spin combo (a decorated spinbutton)
 
 GtkWidget *mt_spinslide_new(int swidth, int sheight)
 {
 	GtkWidget *box, *slider, *spin;
-	GtkObject *adj;
-
-	adj = gtk_adjustment_new(0, 0, 1, 1, 10, 0);
+	GtkAdjustment_t *adj = gtk_adjustment_new(0, 0, 1, 1, 10, 0);
 	box = gtk_hbox_new(FALSE, 0);
 
 	slider = gtk_hscale_new(GTK_ADJUSTMENT(adj));
-	gtk_box_pack_start(GTK_BOX(box), slider, swidth < 0, TRUE, 0);
 	gtk_widget_set_usize(slider, swidth, sheight);
+	gtk_box_pack_start(GTK_BOX(box), slider, swidth < 0, TRUE, 0);
 	gtk_scale_set_draw_value(GTK_SCALE(slider), FALSE);
 	gtk_scale_set_digits(GTK_SCALE(slider), 0);
 
@@ -293,15 +488,14 @@ GtkWidget *wj_radio_pack(char **names, int cnt, int vnum, int idx, void **r,
 	GtkWidget *table, *button = NULL;
 
 	table = gtk_table_new(1, 1, FALSE);
-
 	for (i = j = x = 0; (i != cnt) && names[i]; i++)
 	{
 		if (!names[i][0]) continue;
 		button = gtk_radio_button_new_with_label_from_widget(
 			GTK_RADIO_BUTTON_0(button), __(names[i]));
+		if (vnum > 0) x = j / vnum;
 		gtk_object_set_user_data(GTK_OBJECT(button), (gpointer)i);
 		gtk_container_set_border_width(GTK_CONTAINER(button), 5);
-		if (vnum > 0) x = j / vnum;
 		gtk_table_attach(GTK_TABLE(table), button, x, x + 1,
 			j - x * vnum, j - x * vnum + 1,
 			vnum != 1 ? GTK_EXPAND | GTK_FILL : GTK_FILL, 0, 0, 0);
@@ -369,11 +563,11 @@ static void spin_size_req(GtkWidget *widget, GtkRequisition *requisition,
 
 #endif
 
-static GtkWidget *spin_new_x(GtkObject *adj, int fpart)
+static GtkWidget *spin_new_x(GtkAdjustment_t *adj, int fpart)
 {
 	GtkWidget *spin = gtk_spin_button_new(GTK_ADJUSTMENT(adj), 1, fpart);
 #if (GTK_MAJOR_VERSION == 1) && !defined(U_MTK)
-	gtk_signal_connect_after(GTK_OBJECT(spin), "size_request",
+	gtk_signal_connect(GTK_OBJECT(spin), "size_request",
 		GTK_SIGNAL_FUNC(spin_size_req), NULL);
 #endif
 	gtk_widget_show(spin);
@@ -495,6 +689,8 @@ char *file_in_homedir(char *dest, const char *file, int cnt)
 	return (file_in_dir(dest, get_home_directory(), file, cnt));
 }
 
+#if GTK_MAJOR_VERSION <= 2
+
 // Set minimum size for a widget
 
 static void widget_size_req(GtkWidget *widget, GtkRequisition *requisition,
@@ -517,7 +713,7 @@ void widget_set_minsize(GtkWidget *widget, int width, int height)
 
 	hw = (height < 0 ? 0 : height & 0xFFFF) << 16 |
 		(width < 0 ? 0 : width & 0xFFFF);
-	gtk_signal_connect_after(GTK_OBJECT(widget), "size_request",
+	gtk_signal_connect(GTK_OBJECT(widget), "size_request",
 		GTK_SIGNAL_FUNC(widget_size_req), (gpointer)hw);
 }
 
@@ -533,11 +729,13 @@ GtkWidget *widget_align_minsize(GtkWidget *widget, int width, int height)
 	return (align);
 }
 
+#endif
+
 // Make widget request no less size than before (in one direction)
 
 #define KEEPSIZE_KEY "mtPaint.keepsize"
 
-static guint keepsize_key;
+static GQuark keepsize_key;
 
 /* And if user manages to change theme on the fly... well, more fool him ;-) */
 static void widget_size_keep(GtkWidget *widget, GtkRequisition *requisition,
@@ -562,7 +760,7 @@ static void widget_size_keep(GtkWidget *widget, GtkRequisition *requisition,
 void widget_set_keepsize(GtkWidget *widget, int keep_height)
 {
 	if (!keepsize_key) keepsize_key = g_quark_from_static_string(KEEPSIZE_KEY);
-	gtk_signal_connect_after(GTK_OBJECT(widget), "size_request",
+	gtk_signal_connect(GTK_OBJECT(widget), "size_request",
 		GTK_SIGNAL_FUNC(widget_size_keep), (gpointer)keep_height);
 }
 
@@ -588,7 +786,7 @@ void clist_enable_drag(GtkWidget *clist)
 	gtk_clist_set_reorderable(GTK_CLIST(clist), TRUE);
 }
 
-#else /* GTK1 doesn't have this bug */
+#elif GTK_MAJOR_VERSION == 1 /* GTK1 doesn't have this bug */
 
 void clist_enable_drag(GtkWidget *clist)
 {
@@ -650,7 +848,7 @@ static void paned_realize(GtkWidget *widget, gpointer user_data)
 
 void paned_mouse_fix(GtkWidget *widget)
 {
-	gtk_signal_connect_after(GTK_OBJECT(widget), "realize",
+	gtk_signal_connect(GTK_OBJECT(widget), "realize",
 		GTK_SIGNAL_FUNC(paned_realize), NULL);
 }
 
@@ -761,7 +959,7 @@ void gtk_init_bugfixes()
 	wc->key_press_event = gtk_entry_key_press_fixed;
 }
 
-#else /* if GTK_MAJOR_VERSION == 2 */
+#elif GTK_MAJOR_VERSION == 2
 #if defined GDK_WINDOWING_WIN32
 
 static int win_last_vk;
@@ -834,7 +1032,8 @@ void gtk_init_bugfixes()
 	}
 #endif
 }
-#endif /* GTK+2 */
+
+#endif
 
 // Whatever is needed to move mouse pointer 
 
@@ -997,13 +1196,13 @@ int arrow_key_(unsigned key, unsigned state, int *dx, int *dy, int mult)
 	*dx = *dy = 0;
 	switch (key)
 	{
-		case GDK_KP_Left: case GDK_Left:
+		case KEY(KP_Left): case KEY(Left):
 			*dx = -mult; break;
-		case GDK_KP_Right: case GDK_Right:
+		case KEY(KP_Right): case KEY(Right):
 			*dx = mult; break;
-		case GDK_KP_Up: case GDK_Up:
+		case KEY(KP_Up): case KEY(Up):
 			*dy = -mult; break;
-		case GDK_KP_Down: case GDK_Down:
+		case KEY(KP_Down): case KEY(Down):
 			*dy = mult; break;
 	}
 	return (*dx || *dy);
@@ -1011,8 +1210,7 @@ int arrow_key_(unsigned key, unsigned state, int *dx, int *dy, int mult)
 
 // Create pixmap cursor
 
-GdkCursor *make_cursor(const char *icon, const char *mask, int w, int h,
-	int tip_x, int tip_y)
+GdkCursor *make_cursor(char *icon, char *mask, int w, int h, int tip_x, int tip_y)
 {
 	static GdkColor cfg = { -1, -1, -1, -1 }, cbg = { 0, 0, 0, 0 };
 	GdkPixmap *icn, *msk;
@@ -1172,6 +1370,8 @@ int wj_combo_box_get_history(GtkWidget *combobox)
 
 #endif
 
+#if GTK_MAJOR_VERSION <= 2
+
 // Box widget with customizable size handling
 
 /* There exist no way to override builtin handlers for GTK_RUN_FIRST signals,
@@ -1250,6 +1450,8 @@ gpointer toggle_updates(GtkWidget *widget, gpointer unlock)
 	}
 	return (state);
 }
+
+#endif
 
 // Maximized state
 
@@ -1448,7 +1650,7 @@ unsigned char *wj_get_rgb_image(GdkWindow *window, GdkPixmap *pixmap,
 	return (buf);
 }
 
-#else /* #if GTK_MAJOR_VERSION == 2 */
+#elif GTK_MAJOR_VERSION == 2
 
 unsigned char *wj_get_rgb_image(GdkWindow *window, GdkPixmap *pixmap,
 	unsigned char *buf, int x, int y, int width, int height)
@@ -1555,7 +1757,7 @@ void pixmap_put_rows(pixmap_info *p, unsigned char *src, int y, int cnt)
 		0, y, p->w, cnt, GDK_RGB_DITHER_NONE, src, p->w * 3);
 }
 
-#endif
+#endif /* HAVE_PIXMAPS */
 
 int import_pixmap(pixmap_info *p, XID_type *xid)
 {
@@ -1590,6 +1792,7 @@ int import_pixmap(pixmap_info *p, XID_type *xid)
 	}
 	else // NULL means a screenshot
 	{
+// !!! Should be the screen where gdk_get_default_root_window() is
 		p->w = gdk_screen_width();
 		p->h = gdk_screen_height();
 		p->depth = 3;
@@ -1620,7 +1823,7 @@ int pixmap_get_rows(pixmap_info *p, unsigned char *dest, int y, int cnt)
 	return (!!wj_get_rgb_image(p->depth == 1 ? NULL :
 #if GTK_MAJOR_VERSION == 1
 		(GdkWindow *)&gdk_root_parent,
-#else /* #if GTK_MAJOR_VERSION == 2 */
+#else /* #if GTK_MAJOR_VERSION >= 2 */
 		gdk_get_default_root_window(),
 #endif
 		p->pm, dest, 0, y, p->w, cnt));
@@ -1685,9 +1888,8 @@ static void xpm_realize(GtkWidget *widget, gpointer user_data)
 
 GtkWidget *xpm_image(XPM_TYPE xpm)
 {
-	GdkPixmap *icon, *mask;
 	GtkWidget *widget;
-#if GTK_MAJOR_VERSION == 2
+#if GTK_MAJOR_VERSION >= 2
 	GdkPixbuf *buf;
 	char name[256];
 
@@ -1700,15 +1902,20 @@ GtkWidget *xpm_image(XPM_TYPE xpm)
 		gtk_widget_show(widget);
 		return (widget);
 	}
-	/* Fall back to builtin XPM icon */
-	icon = gdk_pixmap_create_from_xpm_d(main_window->window, &mask, NULL,
-		(char **)xpm[1]);
-#else /* if GTK_MAJOR_VERSION == 1 */
-	icon = gdk_pixmap_create_from_xpm_d(main_window->window, &mask, NULL, xpm);
 #endif
-	widget = gtk_pixmap_new(icon, mask);
-	gdk_pixmap_unref(icon);
-	gdk_pixmap_unref(mask);
+	/* Fall back to builtin XPM icon */
+	{
+		GdkPixmap *icon, *mask;
+		icon = gdk_pixmap_create_from_xpm_d(main_window->window, &mask,
+#if GTK_MAJOR_VERSION == 2
+			NULL, (char **)xpm[1]);
+#else /* if GTK_MAJOR_VERSION == 1 */
+			NULL, xpm);
+#endif
+		widget = gtk_pixmap_new(icon, mask);
+		gdk_pixmap_unref(icon);
+		gdk_pixmap_unref(mask);
+	}
 	gtk_widget_show(widget);
 #if GTK_MAJOR_VERSION == 2
 	gtk_signal_connect(GTK_OBJECT(widget), "realize",
@@ -2500,9 +2707,9 @@ static GtkType wjcanvas_get_type()
 	return (wjcanvas_type);
 }
 
-GtkWidget *wjcanvas_new()
+void wjcanvas_set_expose(GtkWidget *widget, GtkSignalFunc handler, gpointer user_data)
 {
-	return (gtk_widget_new(wjcanvas_get_type(), NULL));
+	gtk_signal_connect(GTK_OBJECT(widget), "expose_event", handler, user_data);
 }
 
 void wjcanvas_size(GtkWidget *widget, int width, int height)
@@ -2524,11 +2731,6 @@ void wjcanvas_size(GtkWidget *widget, int width, int height)
 	widget->requisition.height = height;
 #endif
 	gtk_widget_queue_resize(widget);
-}
-
-void wjcanvas_get_vport(GtkWidget *widget, int *vport)
-{
-	copy4(vport, WJCANVAS(widget)->xy);
 }
 
 static int wjcanvas_offset(GtkAdjustment *adj, int dv)
@@ -2600,12 +2802,20 @@ int wjcanvas_bind_mouse(GtkWidget *widget, GdkEventMotion *event, int x, int y)
 	return (move_mouse_relative(oldv[0] - canvas->xy[0], oldv[1] - canvas->xy[1]));
 }
 
+GtkWidget *wjcanvas_new()
+{
+	return (gtk_widget_new(wjcanvas_get_type(), NULL));
+}
+
+void wjcanvas_get_vport(GtkWidget *widget, int *vport)
+{
+	copy4(vport, WJCANVAS(widget)->xy);
+}
+
 // Focusable pixmap widget
 
 #define WJPIXMAP(obj)		GTK_CHECK_CAST(obj, wjpixmap_get_type(), wjpixmap)
 #define IS_WJPIXMAP(obj)	GTK_CHECK_TYPE(obj, wjpixmap_get_type())
-
-// !!! Implement 2nd cursor later !!!
 
 typedef struct
 {
@@ -3294,7 +3504,7 @@ void handle_events()
 static gboolean convert_ctrl_enter(GtkWidget *widget, GdkEventKey *event,
 	gpointer user_data)
 {
-	if (((event->keyval == GDK_Return) || (event->keyval == GDK_KP_Enter)) &&
+	if (((event->keyval == KEY(Return)) || (event->keyval == KEY(KP_Enter))) &&
 		(event->state & GDK_CONTROL_MASK))
 	{
 #if GTK_MAJOR_VERSION == 1
@@ -3304,7 +3514,7 @@ static gboolean convert_ctrl_enter(GtkWidget *widget, GdkEventKey *event,
 		gtk_editable_delete_selection(edit);
 		gtk_editable_insert_text(edit, "\n", 1, &pos);
 		edit->current_pos = pos;
-#else
+#else /* if GTK_MAJOR_VERSION >= 2 */
 		gtk_signal_emit_by_name(GTK_OBJECT(widget), "insert_at_cursor", "\n");
 #endif
 		return (TRUE);
@@ -3320,6 +3530,9 @@ void accept_ctrl_enter(GtkWidget *entry)
 
 // Grab/ungrab input
 
+#define GRAB_KEY "mtPaint.grab"
+
+/* !!! Widget is expected to have window visible & w/appropriate event masks */
 int do_grab(int mode, GtkWidget *widget, GdkCursor *cursor)
 {
 	int owner_events = mode != GRAB_FULL;
@@ -3335,7 +3548,8 @@ int do_grab(int mode, GtkWidget *widget, GdkCursor *cursor)
 		gdk_keyboard_ungrab(GDK_CURRENT_TIME);
 		return (FALSE);
 	}
-#else /* #if GTK_MAJOR_VERSION == 2 */
+	if (mode != GRAB_PROGRAM) gtk_grab_add(widget);
+#elif GTK_MAJOR_VERSION == 2
 	guint32 time;
 
 	if (!widget->window) return (FALSE);
@@ -3350,8 +3564,8 @@ int do_grab(int mode, GtkWidget *widget, GdkCursor *cursor)
 		gdk_display_keyboard_ungrab(gtk_widget_get_display(widget), time);
 		return (FALSE);
 	}
-#endif
 	if (mode != GRAB_PROGRAM) gtk_grab_add(widget);
+#endif
 	return (TRUE);
 }
 
@@ -3360,13 +3574,14 @@ void undo_grab(GtkWidget *widget)
 #if GTK_MAJOR_VERSION == 1
 	gdk_keyboard_ungrab(GDK_CURRENT_TIME);
 	gdk_pointer_ungrab(GDK_CURRENT_TIME);
-#else /* #if GTK_MAJOR_VERSION == 2 */
+	gtk_grab_remove(widget);
+#elif GTK_MAJOR_VERSION == 2
 	guint32 time = gtk_get_current_event_time();
 	GdkDisplay *display = gtk_widget_get_display(widget);
 	gdk_display_keyboard_ungrab(display, time);
 	gdk_display_pointer_ungrab(display, time);
-#endif
 	gtk_grab_remove(widget);
+#endif
 }
 
 #if GTK_MAJOR_VERSION == 1

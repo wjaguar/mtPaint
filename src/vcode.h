@@ -854,6 +854,8 @@ enum {
 #define TLOPTve(SS,N,V,HS,X,Y) TLOPTvle(SS, N, V, HS, X, Y, 1)
 #define OPTDe(SP,V,HS) WBr2hf_(OPTD, 2 + 2), WBfield(V), WBfield(SP), \
 	EVENT(SELECT, HS)
+#define XOPTDe(SP,V,HS) WBr2hf_x(OPTD, 2 + 2), WBfield(V), WBfield(SP), \
+	EVENT(SELECT, HS)
 #define TOPTDe(NM,SP,V,HS) WBr2hf_t1(OPTD, 2 + 2), WBfield(V), WBfield(SP), \
 	EVENT(SELECT, HS), TLABEL(NM)
 #define COMBO(SS,N,V) WBrhf_(COMBO, 3), WBfield(V), (SS), (void *)(N)

@@ -32,6 +32,33 @@
 #include "fpick.h"
 #include "prefs.h"
 
+/// More of meaningless differences to hide
+
+#define gtk_selection_data_get_data(A) ((A)->data)
+#define gtk_selection_data_get_length(A) ((A)->length)
+#define gtk_selection_data_get_format(A) ((A)->format)
+#define gtk_selection_data_get_target(A) ((A)->target)
+#define gtk_selection_data_get_data_type(A) ((A)->type)
+#define gtk_bin_get_child(A) ((A)->child)
+#define gtk_text_view_get_buffer(A) ((A)->buffer)
+#define gtk_dialog_get_action_area(A) ((A)->action_area)
+#define gtk_dialog_get_content_area(A) ((A)->vbox)
+#define gtk_font_selection_get_preview_entry(A) ((A)->preview_entry)
+#define gtk_check_menu_item_get_active(A) ((A)->active)
+#define gtk_adjustment_get_value(A) ((A)->value)
+#define gtk_adjustment_get_upper(A) ((A)->upper)
+#define gtk_adjustment_get_page_size(A) ((A)->page_size)
+#define gtk_window_get_focus(A) ((A)->focus_widget)
+#define gtk_paned_get_child1(A) ((A)->child1)
+#define gtk_paned_get_child2(A) ((A)->child2)
+#define gtk_paned_get_position(A) ((A)->child1_size)
+#define gtk_menu_item_get_submenu(A) ((A)->submenu)
+#define gdk_device_get_name(A) ((A)->name)
+#define gdk_device_get_n_axes(A) ((A)->num_axes)
+#define gdk_device_get_mode(A) ((A)->mode)
+#define hbox_new(A) gtk_hbox_new(FALSE, (A))
+#define vbox_new(A) gtk_vbox_new(FALSE, (A))
+
 /* Make code not compile if it cannot work */
 typedef char Opcodes_Too_Long[2 * (op_LAST <= WB_OPMASK) - 1];
 
@@ -339,15 +366,30 @@ static gboolean window_evt_key(GtkWidget *widget, GdkEventKey *event, gpointer u
 	return (res);
 }
 
+//	Widget datastores
+
+typedef struct {
+	GtkWidget *pane, *vbox;
+} dock_data;
+
+#define HVSPLIT_MAX 4
+
+typedef struct {
+	GtkWidget *box, *panes[2], *inbox[HVSPLIT_MAX];
+	int cnt;
+} hvsplit_data;
+
 //	Text renderer
 
-#if GTK_MAJOR_VERSION == 2
+#if GTK_MAJOR_VERSION >= 2
 
 int texteng_aa = TRUE;
 #if GTK2VERSION >= 6 /* GTK+ 2.6+ */
+#define FULLPANGO 1
 int texteng_rot = TRUE;
 int texteng_spc = TRUE;
 #else
+#define FULLPANGO 0
 #define PangoMatrix int /* For rotate_box() */
 #define PANGO_MATRIX_INIT 0
 int texteng_rot = FALSE;
@@ -377,7 +419,7 @@ typedef struct {
 	int dpi;
 } fontsel_data;
 
-#if GTK_MAJOR_VERSION == 2
+#if GTK_MAJOR_VERSION >= 2
 
 /* Pango coords to pixels, inclusive */
 static void rotate_box(PangoRectangle *lr, PangoMatrix *m)
@@ -388,7 +430,7 @@ static void rotate_box(PangoRectangle *lr, PangoMatrix *m)
 	int i;
 
 
-#if GTK2VERSION >= 6 /* GTK+ 2.6+ */
+#if FULLPANGO
 	if (m) for (i = 0; i < 4; i++)
 	{
 		double xt, yt;
@@ -413,6 +455,8 @@ static void rotate_box(PangoRectangle *lr, PangoMatrix *m)
 	lr->y = floor(y_min / PANGO_SCALE);
 	lr->height = ceil(y_max / PANGO_SCALE) - lr->y;
 }
+
+#define FONT_SIGNAL "style_set"
 
 /* In principle, similar approach can be used with GTK+1 too - but it would be
  * much less clean and less precise, and I am unsure about possibly wasting
@@ -450,13 +494,15 @@ static void fontsel_prepare(GtkWidget *widget, gpointer user_data)
 static GtkWidget *fontsel(void **r, void *v)
 {
 	GtkWidget *widget = gtk_font_selection_new();
-	accept_ctrl_enter(GTK_FONT_SELECTION(widget)->preview_entry);
+	GtkWidget *entry = gtk_font_selection_get_preview_entry(GTK_FONT_SELECTION(widget));
+
+	accept_ctrl_enter(entry);
 	/* !!! Setting initial values fails if no toplevel */
-	gtk_signal_connect_after(GTK_OBJECT(widget), "realize",
+	gtk_signal_connect(GTK_OBJECT(widget), "realize",
 		GTK_SIGNAL_FUNC(fontsel_prepare), v);
-#if GTK_MAJOR_VERSION == 2
-	gtk_signal_connect_after(GTK_OBJECT(GTK_FONT_SELECTION(widget)->preview_entry),
-		"style_set", GTK_SIGNAL_FUNC(fontsel_style), r);
+#if GTK_MAJOR_VERSION >= 2
+	gtk_signal_connect(GTK_OBJECT(entry), FONT_SIGNAL, 
+		GTK_SIGNAL_FUNC(fontsel_style), r);
 #endif
 	return (widget);
 }
@@ -470,7 +516,7 @@ static void do_render_text(texteng_dd *td)
 	unsigned char *buf;
 	int width, height, have_rgb = 0;
 
-#if GTK_MAJOR_VERSION == 2
+#if GTK_MAJOR_VERSION >= 2
 
 	static const PangoAlignment align[3] = {
 		PANGO_ALIGN_LEFT, PANGO_ALIGN_CENTER, PANGO_ALIGN_RIGHT };
@@ -494,7 +540,7 @@ static void do_render_text(texteng_dd *td)
 	pango_layout_set_text(layout, td->text, -1);
 	pango_layout_set_alignment(layout, align[td->align]);
 
-#if GTK2VERSION >= 6 /* GTK+ 2.6+ */
+#if FULLPANGO
 	if (td->spacing)
 	{
 		PangoAttrList *al = pango_attr_list_new();
@@ -558,9 +604,10 @@ static void do_render_text(texteng_dd *td)
 #endif
 
 	buf = malloc(width * height * 3);
-	if (buf) have_rgb = !!wj_get_rgb_image(widget->window, text_pixmap,
-		buf, 0, 0, width, height);
-	gdk_pixmap_unref(text_pixmap);		// REMOVE PIXMAP
+	if (buf) have_rgb = !!wj_get_rgb_image(gtk_widget_get_window(widget),
+		text_pixmap, buf, 0, 0, width, height);
+	// REMOVE PIXMAP
+	gdk_pixmap_unref(text_pixmap);
 
 	memset(&td->ctx, 0, sizeof(td->ctx));
 	if (!have_rgb) free(buf);
@@ -570,192 +617,6 @@ static void do_render_text(texteng_dd *td)
 		td->ctx.xy[3] = height;
 		td->ctx.rgb = buf;
 	}
-}
-
-//	Tablet handling
-
-#if GTK_MAJOR_VERSION == 1
-static GdkDeviceInfo *tablet_device;
-#else /* #if GTK_MAJOR_VERSION == 2 */
-static GdkDevice *tablet_device;
-#endif
-
-static void init_tablet()
-{
-	GList *devs;
-	char *name, buf[64];
-	int i, n, mode;
-
-	/* Do nothing if tablet wasn't working the last time */
-	if (!inifile_get_gboolean("tablet_USE", FALSE)) return;
-
-	name = inifile_get("tablet_name", "?");
-	mode = inifile_get_gint32("tablet_mode", 0);
-
-#if GTK_MAJOR_VERSION == 1
-	for (devs = gdk_input_list_devices(); devs; devs = devs->next)
-	{
-		GdkDeviceInfo *device = devs->data;
-		GdkAxisUse *u;
-
-		if (strcmp(device->name, name)) continue;
-		/* Found the one that was working the last time */
-		tablet_device = device;
-		gdk_input_set_mode(device->deviceid, mode);
-		n = device->num_axes;
-		u = calloc(n, sizeof(*u));
-		for (i = 0; i < n; i++)
-		{
-			sprintf(buf, "tablet_axes_v%d", i);
-			u[i] = inifile_get_gint32(buf, GDK_AXIS_IGNORE);
-		}
-		gdk_input_set_axes(device->deviceid, u);
-		free(u);
-		break;
-	}
-#else /* #if GTK_MAJOR_VERSION == 2 */
-	for (devs = gdk_devices_list(); devs; devs = devs->next)
-	{
-		GdkDevice *device = devs->data;
-
-		if (strcmp(device->name, name)) continue;
-		/* Found the one that was working the last time */
-		tablet_device = device;
-		gdk_device_set_mode(device, mode);
-		n = device->num_axes;
-		for (i = 0; i < n; i++)
-		{
-			sprintf(buf, "tablet_axes_v%d", i);
-			gdk_device_set_axis_use(device, i,
-				inifile_get_gint32(buf, GDK_AXIS_IGNORE));
-		}
-		break;
-	}
-#endif
-
-	inifile_set_gboolean("tablet_USE", !!tablet_device);
-}
-
-//	TABLETBTN widget
-
-#if GTK_MAJOR_VERSION == 1
-
-static GdkDeviceInfo *tablet_find(gint deviceid)
-{
-	GList *devs;
-
-	for (devs = gdk_input_list_devices(); devs; devs = devs->next)
-	{
-		GdkDeviceInfo *device = devs->data;
-		if (device->deviceid == deviceid) return (device);
-	}
-	return (NULL);
-}
-
-static void tablet_toggle(GtkInputDialog *inputdialog, gint deviceid,
-	gpointer user_data)
-{
-	GdkDeviceInfo *dev = tablet_find(deviceid);
-	tablet_device = !dev || (dev->mode == GDK_MODE_DISABLED) ? NULL : dev;
-	cmd_event(user_data, op_EVT_CHANGE);
-}
-
-#else /* #if GTK_MAJOR_VERSION == 2 */
-
-static void tablet_toggle(GtkInputDialog *inputdialog, GdkDevice *deviceid,
-	gpointer user_data)
-{
-	tablet_device = deviceid->mode == GDK_MODE_DISABLED ? NULL : deviceid;
-	cmd_event(user_data, op_EVT_CHANGE);
-}
-
-#endif
-
-static void **tablet_slot;
-static GtkWidget *tablet_dlg;
-
-static void conf_done(GtkWidget *widget)
-{
-	GtkWidget *w = tablet_dlg;
-	char buf[64];
-	int i, n;
-
-	if (!tablet_slot) return;
-
-	/* Use last selected device if it's active */
-	{
-#if GTK_MAJOR_VERSION == 1
-		GdkDeviceInfo *dev = tablet_find(GTK_INPUT_DIALOG(w)->current_device);
-#else /* #if GTK_MAJOR_VERSION == 2 */
-		GdkDevice *dev = GTK_INPUT_DIALOG(w)->current_device;
-#endif
-		if (dev && (dev->mode != GDK_MODE_DISABLED))
-		{
-			tablet_device = dev;
-			// Skip event if within do_destroy()
-			if (widget) cmd_event(tablet_slot, op_EVT_CHANGE);
-		}
-	}
-
-	if (tablet_device)
-	{
-		inifile_set("tablet_name", tablet_device->name);
-		inifile_set_gint32("tablet_mode", tablet_device->mode);
-
-		n = tablet_device->num_axes;
-		for (i = 0; i < n; i++)
-		{
-			sprintf(buf, "tablet_axes_v%d", i);
-#if GTK_MAJOR_VERSION == 1
-			inifile_set_gint32(buf, tablet_device->axes[i]);
-#else /* #if GTK_MAJOR_VERSION == 2 */
-			inifile_set_gint32(buf, tablet_device->axes[i].use);
-#endif
-		}
-	}
-	inifile_set_gboolean("tablet_USE", !!tablet_device);
-
-	gtk_widget_destroy(w);
-	tablet_slot = NULL;
-}
-
-static gboolean conf_del(GtkWidget *widget)
-{
-	conf_done(widget);
-	return (TRUE);
-}
-
-static void conf_tablet(GtkButton *button, gpointer user_data)
-{
-	GtkWidget *inputd;
-	GtkInputDialog *inp;
-	GtkAccelGroup *ag;
-
-	if (tablet_slot) return;	// There can be only one
-	tablet_slot = user_data;
-	tablet_dlg = inputd = gtk_input_dialog_new();
-	gtk_window_set_position(GTK_WINDOW(inputd), GTK_WIN_POS_CENTER);
-	inp = GTK_INPUT_DIALOG(inputd);
-
-	ag = gtk_accel_group_new();
-	gtk_signal_connect(GTK_OBJECT(inp->close_button), "clicked",
-		GTK_SIGNAL_FUNC(conf_done), NULL);
-	gtk_widget_add_accelerator(inp->close_button, "clicked", ag,
-		GDK_Escape, 0, (GtkAccelFlags)0);
-	gtk_signal_connect(GTK_OBJECT(inputd), "delete_event",
-		GTK_SIGNAL_FUNC(conf_del), NULL);
-
-	gtk_signal_connect(GTK_OBJECT(inputd), "enable-device",
-		GTK_SIGNAL_FUNC(tablet_toggle), user_data);
-	gtk_signal_connect(GTK_OBJECT(inputd), "disable-device",
-		GTK_SIGNAL_FUNC(tablet_toggle), user_data);
-
-	if (inp->keys_list) gtk_widget_hide(inp->keys_list);
-	if (inp->keys_listbox) gtk_widget_hide(inp->keys_listbox);
-	gtk_widget_hide(inp->save_button);
-
-	gtk_window_add_accel_group(GTK_WINDOW(inputd), ag);
-	gtk_widget_show(inputd);
 }
 
 //	Mouse handling
@@ -774,7 +635,7 @@ static int do_evt_mouse(void **slot, void *event, mouse_ext *mouse)
 	mouse_den den = { EVSLOT(ev_MOUSE, orig, event), mouse, { 0, 0, 0, 0 } };
 	int op = GET_OP(orig);
 
-#if GTK_MAJOR_VERSION == 2
+#if GTK_MAJOR_VERSION >= 2
 	if ((((int)desc[0] & WB_OPMASK) >= op_EVT_XMOUSE0) && tablet_device)
 	{
 		gdouble pressure = 1.0;
@@ -865,23 +726,33 @@ static gboolean get_evt_mmouse(GtkWidget *widget, GdkEventMotion *event,
 	return (do_evt_mouse(user_data, event, &mouse));
 }
 
-// !!! With GCC inlining this, weird size fluctuations can happen
-void add_mouse(void **r, int cw)
+static void enable_events(void **slot, int op)
+{
+	if ((op >= op_EVT_MOUSE) && (op <= op_EVT_RXMOUSE))
+	{
+		if (op >= op_EVT_XMOUSE0) gtk_widget_set_extension_events(*slot,
+			GDK_EXTENSION_EVENTS_CURSOR);
+#if GTK_MAJOR_VERSION == 1
+		if (GTK_WIDGET_NO_WINDOW(*slot)) return;
+#endif
+	}
+	else if (op != op_EVT_CROSS) return; // Ignore op_EVT_KEY & op_EVT_SCROLL
+	/* No granularity at all, but it was always this way, and it worked */
+	gtk_widget_set_events(*slot, GDK_ALL_EVENTS_MASK);
+}
+
+// !!! With GCC inlining this, weird size fluctuations can happen. Or not.
+static void add_mouse(void **r, int op)
 {
 	static const char *sn[3] = { "button_press_event",
 		"motion_notify_event", "button_release_event" };
 	void **slot = origin_slot(PREV_SLOT(r));
+	int cw = op - op_EVT_MOUSE + (op >= op_EVT_XMOUSE0);
 
 	gtk_signal_connect(GTK_OBJECT(*slot), sn[cw & 3],
 		cw & 1 ? GTK_SIGNAL_FUNC(get_evt_mmouse) :
 		GTK_SIGNAL_FUNC(get_evt_mouse), r);
-#if GTK_MAJOR_VERSION == 1
-	if (!GTK_WIDGET_NO_WINDOW(*slot))
-#endif
-// !!! Maybe do *_add_events() instead, in more fine-grained way?
-	gtk_widget_set_events(*slot, GDK_ALL_EVENTS_MASK);
-	if (cw > 2) gtk_widget_set_extension_events(*slot,
-		GDK_EXTENSION_EVENTS_CURSOR);
+	enable_events(slot, op);
 }
 
 static gboolean get_evt_cross(GtkWidget *widget, GdkEventCrossing *event,
@@ -899,7 +770,7 @@ static gboolean get_evt_cross(GtkWidget *widget, GdkEventCrossing *event,
 	return (FALSE); // let it propagate
 }
 
-#if GTK_MAJOR_VERSION == 2
+#if GTK_MAJOR_VERSION >= 2
 
 static gboolean get_evt_scroll(GtkWidget *widget, GdkEventScroll *event,
 	gpointer user_data)
@@ -991,6 +862,14 @@ static void set_drag_icon(GdkDragContext *context, GtkWidget *src, int rgb)
 	gdk_pixmap_unref(swatch);
 }
 
+/* !!! In GTK+3 icon must be set in "drag_begin", setting it in try_start_drag()
+ * somehow only sets it for not-valid-target case - WJ */
+static void begin_drag(GtkWidget *widget, GdkDragContext *context, gpointer user_data)
+{
+	drag_ctx *dc = user_data;
+	if (dc->color >= 0) set_drag_icon(context, widget, dc->color);
+}
+
 static int try_start_drag(GtkWidget *widget, GdkEvent *event, gpointer user_data)
 {
 	drag_ctx *dc = user_data;
@@ -1028,24 +907,19 @@ static int try_start_drag(GtkWidget *widget, GdkEvent *event, gpointer user_data
 #if GTK_MAJOR_VERSION == 1
 				((abs(rx - dc->x) > 3) ||
 				(abs(ry - dc->y) > 3))
-#else /* if GTK_MAJOR_VERSION == 2 */
+#else /* if GTK_MAJOR_VERSION >= 2 */
 				gtk_drag_check_threshold(widget,
 					dc->x, dc->y, rx, ry)
 #endif
 			) /* Initiate drag */
 			{
-				GdkDragContext *context;
-
 				dc->may_drag = FALSE;
 				/* Call handler so it can decide if it wants
 				 * this drag, and maybe set icon color */
 				dc->color = -1;
 				if (!drag_event(NULL, dc)) return (TRUE); // no drag
-				context = gtk_drag_begin(widget, dc->cd->targets,
+				gtk_drag_begin(widget, dc->cd->targets,
 					GDK_ACTION_COPY | GDK_ACTION_MOVE, 1, event);
-				if (!context) return (TRUE); // failed
-				if (dc->color >= 0)
-					set_drag_icon(context, widget, dc->color);
 				return (TRUE);
 			}
 		}
@@ -1089,8 +963,8 @@ static void get_evt_drop(GtkWidget *widget, GdkDragContext *drag_context,
 	dx.x = xy[0];
 	dx.y = xy[1];
 	dx.format = cd->src + info;
-	dx.data = data->data;
-	dx.len = data->length;
+	dx.data = (void *)gtk_selection_data_get_data(data);
+	dx.len = gtk_selection_data_get_length(data);
 
 	/* Selection data format isn't checked because it's how GTK+2 does it,
 	 * reportedly to ignore a bug in (some versions of) KDE - WJ */
@@ -1123,7 +997,7 @@ static gboolean tried_drop(GtkWidget *widget, GdkDragContext *context,
 		if (src) break;
 	}
 	if (!dest) return (FALSE);
-#else /* if GTK_MAJOR_VERSION == 2 */
+#else /* if GTK_MAJOR_VERSION >= 2 */
 	target = gtk_drag_dest_find_target(widget, context, NULL);
 	if (target == GDK_NONE) return (FALSE);
 #endif
@@ -1149,6 +1023,8 @@ void *dragdrop(void **r)
 			GTK_SIGNAL_FUNC(try_start_drag), dc);
 		gtk_signal_connect(GTK_OBJECT(*slot), "button_release_event",
 			GTK_SIGNAL_FUNC(try_start_drag), dc);
+		gtk_signal_connect(GTK_OBJECT(*slot), "drag_begin",
+			GTK_SIGNAL_FUNC(begin_drag), dc);
 		gtk_signal_connect(GTK_OBJECT(*slot), "drag_data_get",
 			GTK_SIGNAL_FUNC(get_evt_drag), dc);
 	}
@@ -1195,7 +1071,8 @@ static void clip_evt(GtkSelectionData *sel, guint info, void **slot)
 static int paste_evt(GtkSelectionData *sel, clipform_dd *format, void **slot)
 {
 	void **base = slot[0], **desc = slot[1];
-	copy_ext c = { format, sel->data, sel->length };
+	copy_ext c = { format, (void *)gtk_selection_data_get_data(sel),
+		gtk_selection_data_get_length(sel) };
 
 	return (((evtxr_fn)desc[1])(GET_DDATA(base), base,
 		(int)desc[0] & WB_OPMASK, slot, &c));
@@ -1203,14 +1080,16 @@ static int paste_evt(GtkSelectionData *sel, clipform_dd *format, void **slot)
 
 static clipform_dd *clip_format(GtkSelectionData *sel, clipform_data *cd)
 {
-	GList *dest;
-	GdkAtom target, *targets;
-	int i, n = sel->length / sizeof(GdkAtom);
+	GdkAtom *targets;
+	int i, n = gtk_selection_data_get_length(sel) / sizeof(GdkAtom);
 
-	if ((n > 0) && (sel->format == 32) &&
-		(sel->type == GDK_SELECTION_TYPE_ATOM))
+	if ((n > 0) && (gtk_selection_data_get_format(sel) == 32) &&
+		(gtk_selection_data_get_data_type(sel) == GDK_SELECTION_TYPE_ATOM))
 	{
-		targets = (GdkAtom *)sel->data;
+		GList *dest;
+		GdkAtom target;
+
+		targets = (GdkAtom *)gtk_selection_data_get_data(sel);
 		for (dest = cd->targets->list; dest; dest = dest->next)
 		{
 			target = ((GtkTargetPair *)dest->data)->target;
@@ -1425,7 +1304,7 @@ static void offer_text(void **slot, char *s)
 	offer_clipboard(slot, TRUE);
 }
 
-#else /* if GTK_MAJOR_VERSION == 2 */
+#else /* if GTK_MAJOR_VERSION >= 2 */
 
 #ifdef GDK_WINDOWING_X11
 #define CLIPMASK 3 /* 2 clipboards */
@@ -1442,8 +1321,8 @@ static void clip_paste(GtkClipboard *clipboard, GtkSelectionData *sel,
 	gpointer user_data)
 {
 	void **res = user_data;
-	if ((sel->length < 0) || !paste_evt(sel, res[1], res[0]))
-		res[1] = NULL; // fail
+	if ((gtk_selection_data_get_length(sel) < 0) ||
+		!paste_evt(sel, res[1], res[0])) res[1] = NULL; // fail
 	res[0] = NULL; // done
 }
 
@@ -1570,7 +1449,7 @@ static void get_keyname(char *buf, int buflen, guint key, guint state, int ui)
 		name = tbuf;
 #if GTK_MAJOR_VERSION == 1
 		u = key;
-#else /* #if GTK_MAJOR_VERSION == 2 */
+#else /* #if GTK_MAJOR_VERSION >= 2 */
 		u = gdk_keyval_to_unicode(key);
 		if ((u < 0x80) && (u != key)) u = 0; // Alternative key
 #endif
@@ -1582,7 +1461,7 @@ static void get_keyname(char *buf, int buflen, guint key, guint state, int ui)
 			tbuf[0] = toupper(u);
 			tbuf[1] = 0;
 		}
-#else /* #if GTK_MAJOR_VERSION == 2 */
+#else /* #if GTK_MAJOR_VERSION >= 2 */
 		else if (u && g_unichar_isgraph(u))
 			tbuf[g_unichar_to_utf8(g_unichar_toupper(u), tbuf)] = 0;
 #endif
@@ -1618,7 +1497,7 @@ static guint parse_keyname(char *name, guint *mod)
 	case '_':
 		*mod = m;
 		return (gdk_keyval_from_name(name));
-	default: return (GDK_VoidSymbol);
+	default: return (KEY(VoidSymbol));
 	}
 }
 
@@ -1826,7 +1705,7 @@ static void keymap_update(keymap_data *keymap, keymap_dd *keys)
 	{
 		nm = INI_KEY(&main_ini, i);
 		key = parse_keyname(nm, &mod);
-		if (key == GDK_VoidSymbol) continue;
+		if (key == KEY(VoidSymbol)) continue;
 		sec = ini_getref(&main_ini, w, nm, 0);
 		if (sec <= 0) continue;
 		sec = (int)INI_VALUE(&main_ini, sec);
@@ -1879,7 +1758,7 @@ void keymap_init(keymap_data *keymap, keymap_dd *keys)
 		w = ks->slot[0];
 		if (key0 | mod0) gtk_widget_remove_accelerator(w, keymap->ag,
 			key0, mod0);
-#if GTK_MAJOR_VERSION == 2
+#if GTK_MAJOR_VERSION >= 2
 		/* !!! It has to be there in place of key, for menu spacing */
 		gtk_widget_set_accel_path(w, j < 0 ? FAKE_ACCEL : NULL, keymap->ag);
 #endif
@@ -1942,7 +1821,7 @@ static gboolean convert_key(GtkWidget *widget, GdkEventKey *event,
 	{
 		get_keyname(buf, sizeof(buf), dt->key = low_key(event),
 			dt->mod = event->state, TRUE);
-		gtk_label_set_text(GTK_LABEL(GTK_BIN(widget)->child), buf);
+		gtk_label_set_text(GTK_LABEL(gtk_bin_get_child(GTK_BIN(widget))), buf);
 	}
 	/* Depress button when key gets released */
 	else /* if (event->type == GDK_KEY_RELEASE) */
@@ -2021,54 +1900,6 @@ static void trigger_things(void **wdata)
 		desc = base[1];
 		((evt_fn)desc[1])(data, base[0], (int)desc[0] & WB_OPMASK, slot);
 	}
-}
-
-/* More specialized packing modes */
-
-enum {
-	pk_PACKEND1 = pk_LAST,
-	pk_TABLE0p,
-	pk_TABLEp,
-	pk_SCROLLVP,
-	pk_SCROLLVPv,
-	pk_SCROLLVPm,
-	pk_SCROLLVPn,
-	pk_CONT,
-	pk_BIN,
-	pk_SHOW,	/* No packing needed, just show the widget */
-	pk_UNREAL,	/* Pseudo widget - no packing, just finish creation */
-	pk_UNREALV,	/* Pseudo widget with int value */
-};
-
-#define pk_MASK     0xFF
-#define pkf_PARENT 0x100
-
-/* Make code not compile where it cannot run */
-typedef char Too_Many_Packing_Modes[2 * (pk_LAST <= WB_PKMASK + 1) - 1];
-
-static void table_it(GtkWidget *table, GtkWidget *it, int wh, int pad, int pack)
-{
-	int row = wh & 255, column = (wh >> 8) & 255, l = (wh >> 16) + 1;
-	gtk_table_attach(GTK_TABLE(table), it, column, column + l, row, row + 1,
-		pack == pk_TABLEx ? GTK_EXPAND | GTK_FILL : GTK_FILL, 0,
-		pack == pk_TABLEp ? pad : 0, pad);
-}
-
-/* Find where unused rows start in given column */
-static int next_table_level(GtkWidget *table, int where)
-{
-	GList *item;
-	int y, n = 0;
-
-	for (item = GTK_TABLE(table)->children; item; item = item->next)
-	{
-		GtkTableChild *c = item->data;
-		if ((c->left_attach > where) || (c->right_attach <= where))
-			continue;
-		y = c->bottom_attach;
-		if (n < y) n = y;
-	}
-	return (n);
 }
 
 /* Try to avoid scrolling - request full size of contents */
@@ -2201,7 +2032,7 @@ GtkWidget *rgbimagep(void **r, int w, int h)
 	rd->rgb = r[0];
 	rd->w = w;
 	rd->h = h;
-	gtk_signal_connect_after(GTK_OBJECT(widget), "realize",
+	gtk_signal_connect(GTK_OBJECT(widget), "realize",
 		GTK_SIGNAL_FUNC(reset_rgbp), rd);
 
 	return (widget);
@@ -2230,8 +2061,7 @@ GtkWidget *canvasimg(void **r, int w, int h, int bkg)
 	rd->h = h;
 	rd->bkg = bkg;
 	wjcanvas_size(widget, w, h);
-	gtk_signal_connect(GTK_OBJECT(widget), "expose_event",
-		GTK_SIGNAL_FUNC(expose_canvasimg), rd);
+	wjcanvas_set_expose(widget, GTK_SIGNAL_FUNC(expose_canvasimg), rd);
 
 	frame = wjframe_new();
 	gtk_widget_show(frame);
@@ -2340,7 +2170,7 @@ GtkWidget *fcimagep(void **r, char *ddata)
 	fd->rgb = r[0];
 	fd->w = w;
 	fd->h = h;
-	gtk_signal_connect_after(GTK_OBJECT(widget), "realize",
+	gtk_signal_connect(GTK_OBJECT(widget), "realize",
 		GTK_SIGNAL_FUNC(reset_fcimage), fd);
 	gtk_signal_connect(GTK_OBJECT(widget), "button_press_event",
 		GTK_SIGNAL_FUNC(click_fcimage), NULL);
@@ -2406,6 +2236,8 @@ static int wj_option_menu_get_history(GtkWidget *optmenu)
 	optmenu = gtk_menu_get_active(GTK_MENU(optmenu));
 	return (optmenu ? (int)gtk_object_get_user_data(GTK_OBJECT(optmenu)) : 0);
 }
+
+#define wj_option_menu_set_history(W,N) gtk_option_menu_set_history(W,N)
 
 //	RPACK* and COMBO widgets
 
@@ -2722,7 +2554,7 @@ static void gradbar_scroll(GtkWidget *btn, gpointer user_data)
 	*dt->idx += dir; // self-reading
 	gtk_widget_set_sensitive(dt->lr[0], !!dt->ofs);
 	gtk_widget_set_sensitive(dt->lr[1], dt->ofs < dt->lim - GRADBAR_LEN);
-	gtk_widget_queue_draw(btn->parent);
+	gtk_widget_queue_draw(gtk_widget_get_parent(btn));
 	get_evt_1(NULL, (gpointer)dt->r);
 }
 
@@ -2786,7 +2618,7 @@ GtkWidget *gradbar(void **r, char *ddata)
 #if GTK_MAJOR_VERSION == 1
         // !!! Arrow w/o shadow is invisible in plain GTK+1
 		GTK_SHADOW_OUT));
-#else /* #if GTK_MAJOR_VERSION == 2 */
+#else /* #if GTK_MAJOR_VERSION >= 2 */
 		GTK_SHADOW_NONE));
 #endif
 	gtk_widget_set_sensitive(btn, FALSE);
@@ -2812,7 +2644,7 @@ GtkWidget *gradbar(void **r, char *ddata)
 #if GTK_MAJOR_VERSION == 1
         // !!! Arrow w/o shadow is invisible in plain GTK+1
 		GTK_SHADOW_OUT));
-#else /* #if GTK_MAJOR_VERSION == 2 */
+#else /* #if GTK_MAJOR_VERSION >= 2 */
 		GTK_SHADOW_NONE));
 #endif
 	gtk_signal_connect(GTK_OBJECT(btn), "clicked",
@@ -2851,13 +2683,16 @@ GtkWidget *comboentry(char *ddata, void **r)
 	gtk_combo_disable_activate(combo);
 	comboentry_reset(combo, r[0], *(char ***)(ddata + (int)pp[2]));
 
-	gtk_signal_connect_after(GTK_OBJECT(combo->popwin), "hide",
+	gtk_signal_connect(GTK_OBJECT(combo->popwin), "hide",
 		GTK_SIGNAL_FUNC(get_evt_1), NEXT_SLOT(r));
 	gtk_signal_connect(GTK_OBJECT(combo->entry), "activate",
 		GTK_SIGNAL_FUNC(get_evt_1), NEXT_SLOT(r));
 
 	return (w);
 }
+
+#define comboentry_get_text(A) gtk_entry_get_text(GTK_ENTRY(GTK_COMBO(A)->entry))
+#define comboentry_set_text(A,B) gtk_entry_set_text(GTK_ENTRY(GTK_COMBO(A)->entry), B)
 
 //	PCTCOMBO widget
 
@@ -2922,6 +2757,8 @@ GtkWidget *pctcombo(void **r)
 	return (w);
 }
 
+#define pctcombo_entry(A) (GTK_COMBO(A)->entry)
+
 //	TEXT widget
 
 static GtkWidget *textarea(char *init)
@@ -2934,7 +2771,7 @@ static GtkWidget *textarea(char *init)
 	if (init) gtk_text_insert(GTK_TEXT(text), NULL, NULL, NULL, init, -1);
 
 	scroll = gtk_scrolled_window_new(NULL, GTK_TEXT(text)->vadj);
-#else /* #if GTK_MAJOR_VERSION == 2 */
+#else /* #if GTK_MAJOR_VERSION >= 2 */
 	GtkTextBuffer *texbuf = gtk_text_buffer_new(NULL);
 	if (init) gtk_text_buffer_set_text(texbuf, init, -1);
 
@@ -2955,9 +2792,9 @@ static char *read_textarea(GtkWidget *text)
 {
 #if GTK_MAJOR_VERSION == 1
 	return (gtk_editable_get_chars(GTK_EDITABLE(text), 0, -1));
-#else /* #if GTK_MAJOR_VERSION == 2 */
+#else /* #if GTK_MAJOR_VERSION >= 2 */
 	GtkTextIter begin, end;
-	GtkTextBuffer *buffer = GTK_TEXT_VIEW(text)->buffer;
+	GtkTextBuffer *buffer = gtk_text_view_get_buffer(GTK_TEXT_VIEW(text));
 
 	gtk_text_buffer_get_start_iter(buffer, &begin);
 	gtk_text_buffer_get_end_iter(buffer, &end);
@@ -2970,8 +2807,9 @@ static void set_textarea(GtkWidget *text, char *init)
 #if GTK_MAJOR_VERSION == 1
 	gtk_editable_delete_text(GTK_EDITABLE(text), 0, -1);
 	if (init) gtk_text_insert(GTK_TEXT(text), NULL, NULL, NULL, init, -1);
-#else /* #if GTK_MAJOR_VERSION == 2 */
-	gtk_text_buffer_set_text(GTK_TEXT_VIEW(text)->buffer, init ? init : "", -1);
+#else /* #if GTK_MAJOR_VERSION >= 2 */
+	gtk_text_buffer_set_text(gtk_text_view_get_buffer(GTK_TEXT_VIEW(text)),
+		init ? init : "", -1);
 #endif
 }
 
@@ -4026,11 +3864,11 @@ GtkWidget *listc(void **r, char *ddata, col_data *c)
 	}
 
 	/* For some finishing touches */
-	gtk_signal_connect_after(GTK_OBJECT(clist), "realize",
+	gtk_signal_connect(GTK_OBJECT(clist), "realize",
 		GTK_SIGNAL_FUNC(listc_prepare), ld);
 
 	/* This will apply delayed updates when they can take effect */
-	gtk_signal_connect_after(GTK_OBJECT(clist), "map",
+	gtk_signal_connect(GTK_OBJECT(clist), "map",
 		GTK_SIGNAL_FUNC(listc_update), ld);
 
 	if (*cntv) listc_reset(clist, ld);
@@ -4654,7 +4492,7 @@ GtkWidget *pathbox(void **r, int border)
 {
 	GtkWidget *hbox, *entry, *button;
 
-	hbox = gtk_hbox_new(FALSE, 5 - 2);
+	hbox = hbox_new(5 - 2);
 	gtk_widget_show(hbox);
 	gtk_container_set_border_width(GTK_CONTAINER(hbox), border);
 
@@ -5481,7 +5319,7 @@ static int check_smart_menu_keys(void *sdata, GdkEventKey *event)
 		if (--l <= 0) return (FALSE); // No such key in overflow
 
 	/* Just popup - if we're here, overflow menu is offscreen anyway */
-	gtk_menu_popup(GTK_MENU(GTK_MENU_ITEM(slot->fallback)->submenu),
+	gtk_menu_popup(GTK_MENU(gtk_menu_item_get_submenu(GTK_MENU_ITEM(slot->fallback))),
 		NULL, NULL, NULL, NULL, 0, 0);
 	return (TRUE);
 }
@@ -5711,7 +5549,7 @@ void *smartmenu_done(void **tbar, void **r)
 	}
 
 	/* Setup overflow submenu */
-	parent = GTK_MENU_ITEM(sd->r_menu[--n].slot[0])->submenu;
+	parent = gtk_menu_item_get_submenu(GTK_MENU_ITEM(sd->r_menu[--n].slot[0]));
 	for (i = 0; i < n; i++)
 	{
 		sd->r_menu[i].fallback = item = gtk_menu_item_new_with_label("");
@@ -5735,6 +5573,8 @@ void *smartmenu_done(void **tbar, void **r)
 	return (sd);
 }
 
+#if GTK_MAJOR_VERSION <= 2
+
 /* Heightbar: increase own height to max height of invisible neighbors */
 
 typedef struct {
@@ -5753,7 +5593,6 @@ static void heightbar_req(GtkWidget *widget, gpointer data)
 	if (req.height > hd->req->height) hd->req->height = req.height;
 }
 
-// !!! Can attach to any regular widget, but what's best way to do it in V-code?
 static void heightbar_size_req(GtkWidget *widget, GtkRequisition *req,
 	gpointer user_data)
 {
@@ -5761,6 +5600,8 @@ static void heightbar_size_req(GtkWidget *widget, GtkRequisition *req,
 	if (widget->parent) gtk_container_foreach(GTK_CONTAINER(widget->parent),
 		(GtkCallback)heightbar_req, &hd);
 }
+
+#endif
 
 /* Get/set window position & size from/to inifile */
 void rw_pos(v_dd *vdata, int set)
@@ -5786,27 +5627,68 @@ static GtkWidget *get_wrap(void **slot)
 	if ((op == op_SPINSLIDE) || (op == op_SPINSLIDEa) ||
 //		(op == op_CANVASIMG) || (op == op_CANVASIMGB) || // Leave frame be
 		(op == op_PATHs) || (op == op_PATH) || (op == op_TEXT))
-		w = w->parent;
+		w = gtk_widget_get_parent(w);
 	return (w);
 }
 
+/* More specialized packing modes */
+
+enum {
+	pk_PACKEND1 = pk_LAST,
+	pk_TABLE0p,
+	pk_TABLEp,
+	pk_SCROLLVP,
+	pk_SCROLLVPv,
+	pk_SCROLLVPm,
+	pk_SCROLLVPn,
+	pk_CONT,
+	pk_BIN,
+	pk_SHOW,	/* No packing needed, just show the widget */
+	pk_UNREAL,	/* Pseudo widget - no packing, just finish creation */
+	pk_UNREALV,	/* Pseudo widget with int value */
+};
+
+#define pk_MASK     0xFF
+#define pkf_PARENT 0x100
+#define pkf_CANVAS 0x200
+
+/* Make code not compile where it cannot run */
+typedef char Too_Many_Packing_Modes[2 * (pk_LAST <= WB_PKMASK + 1) - 1];
+
+/* Packing modifiers */
+
+typedef struct {
+	int cw;
+	int minw, minh;
+	int maxw, maxh;
+	int wantmax;
+} pkmods;
+
 /* Prepare widget for packing according to settings */
-GtkWidget *do_prepare(GtkWidget *widget, int pk, int cw, int minw, int minh)
+GtkWidget *do_prepare(GtkWidget *widget, int pk, pkmods *mods)
 {
 	/* Show this */
 	if (pk) gtk_widget_show(widget);
 	/* Unwrap this */
 	if (pk & pkf_PARENT)
-		while (widget->parent) widget = widget->parent;
+		while (gtk_widget_get_parent(widget))
+			widget = gtk_widget_get_parent(widget);
 	/* Border this */
-	if (cw) gtk_container_set_border_width(GTK_CONTAINER(widget), cw);
+	if (mods->cw) gtk_container_set_border_width(GTK_CONTAINER(widget), mods->cw);
 	/* Set fixed width/height for this */
-	if ((minw > 0) || (minh > 0)) gtk_widget_set_usize(widget,
-		minw > 0 ? minw : -2, minh > 0 ? minh : -2);
+	if ((mods->minw > 0) || (mods->minh > 0))
+		gtk_widget_set_usize(widget,
+			mods->minw > 0 ? mods->minw : -2,
+			mods->minh > 0 ? mods->minh : -2);
 	/* And/or min ones */
 // !!! For now, always use wrapper
-	if ((minw < 0) || (minh < 0)) widget = widget_align_minsize(widget,
-		minw < 0 ? -minw : -2, minh < 0 ? -minh : -2);
+	if ((mods->minw < 0) || (mods->minh < 0))
+		widget = widget_align_minsize(widget,
+			mods->minw < 0 ? -mods->minw : -2,
+			mods->minh < 0 ? -mods->minh : -2);
+	/* Make this scrolled window request max size */
+	if (mods->wantmax) gtk_signal_connect(GTK_OBJECT(widget), "size_request",
+		GTK_SIGNAL_FUNC(scroll_max_size_req), (gpointer)(mods->wantmax - 1));
 
 	return (widget);
 }
@@ -5830,7 +5712,24 @@ enum {
 	ct_SCROLL,
 	ct_TBAR,
 	ct_NBOOK,
+	ct_HVSPLIT,
 };
+
+/* !!! Limited to rows & columns 0-255 per wh composition l16:col8:row8 */
+static void table_it(ctslot *ct, GtkWidget *it, int wh, int pad, int pack)
+{
+	int row = wh & 255, column = (wh >> 8) & 255, l = (wh >> 16) + 1;
+	int r0 = (ct->type >> 8) & 255, r1 = ct->type >> 16;
+
+	/* Track height of columns 0 & 1 in bytes 1 & 2 of type field */
+	if (!column && (r0 <= row)) r0 = row + 1;
+	if ((column <= 1) && (column + l > 1) && (r1 <= row)) r1 = row + 1;
+	ct->type = (r1 << 16) + (r0 << 8) + (ct->type & 255);
+
+	gtk_table_attach(GTK_TABLE(ct->widget), it, column, column + l, row, row + 1,
+		pack == pk_TABLEx ? GTK_EXPAND | GTK_FILL : GTK_FILL, 0,
+		pack == pk_TABLEp ? pad : 0, pad);
+}
 
 /* Pack widget into container according to settings */
 int do_pack(GtkWidget *widget, ctslot *ct, void **pp, int n, int tpad)
@@ -5838,8 +5737,19 @@ int do_pack(GtkWidget *widget, ctslot *ct, void **pp, int n, int tpad)
 	GtkScrolledWindow *sw;
 	GtkAdjustment *adj = adj;
 	GtkWidget *box = ct->widget;
-	int what = ct->type;
-	int y, l = WB_GETLEN((int)pp[0]);
+	int what = ct->type & 255;
+	int l = WB_GETLEN((int)pp[0]);
+
+
+	/* Remember what & when goes into HVSPLIT */
+	if (what == ct_HVSPLIT)
+	{
+		hvsplit_data *hd = (void *)ct->widget;
+		box = hd->box;
+		if (hd->cnt < HVSPLIT_MAX) hd->inbox[hd->cnt++] = widget;
+	}
+
+	n &= pk_MASK; // Strip flags
 
 	/* Adapt packing mode to container type */
 	if (n <= pk_DEF) switch (what)
@@ -5861,15 +5771,13 @@ int do_pack(GtkWidget *widget, ctslot *ct, void **pp, int n, int tpad)
 		gtk_box_pack_end(GTK_BOX(box), widget, FALSE, FALSE, tpad);
 		break;
 	case pk_TABLE: case pk_TABLEx: case pk_TABLEp:
-		table_it(box, widget, (int)pp[l], tpad, n);
+		table_it(ct, widget, (int)pp[l], tpad, n);
 		break;
 	case pk_TABLE0p:
-		y = next_table_level(box, 0);
-		table_it(box, widget, y, tpad, pk_TABLEp);
+		table_it(ct, widget, (ct->type >> 8) & 255, tpad, pk_TABLEp);
 		break;
 	case pk_TABLE1x:
-		y = next_table_level(box, 1);
-		table_it(box, widget, 0x100 + y, tpad, pk_TABLEx);
+		table_it(ct, widget, 0x100 + (ct->type >> 16), tpad, pk_TABLEx);
 		break;
 	case pk_SCROLLVP: case pk_SCROLLVPv: case pk_SCROLLVPm: case pk_SCROLLVPn:
 		sw = GTK_SCROLLED_WINDOW(box);
@@ -5881,14 +5789,14 @@ int do_pack(GtkWidget *widget, ctslot *ct, void **pp, int n, int tpad)
 			gtk_container_set_focus_vadjustment(GTK_CONTAINER(widget), adj);
 		if (n == pk_SCROLLVPm)
 		{
-			gtk_signal_connect_after(GTK_OBJECT(widget), "map",
+			gtk_signal_connect(GTK_OBJECT(widget), "map",
 				GTK_SIGNAL_FUNC(list_scroll_in), adj);
 		}
 #endif
 		if (n == pk_SCROLLVPn)
 		{
 			/* Set viewport to shadowless */
-			box = GTK_BIN(box)->child;
+			box = gtk_bin_get_child(GTK_BIN(box));
 			gtk_viewport_set_shadow_type(GTK_VIEWPORT(box), GTK_SHADOW_NONE);
 			vport_noshadow_fix(box);
 		}
@@ -6012,6 +5920,8 @@ static cmdef cmddefs[] = {
 	{ op_LISTCu,	sizeof(listc_data) },
 	{ op_LISTCS,	sizeof(listc_data), op_uLISTC },
 	{ op_LISTCX,	sizeof(listc_data) },
+	{ op_DOCK,	sizeof(dock_data) },
+	{ op_HVSPLIT,	sizeof(hvsplit_data) },
 	{ op_SMARTTBAR,	sizeof(smarttbar_data), op_uMENUBAR },
 	{ op_SMARTMENU,	sizeof(smartmenu_data), op_uMENUBAR },
 	{ op_DRAGDROP,	sizeof(drag_ctx) },
@@ -6121,7 +6031,7 @@ static void do_destroy(void **wdata);
 #define CT_DROP(SP)	(keygroup = ((SP)++)->group)
 #define CT_TOP(SP)	((SP)->widget)
 #define CT_N(SP,N)	((SP)[(N)].widget)
-#define CT_WHAT(SP)	((SP)->type)
+#define CT_WHAT(SP)	((SP)->type & 255)
 
 void **run_create_(void **ifcode, void *ddata, int ddsize, char **script)
 {
@@ -6136,17 +6046,18 @@ void **run_create_(void **ifcode, void *ddata, int ddsize, char **script)
 	ctslot wstack[CONT_DEPTH], *wp = wstack + CONT_DEPTH;
 	int keygroup = 0;
 	keymap_data *keymap = NULL;
-	GtkWidget *window = NULL, *widget = NULL, *sw = NULL;
+	GtkWidget *window = NULL, *widget = NULL;
 	GtkAccelGroup* ag = NULL;
 	v_dd *vdata;
 	sizedata sz;
 	col_data c;
+	pkmods mods;
 	void *rstack[CALL_DEPTH], **rp = rstack;
-	void *v, **pp, **dtail, **r = NULL, **res = NULL;
+	void *v, **pp, **dtail, **r = NULL, **res = NULL, *sw = NULL;
 	void **tbar = NULL, **rslot = NULL, *rvar = NULL;
 	char *wid = NULL, *gid = NULL;
 	int ld, dsize;
-	int i, n, op, lp, ref, pk, cw, tpad, minw = 0, minh = 0, ct = 0;
+	int i, n, op, lp, ref, pk, cw, tpad, ct = 0;
 
         // Per-command allocations
         memset(cmds, 0, sizeof(cmds));
@@ -6175,6 +6086,9 @@ void **run_create_(void **ifcode, void *ddata, int ddsize, char **script)
 
 	// Column data
 	memset(&c, 0, sizeof(c));
+
+	// Packing modifiers
+	memset(&mods, 0, sizeof(mods));
 
 	if (!script) ag = gtk_accel_group_new();
 
@@ -6231,7 +6145,7 @@ void **run_create_(void **ifcode, void *ddata, int ddsize, char **script)
 				(GtkDestroyNotify)free, (gpointer)ddata);
 #if GTK_MAJOR_VERSION == 1
 			/* To make Smooth theme engine render sliders properly */
-			if (have_sliders) gtk_signal_connect_after(
+			if (have_sliders) gtk_signal_connect(
 				GTK_OBJECT(window), "show",
 				GTK_SIGNAL_FUNC(gtk_widget_queue_resize), NULL);
 #endif
@@ -6484,7 +6398,7 @@ void **run_create_(void **ifcode, void *ddata, int ddsize, char **script)
 				gdk_window_set_icon(window->window, NULL, icon_pix, NULL);
 //				gdk_pixmap_unref(icon_pix);
 			}
-#else /* #if GTK_MAJOR_VERSION == 2 */
+#else /* #if GTK_MAJOR_VERSION >= 2 */
 			{
 				GdkPixbuf *p = gdk_pixbuf_new_from_xpm_data(pp[2]);
 				gtk_window_set_icon(GTK_WINDOW(window), p);
@@ -6515,8 +6429,8 @@ void **run_create_(void **ifcode, void *ddata, int ddsize, char **script)
 // !!! Border = 6
 			gtk_container_set_border_width(GTK_CONTAINER(window), 6);
 			/* Both boxes go onto stack, with vbox on top */
-			CT_PUSH(wp, GTK_DIALOG(window)->action_area, ct_BOX);
-			CT_PUSH(wp, GTK_DIALOG(window)->vbox, ct_BOX);
+			CT_PUSH(wp, gtk_dialog_get_action_area(GTK_DIALOG(window)), ct_BOX);
+			CT_PUSH(wp, gtk_dialog_get_content_area(GTK_DIALOG(window)), ct_BOX);
 			break;
 		/* Create a fileselector window (with horizontal box inside) */
 		case op_FPICKpm:
@@ -6547,7 +6461,7 @@ void **run_create_(void **ifcode, void *ddata, int ddsize, char **script)
 		/* Create a vbox which will serve as separate widget */
 		case op_TOPVBOX:
 			part = TRUE; // not toplevel
-			widget = window = gtk_vbox_new(FALSE, 0);
+			widget = window = vbox_new(0);
 			cw = GET_BORDER(TOPVBOX);
 			ct = ct_BOX;
 			pk = pk_SHOW;
@@ -6569,17 +6483,18 @@ void **run_create_(void **ifcode, void *ddata, int ddsize, char **script)
 		case op_DOCK:
 		{
 			GtkWidget *p0, *p1, *pane;
+			dock_data *dd = (void *)dtail;
 
-			widget = gtk_hbox_new(FALSE, 0);
+			widget = hbox_new(0);
 			gtk_widget_show(widget);
 
 			/* First, create the dock pane - hidden for now */
-			pane = gtk_hpaned_new();
+			dd->pane = pane = gtk_hpaned_new();
 			paned_mouse_fix(pane);
 			gtk_box_pack_end(GTK_BOX(widget), pane, TRUE, TRUE, 0);
 
 			/* Create the right pane */
-			p1 = gtk_vbox_new(FALSE, 0);
+			p1 = vbox_new(0);
 			gtk_widget_show(p1);
 			gtk_paned_pack2(GTK_PANED(pane), p1, FALSE, TRUE);
 #if GTK_MAJOR_VERSION == 1
@@ -6590,7 +6505,7 @@ void **run_create_(void **ifcode, void *ddata, int ddsize, char **script)
 #endif
 
 			/* Now, create the left pane - for now, separate */
-			p0 = xpack(widget, gtk_vbox_new(FALSE, 0));
+			dd->vbox = p0 = xpack(widget, vbox_new(0));
 			gtk_widget_show(p0);
 
 			/* Pack everything */
@@ -6605,18 +6520,20 @@ void **run_create_(void **ifcode, void *ddata, int ddsize, char **script)
 		case op_HVSPLIT:
 		{
 			GtkWidget *p;
+			hvsplit_data *hd = (void *)dtail;
 
-			widget = gtk_vbox_new(FALSE, 0);
+			hd->box = widget = vbox_new(0);
 
 			/* Create the two panes - hidden for now */
-			p = gtk_hpaned_new();
+			hd->panes[0] = p = gtk_hpaned_new();
 			paned_mouse_fix(p);
 			gtk_box_pack_end(GTK_BOX(widget), p, TRUE, TRUE, 0);
-			p = gtk_vpaned_new();
+			hd->panes[1] = p = gtk_vpaned_new();
 			paned_mouse_fix(p);
 			gtk_box_pack_end(GTK_BOX(widget), p, TRUE, TRUE, 0);
 
-			ct = ct_BOX;
+			sw = hd; // Datastruct in place of widget
+			ct = ct_HVSPLIT;
 			break;
 		}
 		/* Add a notebook page */
@@ -6625,8 +6542,7 @@ void **run_create_(void **ifcode, void *ddata, int ddsize, char **script)
 			GtkWidget *label = op == op_PAGE ?
 				gtk_label_new(_(v)) : xpm_image(v);
 			gtk_widget_show(label);
-			widget = gtk_vbox_new(FALSE, op == op_PAGE ?
-				0 : (int)pp[2]);
+			widget = vbox_new(op == op_PAGE ? 0 : (int)pp[2]);
 			gtk_notebook_append_page(GTK_NOTEBOOK(CT_TOP(wp)),
 				widget, label);
 			ct = ct_BOX;
@@ -6711,7 +6627,7 @@ void **run_create_(void **ifcode, void *ddata, int ddsize, char **script)
 			if (do_pack(widget, wp, pp, pk, tpad)) CT_POP(wp);
 			while (n-- > 0)
 			{
-				GtkWidget *page = gtk_vbox_new(FALSE, 0);
+				GtkWidget *page = vbox_new(0);
 				gtk_notebook_prepend_page(GTK_NOTEBOOK(widget),
 					page, NULL); // stack pages back to front
 				CT_PUSH(wp, page, ct_BOX);
@@ -6735,7 +6651,7 @@ void **run_create_(void **ifcode, void *ddata, int ddsize, char **script)
 			GtkWidget *label;
 			GtkRequisition req;
 
-			widget = gtk_hbox_new(FALSE, 0);
+			widget = hbox_new(0);
 		/* !!! The following is intended to give enough height to the bar
 		 * even in case no items are shown. It depends on GTK+ setting
 		 * proper height (and zero width) for a label containing an empty
@@ -6759,7 +6675,7 @@ void **run_create_(void **ifcode, void *ddata, int ddsize, char **script)
 			widget = gtk_label_new("");
 			gtk_misc_set_alignment(GTK_MISC(widget),
 				((paw >> 16) & 255) / 2.0, 0.0);
-			if (paw & 0xFFFF) minw = paw & 0xFFFF; // usize
+			if (paw & 0xFFFF) mods.minw = paw & 0xFFFF; // usize
 			// Label-specific packing
 			if (pk == pk_PACKEND) pk = pk_PACKEND1;
 // !!! Padding = 0 Border = 0
@@ -6770,9 +6686,9 @@ void **run_create_(void **ifcode, void *ddata, int ddsize, char **script)
 			widget = gtk_hseparator_new();
 			if ((int)v >= 0) // usize
 			{
-				if (lp) minw = (int)v;
+				if (lp) mods.minw = (int)v;
 // !!! Height = 10
-				minh = 10;
+				mods.minh = 10;
 			}
 // !!! Padding = 0
 			break;
@@ -6820,8 +6736,10 @@ void **run_create_(void **ifcode, void *ddata, int ddsize, char **script)
 		case op_HLABEL: case op_HLABELm:
 			widget = gtk_label_new(v);
 			GTK_WIDGET_SET_FLAGS(widget, GTK_CAN_FOCUS);
-#if GTK_MAJOR_VERSION == 2
+#if GTK_MAJOR_VERSION >= 2
 			gtk_label_set_selectable(GTK_LABEL(widget), TRUE);
+#endif
+#if GTK_MAJOR_VERSION == 2
 			if (op == op_HLABELm)
 			{
 				PangoFontDescription *pfd =
@@ -6874,7 +6792,7 @@ void **run_create_(void **ifcode, void *ddata, int ddsize, char **script)
 			if ((CT_WHAT(wp) == ct_SCROLL) && (pk <= pk_DEF))
 				pk = pk_BIN;
 // !!! Padding = 0
-			pk |= pkf_PARENT;
+			pk |= pkf_PARENT | pkf_CANVAS;
 			break;
 		/* Add a framed canvas-based renderer with background */
 		case op_CANVASIMGB:
@@ -6884,7 +6802,7 @@ void **run_create_(void **ifcode, void *ddata, int ddsize, char **script)
 			if ((CT_WHAT(wp) == ct_SCROLL) && (pk <= pk_DEF))
 				pk = pk_BIN;
 // !!! Padding = 0
-			pk |= pkf_PARENT;
+			pk |= pkf_PARENT | pkf_CANVAS;
 			break;
 		}
 		/* Add a canvas widget */
@@ -6894,8 +6812,8 @@ void **run_create_(void **ifcode, void *ddata, int ddsize, char **script)
 
 			widget = wjcanvas_new();
 			wjcanvas_size(widget, (int)v >> 16, (int)v & 0xFFFF);
-			gtk_signal_connect(GTK_OBJECT(widget), "expose_event",
-				GTK_SIGNAL_FUNC(expose_canvas_), NEXT_SLOT(r));
+			wjcanvas_set_expose(widget, GTK_SIGNAL_FUNC(expose_canvas_),
+				NEXT_SLOT(r));
 
 			frame = wjframe_new();
 			gtk_widget_show(frame);
@@ -6904,7 +6822,7 @@ void **run_create_(void **ifcode, void *ddata, int ddsize, char **script)
 // !!! For now, connection to scrollbars is automatic
 			if ((CT_WHAT(wp) == ct_SCROLL) && (pk <= pk_DEF))
 				pk = pk_BIN;
-			pk |= pkf_PARENT;
+			pk |= pkf_PARENT | pkf_CANVAS;
 			break;
 		}
 		/* Add a focusable buffered RGB renderer with cursor */
@@ -7007,7 +6925,7 @@ void **run_create_(void **ifcode, void *ddata, int ddsize, char **script)
 			 /* !!! Show now - or size won't be set properly */
 			gtk_widget_show(widget);
 #if GTK_MAJOR_VERSION == 2
-			gtk_signal_connect_after(GTK_OBJECT(widget), "realize",
+			gtk_signal_connect(GTK_OBJECT(widget), "realize",
 				GTK_SIGNAL_FUNC(opt_size_fix), NULL);
 #endif
 			opt_reset(r, ddata, *(int *)v);
@@ -7090,7 +7008,7 @@ void **run_create_(void **ifcode, void *ddata, int ddsize, char **script)
 		/* Add a button for tablet config dialog */
 		case op_TABLETBTN:
 			widget = gtk_button_new_with_label(_(v));
-			gtk_signal_connect(GTK_OBJECT(widget), "clicked",
+			gtk_signal_connect_object(GTK_OBJECT(widget), "clicked",
 				GTK_SIGNAL_FUNC(conf_tablet), (gpointer)r);
 			cw = GET_BORDER(BUTTON);
 			break;
@@ -7159,15 +7077,15 @@ void **run_create_(void **ifcode, void *ddata, int ddsize, char **script)
 			if ((op == op_OKBTN) || (op == op_DONEBTN))
 			{
 				gtk_widget_add_accelerator(widget, "clicked", ag,
-					GDK_Return, 0, (GtkAccelFlags)0);
+					KEY(Return), 0, (GtkAccelFlags)0);
 				gtk_widget_add_accelerator(widget, "clicked", ag,
-					GDK_KP_Enter, 0, (GtkAccelFlags)0);
+					KEY(KP_Enter), 0, (GtkAccelFlags)0);
 				accel |= 1;
 			}
 			if ((op == op_CANCELBTN) || (op == op_DONEBTN))
 			{
 				gtk_widget_add_accelerator(widget, "clicked", ag,
-					GDK_Escape, 0, (GtkAccelFlags)0);
+					KEY(Escape), 0, (GtkAccelFlags)0);
 				add_del(NEXT_SLOT(r), window);
 				accel |= 1;
 			}
@@ -7189,15 +7107,18 @@ void **run_create_(void **ifcode, void *ddata, int ddsize, char **script)
 		/* Add a toolbar */
 		case op_TOOLBAR: case op_SMARTTBAR:
 		{
-			GtkWidget *vport, *bar;
+			GtkWidget *bar;
+#if GTK_MAJOR_VERSION <= 2
+			GtkWidget *vport;
 			smarttbar_data *sd;
+#endif
 
 			tbar = r;
 			rvar = rslot = NULL;
 #if GTK_MAJOR_VERSION == 1
 			widget = gtk_toolbar_new(GTK_ORIENTATION_HORIZONTAL,
 				GTK_TOOLBAR_ICONS);
-#else /* #if GTK_MAJOR_VERSION == 2 */
+#else /* #if GTK_MAJOR_VERSION >= 2 */
 			widget = gtk_toolbar_new();
 			gtk_toolbar_set_style(GTK_TOOLBAR(widget), GTK_TOOLBAR_ICONS);
 #endif
@@ -7238,15 +7159,17 @@ void **run_create_(void **ifcode, void *ddata, int ddsize, char **script)
 		case op_SMARTTBMORE:
 		{
 			GtkWidget *box = tbar[0];
-			smarttbar_data *sd = tbar[2];
 
 			// !!! Box replaces toolbar on stack
 			CT_POP(wp);
 			CT_PUSH(wp, box, ct_BOX);
-			sd->r2 = r; // remember where the slots end
+			{
+				smarttbar_data *sd = tbar[2];
+				sd->r2 = r; // remember where the slots end
 
-			widget = smarttbar_button(sd, v);
-			pk = pk_SHOW;
+				widget = smarttbar_button(sd, v);
+				pk = pk_SHOW;
+			}
 			break;
 		}
 		/* Add a container-toggle beside toolbar */
@@ -7267,8 +7190,6 @@ void **run_create_(void **ifcode, void *ddata, int ddsize, char **script)
 		case op_TBBUTTON: case op_TBTOGGLE: case op_TBRBUTTON:
 		{
 			GtkWidget *rb = NULL;
-			int mode = op == op_TBBUTTON ? GTK_TOOLBAR_CHILD_BUTTON :
-				GTK_TOOLBAR_CHILD_TOGGLEBUTTON;
 
 			if (keygroup) keymap_add(keymap, r, pp[3], keygroup);
 
@@ -7277,7 +7198,6 @@ void **run_create_(void **ifcode, void *ddata, int ddsize, char **script)
 			{
 				static int set = TRUE;
 
-				mode = GTK_TOOLBAR_CHILD_RADIOBUTTON;
 				if (rvar == v) rb = rslot[0];
 				/* Now this represents group */
 				rslot = r; rvar = v;
@@ -7286,21 +7206,26 @@ void **run_create_(void **ifcode, void *ddata, int ddsize, char **script)
 			}
 
 			if (op != op_TBBOXTOG) widget = gtk_toolbar_append_element(
-				GTK_TOOLBAR(CT_TOP(wp)), mode, rb,
+				GTK_TOOLBAR(CT_TOP(wp)),
+				(op == op_TBBUTTON ? GTK_TOOLBAR_CHILD_BUTTON :
+				op == op_TBRBUTTON ? GTK_TOOLBAR_CHILD_RADIOBUTTON :
+				GTK_TOOLBAR_CHILD_TOGGLEBUTTON), rb,
 				NULL, _(wid = pp[3]), "Private", xpm_image(pp[4]),
 				GTK_SIGNAL_FUNC(toolbar_lclick), NEXT_SLOT(tbar));
 			if (v) gtk_toggle_button_set_active(
 				GTK_TOGGLE_BUTTON(widget), *(int *)v);
+			gtk_object_set_user_data(GTK_OBJECT(widget), r);
 			if (lp > 4) gtk_signal_connect(GTK_OBJECT(widget),
 				"button_press_event",
 				GTK_SIGNAL_FUNC(toolbar_rclick), SLOT_N(tbar, 2));
-			gtk_object_set_user_data(GTK_OBJECT(widget), r);
 			break;
 		}
 		/* Add a toolbar separator */
 		case op_TBSPACE:
+		{
 			gtk_toolbar_append_space(GTK_TOOLBAR(CT_TOP(wp)));
 			break;
+		}
 		/* Add a two/one row container for 2 toolbars */
 		case op_TWOBOX:
 			widget = wj_size_box();
@@ -7332,12 +7257,12 @@ void **run_create_(void **ifcode, void *ddata, int ddsize, char **script)
 			sw = bar = widget;
 			gtk_widget_show(bar);
 
-			widget = wj_size_box();
-
 			/* Make datastruct */
 			sd = (void *)dtail;
 			sd->mbar = bar;
 			sd->r = r;
+
+			widget = wj_size_box();
 
 			gtk_signal_connect(GTK_OBJECT(widget), "size_request",
 				GTK_SIGNAL_FUNC(smart_menu_size_req), sd);
@@ -7372,7 +7297,7 @@ void **run_create_(void **ifcode, void *ddata, int ddsize, char **script)
 			if (s[l]) s = _(s); // Translate
 			s += l;
 
-			label = GTK_BIN(widget)->child;
+			label = gtk_bin_get_child(GTK_BIN(widget));
 			keyval = gtk_label_parse_uline(GTK_LABEL(label), s);
 			/* Toplevel submenus can have Alt+letter shortcuts */
 			if ((l < 2) && (keyval != GDK_VoidSymbol))
@@ -7411,7 +7336,7 @@ void **run_create_(void **ifcode, void *ddata, int ddsize, char **script)
 				rslot = r; rvar = v;
 				widget = gtk_radio_menu_item_new_with_label(group, "");
 			}
-#if GTK_MAJOR_VERSION == 2
+#if GTK_MAJOR_VERSION >= 2
 			else if ((lp > 3) && show_menu_icons)
 			{
 				widget = gtk_image_menu_item_new_with_label("");
@@ -7438,11 +7363,11 @@ void **run_create_(void **ifcode, void *ddata, int ddsize, char **script)
 
 			gtk_label_parse_uline(GTK_LABEL(GTK_BIN(widget)->child), s);
 
+			gtk_object_set_user_data(GTK_OBJECT(widget), r);
 			gtk_signal_connect(GTK_OBJECT(widget), "activate",
 				GTK_SIGNAL_FUNC(menu_evt), NEXT_SLOT(tbar));
-			gtk_object_set_user_data(GTK_OBJECT(widget), r);
 
-#if GTK_MAJOR_VERSION == 2
+#if GTK_MAJOR_VERSION >= 2
 		/* !!! Otherwise GTK+ won't add spacing to an empty accel field */
 			gtk_widget_set_accel_path(widget, FAKE_ACCEL, ag);
 #endif
@@ -7477,8 +7402,7 @@ void **run_create_(void **ifcode, void *ddata, int ddsize, char **script)
 				paned_mouse_fix(pane);
 				gtk_paned_set_position(GTK_PANED(pane),
 					inifile_get_gint32(pp[3], (int)pp[4]));
-				gtk_paned_pack2(GTK_PANED(pane),
-					gtk_vbox_new(FALSE, 0), TRUE, TRUE);
+				gtk_paned_pack2(GTK_PANED(pane), vbox_new(0), TRUE, TRUE);
 				gtk_widget_show_all(pane);
 				gtk_paned_pack1(GTK_PANED(pane),
 					widget, FALSE, TRUE);
@@ -7490,7 +7414,7 @@ void **run_create_(void **ifcode, void *ddata, int ddsize, char **script)
 		case op_REMOUNT:
 		{
 			void **where = *(void ***)v;
-			GtkWidget *what = GTK_BIN(where[0])->child;
+			GtkWidget *what = gtk_bin_get_child(GTK_BIN(where[0]));
 
 			widget = gtk_alignment_new(0.5, 0.5, 1.0, 1.0);
 			gtk_widget_hide(where[0]);
@@ -7575,7 +7499,7 @@ void **run_create_(void **ifcode, void *ddata, int ddsize, char **script)
 				if (lp) keymap_map(keymap, keymap->nslots, keyval, mods);
 				continue;
 			}
-#if GTK_MAJOR_VERSION == 2
+#if GTK_MAJOR_VERSION >= 2
 			/* !!! In case one had been set (for menu spacing) */
 			gtk_widget_set_accel_path(*slot, NULL, ag);
 #endif
@@ -7603,8 +7527,7 @@ void **run_create_(void **ifcode, void *ddata, int ddsize, char **script)
 			continue;
 		/* Make scrolled window request max size */
 		case op_WANTMAX:
-			gtk_signal_connect(GTK_OBJECT(widget), "size_request",
-				GTK_SIGNAL_FUNC(scroll_max_size_req), v);
+			mods.wantmax = (int)v + 1;
 			continue;
 		/* Make widget keep max requested width/height */
 		case op_KEEPSIZE:
@@ -7638,20 +7561,21 @@ void **run_create_(void **ifcode, void *ddata, int ddsize, char **script)
 			void **orig = origin_slot(PREV_SLOT(r));
 			/* !!! For GtkFontSelection, focusing needs be done after
 			 * window is shown - in GTK+ 2.24.10, at least */
-			if (GET_OP(orig) == op_FONTSEL) gtk_signal_connect_object_after(
+			if (GET_OP(orig) == op_FONTSEL) gtk_signal_connect_object(
 				GTK_OBJECT(window), "show",
 				GTK_SIGNAL_FUNC(gtk_widget_grab_focus),
-				(gpointer)GTK_FONT_SELECTION(*orig)->preview_entry);
+				(gpointer)gtk_font_selection_get_preview_entry(
+				GTK_FONT_SELECTION(*orig)));
 			else gtk_widget_grab_focus(*orig);
 			continue;
 		}
 		/* Set fixed/minimum width for next widget */
 		case op_WIDTH:
-			minw = (int)v;
+			mods.minw = (int)v;
 			continue;
 		/* Set fixed/minimum height for next widget */
 		case op_HEIGHT:
-			minh = (int)v;
+			mods.minh = (int)v;
 			continue;
 		/* Make window transient to given widget-map */
 		case op_ONTOP:
@@ -7773,17 +7697,14 @@ void **run_create_(void **ifcode, void *ddata, int ddsize, char **script)
 				// Special handler for toplevels
 				toplevel ? GTK_SIGNAL_FUNC(window_evt_key) :
 				GTK_SIGNAL_FUNC(get_evt_key), r);
+			enable_events(slot, op);
 			widget = NULL;
 			break;
 		}
 		/* Install mouse event handler */
-		case op_EVT_RXMOUSE: cw++;
-		case op_EVT_MXMOUSE: cw++;
-		case op_EVT_XMOUSE: cw += 2;
-		case op_EVT_RMOUSE: cw++;
-		case op_EVT_MMOUSE: cw++;
-		case op_EVT_MOUSE: add_mouse(r, cw);
-			cw = 0;
+		case op_EVT_MOUSE: case op_EVT_MMOUSE: case op_EVT_RMOUSE:
+		case op_EVT_XMOUSE: case op_EVT_MXMOUSE: case op_EVT_RXMOUSE:
+			add_mouse(r, op);
 			widget = NULL;
 			break;
 		/* Install crossing event handler */
@@ -7794,17 +7715,23 @@ void **run_create_(void **ifcode, void *ddata, int ddsize, char **script)
 				GTK_SIGNAL_FUNC(get_evt_cross), r);
 			gtk_signal_connect(GTK_OBJECT(*slot), "leave_notify_event",
 				GTK_SIGNAL_FUNC(get_evt_cross), r);
-			gtk_widget_set_events(*slot, GDK_ALL_EVENTS_MASK);
+			enable_events(slot, op);
 			widget = NULL;
 			break;
 		}
-#if GTK_MAJOR_VERSION == 2
+#if GTK_MAJOR_VERSION >= 2
 		/* Install scroll event handler */
 		case op_EVT_SCROLL:
 		{
 			void **slot = origin_slot(PREV_SLOT(r));
 			gtk_signal_connect(GTK_OBJECT(*slot), "scroll_event",
 				GTK_SIGNAL_FUNC(get_evt_scroll), r);
+	/* !!! The classical scroll events cannot be reliably received on any
+	 * GdkWindow with GDK_SMOOTH_SCROLL_MASK set (such as the ones of GTK+3
+	 * builtin scrollable widgets); if that is ever needed, enable_events()
+	 * will need install a realize handler which forcibly removes the flag
+	 * from all widget's GdkWindows - WJ */
+			enable_events(slot, op);
 			widget = NULL;
 			break;
 		}
@@ -7846,9 +7773,10 @@ void **run_create_(void **ifcode, void *ddata, int ddsize, char **script)
 					GTK_SIGNAL_FUNC(get_evt_conf), r);
 				break;
 			case op_TEXT:
-#if GTK_MAJOR_VERSION == 2 /* In GTK+1, same handler as for GtkEntry */
-				g_signal_connect(GTK_TEXT_VIEW(*slot)->buffer,
-					"changed", GTK_SIGNAL_FUNC(get_evt_1), r);
+#if GTK_MAJOR_VERSION >= 2 /* In GTK+1, same handler as for GtkEntry */
+				g_signal_connect(gtk_text_view_get_buffer(
+					GTK_TEXT_VIEW(*slot)), "changed",
+					GTK_SIGNAL_FUNC(get_evt_1), r);
 				break;
 #endif
 			case op_ENTRY: case op_MLENTRY: case op_PENTRY:
@@ -7920,11 +7848,11 @@ void **run_create_(void **ifcode, void *ddata, int ddsize, char **script)
 		}
 		/* Pack this according to mode flags */
 		if (script) continue; // no packing in script mode
+		mods.cw = cw;
 		{
-			GtkWidget *w = do_prepare(widget, pk, cw, minw, minh);
-			minw = minh = 0;
-			pk &= pk_MASK;
-			if ((pk != pk_NONE) && do_pack(w, wp, pp, pk, tpad))
+			GtkWidget *w = do_prepare(widget, pk, &mods);
+			memset(&mods, 0, sizeof(mods));
+			if (((pk & pk_MASK) != pk_NONE) && do_pack(w, wp, pp, pk, tpad))
 				CT_POP(wp); // unstack
 		}
 		/* Stack this */
@@ -7983,7 +7911,7 @@ static void do_destroy(void **wdata)
 		case op_REMOUNT:
 		{
 			void **where = *(void ***)v;
-			GtkWidget *what = GTK_BIN(*wdata)->child;
+			GtkWidget *what = gtk_bin_get_child(GTK_BIN(*wdata));
 
 			gtk_widget_reparent(what, where[0]);
 			gtk_widget_show(where[0]);
@@ -8034,8 +7962,8 @@ static void *do_query(char *data, void **wdata, int mode)
 				GTK_SPIN_BUTTON(*wdata)->adjustment->value :
 				read_float_spin(*wdata)) * 100);
 			break;
-		case op_CHECK: case op_CHECKb: case op_TOGGLE:
-		case op_TBTOGGLE: case op_TBBOXTOG:
+		case op_TBTOGGLE:
+		case op_CHECK: case op_CHECKb: case op_TOGGLE: case op_TBBOXTOG:
 			*(int *)v = gtk_toggle_button_get_active(*wdata);
 			if (op == op_CHECKb) inifile_set_gboolean(pp[2], *(int *)v);
 			break;
@@ -8061,7 +7989,8 @@ static void *do_query(char *data, void **wdata, int mode)
 			break;
 		}
 		case op_MENUCHECK:
-			*(int *)v = GTK_CHECK_MENU_ITEM(*wdata)->active;
+			*(int *)v = gtk_check_menu_item_get_active(
+				GTK_CHECK_MENU_ITEM(*wdata));
 			break;
 		case op_MENURITEM:
 		{
@@ -8069,13 +7998,14 @@ static void *do_query(char *data, void **wdata, int mode)
 			void **slot = wdata;
 
 			/* If reading radio group through an inactive slot */
-			if (!GTK_CHECK_MENU_ITEM(*wdata)->active)
+			if (!gtk_check_menu_item_get_active(GTK_CHECK_MENU_ITEM(*wdata)))
 			{
 				/* Let outer loop find active item */
 				if (mode <= 1) break;
 				/* Otherwise, find active item here */
 				group = gtk_radio_menu_item_group(*wdata);
-				while (group && !GTK_CHECK_MENU_ITEM(group->data)->active)
+				while (group && !gtk_check_menu_item_get_active(
+					GTK_CHECK_MENU_ITEM(group->data)))
 					group = group->next;
 				if (!group) break; // impossible happened
 				slot = gtk_object_get_user_data(
@@ -8133,8 +8063,8 @@ static void *do_query(char *data, void **wdata, int mode)
 			GtkAdjustment *xa, *ya;
 			int *xp = v;
 			get_scroll_adjustments(*wdata, &xa, &ya);
-			xp[0] = xa->value;
-			xp[1] = ya->value;
+			xp[0] = gtk_adjustment_get_value(xa);
+			xp[1] = gtk_adjustment_get_value(ya);
 			break;
 		}
 		case op_RPACK: case op_RPACKD:
@@ -8149,12 +8079,11 @@ static void *do_query(char *data, void **wdata, int mode)
 		case op_PCTCOMBO:
 			*(int *)v = 0; // default for error
 			sscanf(gtk_entry_get_text(
-				GTK_ENTRY(GTK_COMBO(*wdata)->entry)), "%d%%",
+				GTK_ENTRY(pctcombo_entry(*wdata))), "%d%%",
 				(int *)v);
 			break;
 		case op_COMBOENTRY:
-			*(const char **)v = gtk_entry_get_text(
-				GTK_ENTRY(GTK_COMBO(*wdata)->entry));
+			*(const char **)v = comboentry_get_text(*wdata);
 			break;
 		case op_ENTRY: case op_MLENTRY:
 			*(const char **)v = gtk_entry_get_text(GTK_ENTRY(*wdata));
@@ -8191,7 +8120,7 @@ static void *do_query(char *data, void **wdata, int mode)
 			break;
 		}
 		case op_MOUNT:
-			*(int *)v = !!GTK_BIN(*wdata)->child;
+			*(int *)v = !!gtk_bin_get_child(GTK_BIN(*wdata));
 			break;
 		case op_uMOUNT:
 			*(int *)v = !!((swdata *)*wdata)->strs;
@@ -8211,7 +8140,7 @@ void run_query(void **wdata)
 	if (!vdata->script)
 	{
 		GtkWidget *w = GET_REAL_WINDOW(wdata);
-		GtkWidget *f = GTK_WINDOW(w)->focus_widget;
+		GtkWidget *f = gtk_window_get_focus(GTK_WINDOW(w));
 		/* !!! No use to check if "fupslot" has focus - all dialogs with
 		 * such widget get destroyed after query anyway */
 		if (f && (GTK_IS_SPIN_BUTTON(f) || vdata->fupslot))
@@ -8288,15 +8217,17 @@ void cmd_reset(void **slot, void *ddata)
 				n < sd->range[0] ? sd->range[0] : n;
 			break;
 		}
+		case op_TBTOGGLE: 
 		case op_CHECK: case op_CHECKb: case op_TOGGLE:
-		case op_TBTOGGLE: case op_TBBOXTOG:
+		case op_TBBOXTOG:
 			gtk_toggle_button_set_active(*wdata, *(int *)v);
 			break;
 		case op_uCHECK: case op_uCHECKb:
 			((swdata *)*wdata)->value = !!*(int *)v;
 			break;
 		case op_OPT:
-			gtk_option_menu_set_history(*wdata, *(int *)v);
+			/* !!! No support for discontinuous lists, for now */
+			wj_option_menu_set_history(*wdata, *(int *)v);
 			break;
 		case op_OPTD:
 			opt_reset(wdata, ddata, *(int *)v);
@@ -8389,7 +8320,7 @@ void cmd_reset(void **slot, void *ddata)
 		}
 		case op_KEYMAP:
 			keymap_reset(wdata[2]);
-#if GTK_MAJOR_VERSION > 1
+#if GTK_MAJOR_VERSION >= 2
 			gtk_signal_emit_by_name(GTK_OBJECT(gtk_widget_get_toplevel(
 				GET_REAL_WINDOW(wdata_slot(wdata)))),
 				"keys_changed", NULL);
@@ -8438,7 +8369,7 @@ void cmd_reset(void **slot, void *ddata)
 			rd->rgb = v;
 			rd->w = wh[0];
 			rd->h = wh[1];
-			gtk_widget_queue_draw(*wdata);
+			cmd_repaint(wdata);
 			break;
 		}
 #endif
@@ -8983,7 +8914,7 @@ void cmd_showhide(void **slot, int state)
 			if (vdata->modal) gtk_window_set_modal(GTK_WINDOW(w), TRUE);
 			/* Prepare to do postponed actions */
 			mx = vdata->xywh[4];
-#if GTK_MAJOR_VERSION > 1
+#if GTK_MAJOR_VERSION >= 2
 			/* !!! When doing maximize, we have to display window
 			 * contents after window itself, or some widgets may get
 			 * locked into wrong size by premature first-time size
@@ -8993,7 +8924,7 @@ void cmd_showhide(void **slot, int state)
 			 * can cause proper resizing there, isn't found yet - WJ */
 			if (mx)
 			{
-				ws = GTK_BIN(w)->child;
+				ws = gtk_bin_get_child(GTK_BIN(w));
 				if (ws && GTK_WIDGET_VISIBLE(ws))
 					widget_showhide(ws, FALSE);
 				else ws = NULL;
@@ -9013,7 +8944,7 @@ void cmd_showhide(void **slot, int state)
 			{
 				gdk_window_get_size(w->window,
 					vdata->xywh + 2, vdata->xywh + 3);
-				gdk_window_get_root_origin(w->window,
+				gdk_window_get_root_origin(gtk_widget_get_window(w),
 					vdata->xywh + 0, vdata->xywh + 1);
 			}
 			if (vdata->ininame && vdata->ininame[0])
@@ -9030,7 +8961,7 @@ void cmd_showhide(void **slot, int state)
 	 * already at max, with KDE3 & 4 at least - WJ */
 	if (mx) set_maximized(slot[0]);
 	if (ws) widget_showhide(ws, TRUE);
-	if (raise) gdk_window_raise(GTK_WIDGET(slot[0])->window);
+	if (raise) gdk_window_raise(gtk_widget_get_window(GTK_WIDGET(slot[0])));
 	if (unfocus) gtk_window_set_focus(slot[0], NULL);
 	/* !!! Have to wait till canvas is displayed, to init keyboard */
 	if (keymap) keymap_reset(keymap[2]);
@@ -9050,11 +8981,12 @@ void cmd_set(void **slot, int v)
 	{
 	case op_DOCK:
 	{
-		GtkWidget *window, *vbox, *pane = BOX_CHILD_0(slot[0]);
+		dock_data *dd = slot[2];
+		GtkWidget *window, *vbox = dd->vbox, *pane = dd->pane;
 		char *ini = ((void **)slot[1])[1];
 		int w, w2;
 
-		if (!v ^ !!GTK_PANED(pane)->child1) return; // nothing to do
+		if (!v ^ !!gtk_paned_get_child1(GTK_PANED(pane))) return; // nothing to do
 
 		window = gtk_widget_get_toplevel(slot[0]);
 		if (GTK_WIDGET_VISIBLE(window))
@@ -9068,7 +9000,6 @@ void cmd_set(void **slot, int v)
 			w = inifile_get_gint32(ini, -1);
 			if (w >= 0) gtk_paned_set_position(GTK_PANED(pane), w2 - w);
 			/* Now, let's juggle the widgets */
-			vbox = BOX_CHILD_1(slot[0]);
 			gtk_widget_ref(vbox);
 			gtk_container_remove(GTK_CONTAINER(slot[0]), vbox);
 			gtk_paned_pack1(GTK_PANED(pane), vbox, TRUE, TRUE);
@@ -9076,9 +9007,10 @@ void cmd_set(void **slot, int v)
 		}
 		else
 		{
-			inifile_set_gint32(ini, w2 - GTK_PANED(pane)->child1_size);
+			inifile_set_gint32(ini, w2 - gtk_paned_get_position(
+				GTK_PANED(pane)));
 			gtk_widget_hide(pane);
-			vbox = GTK_PANED(pane)->child1;
+//			vbox = gtk_paned_get_child1(GTK_PANED(pane));
 			gtk_widget_ref(vbox);
 			gtk_container_remove(GTK_CONTAINER(pane), vbox);
 			xpack(slot[0], vbox);
@@ -9088,20 +9020,19 @@ void cmd_set(void **slot, int v)
 	}
 	case op_HVSPLIT:
 	{
-		GtkWidget *w, *pane, *p[2], *box = slot[0];
+		hvsplit_data *hd = slot[2];
+		GtkWidget *pane, **p = hd->panes, *w = NULL, *box = slot[0];
 		int v0, v1;
 
-		p[0] = BOX_CHILD_0(box);
-		p[1] = BOX_CHILD_1(box);
 		v0 = GTK_WIDGET_VISIBLE(p[0]) ? 1 :
 			GTK_WIDGET_VISIBLE(p[1]) ? 2 : 0;
 		v1 = (int)v < 1 ? 0 : (int)v > 1 ? 2 : 1;
-		if (v1 == v0) return; // nothing to do
+		if (v1 == v0) break; // nothing to do
 		if (!v1) // hide 2nd part
 		{
 			pane = p[v0 - 1];
 			gtk_widget_hide(pane);
-			w = GTK_PANED(pane)->child1;
+			w = gtk_paned_get_child1(GTK_PANED(pane));
 			gtk_widget_ref(w);
 			gtk_container_remove(GTK_CONTAINER(pane), w);
 			xpack(box, w);
@@ -9109,17 +9040,17 @@ void cmd_set(void **slot, int v)
 		else if (!v0) // show 2nd part
 		{
 			pane = p[v1 - 1];
-			if (!GTK_PANED(pane)->child2) // move
+			if (!gtk_paned_get_child2(GTK_PANED(pane))) // move
 			{
-				w = GTK_PANED(p[2 - v1])->child2;
-				if (!w) w = BOX_CHILD(box, 3);
+				w = hd->inbox[1];
 				gtk_widget_ref(w);
-				gtk_container_remove(GTK_CONTAINER(w->parent), w);
+				gtk_container_remove(GTK_CONTAINER(
+					gtk_widget_get_parent(w)), w);
 				gtk_paned_pack2(GTK_PANED(pane), w, TRUE, TRUE);
 				gtk_widget_unref(w);
 				gtk_widget_show(w);
 			}
-			w = BOX_CHILD_2(box);
+			w = hd->inbox[0];
 			gtk_widget_ref(w);
 			gtk_container_remove(GTK_CONTAINER(box), w);
 			gtk_paned_pack1(GTK_PANED(pane), w, TRUE, TRUE);
@@ -9129,12 +9060,12 @@ void cmd_set(void **slot, int v)
 		{
 			pane = p[v0 - 1];
 			gtk_widget_hide(pane);
-			w = GTK_PANED(pane)->child1;
+			w = gtk_paned_get_child1(GTK_PANED(pane));
 			gtk_widget_ref(w);
 			gtk_container_remove(GTK_CONTAINER(pane), w);
 			gtk_paned_pack1(GTK_PANED(p[2 - v0]), w, TRUE, TRUE);
 			gtk_widget_unref(w);
-			w = GTK_PANED(pane)->child2;
+			w = gtk_paned_get_child2(GTK_PANED(pane));
 			gtk_widget_ref(w);
 			gtk_container_remove(GTK_CONTAINER(pane), w);
 			gtk_paned_pack2(GTK_PANED(p[2 - v0]), w, TRUE, TRUE);
@@ -9206,8 +9137,9 @@ void cmd_set(void **slot, int v)
 	case op_FSPIN:
 		gtk_spin_button_set_value(slot[0], v / 100.0);
 		break;
+	case op_TBTOGGLE: case op_TBRBUTTON:
 	case op_CHECK: case op_CHECKb: case op_TOGGLE:
-	case op_TBTOGGLE: case op_TBBOXTOG: case op_TBRBUTTON:
+	case op_TBBOXTOG:
 		gtk_toggle_button_set_active(slot[0], v);
 		break;
 	case op_MENUITEM:
@@ -9218,14 +9150,14 @@ void cmd_set(void **slot, int v)
 		break;
 	case op_OPT: case op_OPTD:
 		/* !!! No support for discontinuous lists, for now */
-		gtk_option_menu_set_history(slot[0], v);
+		wj_option_menu_set_history(slot[0], v);
 		break;
 	case op_PCTCOMBO:
 	{
 		char buf[32];
 
 		sprintf(buf, "%d%%", v);
-		gtk_entry_set_text(GTK_ENTRY(GTK_COMBO(slot[0])->entry), buf);
+		gtk_entry_set_text(GTK_ENTRY(pctcombo_entry(slot[0])), buf);
 #if GTK_MAJOR_VERSION == 1
 		/* Call the handler, for consistency */
 		get_evt_1(NULL, NEXT_SLOT(slot));
@@ -9281,8 +9213,8 @@ void cmd_peekv(void **slot, void *res, int size, int idx)
 	{
 		if (idx == WDATA_TABLET)
 		{
-			if (size >= sizeof(char *)) *(char **)res =
-				tablet_device ? tablet_device->name : NULL;
+			if (size >= sizeof(char *)) *(char **)res = tablet_device ?
+				(char *)gdk_device_get_name(tablet_device) : NULL;
 			return;
 		}
 		// skip to toplevel slot
@@ -9323,19 +9255,21 @@ void cmd_peekv(void **slot, void *res, int size, int idx)
 			switch (size / sizeof(int))
 			{
 			default:
-			case 4: v[3] = ya->page_size;
-			case 3: v[2] = xa->page_size;
-			case 2: v[1] = ya->value;
-			case 1: v[0] = xa->value;
+			case 4: v[3] = gtk_adjustment_get_page_size(ya);
+			case 3: v[2] = gtk_adjustment_get_page_size(xa);
+			case 2: v[1] = gtk_adjustment_get_value(ya);
+			case 1: v[0] = gtk_adjustment_get_value(xa);
 			case 0: break;
 			}
 		}
 		else if (idx == CSCROLL_LIMITS)
 		{
 			if (size >= sizeof(int))
-				v[0] = xa->upper - xa->page_size;
+				v[0] = gtk_adjustment_get_upper(xa) -
+					gtk_adjustment_get_page_size(xa);
 			if (size >= sizeof(int) * 2)
-				v[1] = ya->upper - ya->page_size;
+				v[1] = gtk_adjustment_get_upper(ya) -
+					gtk_adjustment_get_page_size(ya);
 		}
 		break;
 	}
@@ -9361,7 +9295,8 @@ void cmd_peekv(void **slot, void *res, int size, int idx)
 
 			// No reason to parcel the data
 			if (size < sizeof(mouse_ext)) break;
-			gdk_window_get_pointer(w->window, &x, &y, &m->state);
+			gdk_window_get_pointer(gtk_widget_get_window(w), &x, &y,
+				&m->state);
 			wjcanvas_get_vport(w, vport);
 			m->x = x + vport[0];
 			m->y = y + vport[1];
@@ -9428,7 +9363,7 @@ void cmd_setv(void **slot, void *res, int idx)
 		{
 			GtkAccelGroup *ag = gtk_accel_group_new();
 			gtk_widget_add_accelerator(*(void **)res, "clicked", ag,
-				GDK_Escape, 0, (GtkAccelFlags)0);
+				KEY(Escape), 0, (GtkAccelFlags)0);
 			gtk_window_add_accel_group(slot[0], ag);
 		}
 		else if (idx == WINDOW_FOCUS)
@@ -9441,7 +9376,8 @@ void cmd_setv(void **slot, void *res, int idx)
 		else if (idx == WINDOW_RAISE)
 		{
 			if (GTK_WIDGET_VISIBLE(slot[0]))
-				gdk_window_raise(GTK_WIDGET(slot[0])->window);
+				gdk_window_raise(gtk_widget_get_window(
+					GTK_WIDGET(slot[0])));
 			/* Cannot raise hidden window, will do it later */
 			else vdata->raise = TRUE;
 		}
@@ -9453,10 +9389,10 @@ void cmd_setv(void **slot, void *res, int idx)
 			if (!res) /* Show again */
 			{
 				if (!w) break; // Paranoia
-#if GTK_MAJOR_VERSION == 2
-				gdk_window_deiconify(w->window);
+#if GTK_MAJOR_VERSION >= 2
+				gdk_window_deiconify(gtk_widget_get_window(w));
 #endif
-				gdk_window_raise(w->window);
+				gdk_window_raise(gtk_widget_get_window(w));
 				break;
 			}
 			if (w == main_window) w = NULL;
@@ -9469,13 +9405,13 @@ void cmd_setv(void **slot, void *res, int idx)
 			handle_events();	// Wait for minimize
 
 			sleep(1);	// Wait a second for screen to redraw
-#else /* #if GTK_MAJOR_VERSION == 2 */
+#else /* #if GTK_MAJOR_VERSION >= 2 */
 			if (w)
 			{
 				gtk_window_set_transient_for(slot[0], NULL);
-				gdk_window_iconify(w->window);
+				gdk_window_iconify(gtk_widget_get_window(w));
 			}
-			gdk_window_iconify(main_window->window);
+			gdk_window_iconify(gtk_widget_get_window(main_window));
 
 			gdk_flush();
 			handle_events(); 	// Wait for minimize
@@ -9530,7 +9466,7 @@ void cmd_setv(void **slot, void *res, int idx)
 		break;
 	}
 	case op_MENUITEM: case op_MENUCHECK: case op_MENURITEM:
-		gtk_label_set_text(GTK_LABEL(GTK_BIN(slot[0])->child), res);
+		gtk_label_set_text(GTK_LABEL(gtk_bin_get_child(GTK_BIN(slot[0]))), res);
 		break;
 	case op_LABEL: case op_WLABEL: case op_STLABEL:
 		gtk_label_set_text(slot[0], res);
@@ -9549,7 +9485,7 @@ void cmd_setv(void **slot, void *res, int idx)
 		set_path(slot[0], res, idx);
 		break;
 	case op_COMBOENTRY:
-		gtk_entry_set_text(GTK_ENTRY(GTK_COMBO(slot[0])->entry), res);
+		comboentry_set_text(slot[0], res);
 		break;
 	case op_COLOR: case op_TCOLOR:
 	{
@@ -9604,9 +9540,11 @@ void cmd_setv(void **slot, void *res, int idx)
 		if (idx == CANVAS_REPAINT)
 		{
 			if (clip(rxy, v[0], v[1], v[2], v[3], vport))
+			{
 				gtk_widget_queue_draw_area(w,
 					rxy[0] - vport[0], rxy[1] - vport[1],
 					rxy[2] - rxy[0], rxy[3] - rxy[1]);
+			}
 		}
 		else if (idx == CANVAS_PAINT)
 		{
@@ -9632,7 +9570,7 @@ void cmd_setv(void **slot, void *res, int idx)
 		else if (idx == CANVAS_BMOVE_MOUSE)
 		{
 			gint x, y;
-			gdk_window_get_pointer(w->window, &x, &y, NULL);
+			gdk_window_get_pointer(gtk_widget_get_window(w), &x, &y, NULL);
 			if ((x >= 0) && (y >= 0) &&
 				((x += vport[0]) < vport[2]) &&
 				((y += vport[1]) < vport[3]) &&
@@ -9698,7 +9636,7 @@ void cmd_setv(void **slot, void *res, int idx)
 	{
 		copy_den *cp = (void *)slot;
 		char **pp = res;
-		gtk_selection_data_set(cp->data, cp->data->target,
+		gtk_selection_data_set(cp->data, gtk_selection_data_get_target(cp->data),
 			cp->c.format->format ? cp->c.format->format : 8,
 			pp[0], pp[1] - pp[0]);
 		break;
@@ -9706,19 +9644,22 @@ void cmd_setv(void **slot, void *res, int idx)
 	case op_CLIPBOARD:
 		offer_text(slot, res);
 		break;
-#if GTK_MAJOR_VERSION == 2
+#if GTK_MAJOR_VERSION >= 2
 	case op_FONTSEL:
 	{
 		GtkFontSelection *fs = slot[0];
 		fontsel_data *fd = slot[2];
-		int size = fs->size;
 
 		fd->dpi = (int)res;
 		if (!fd->sysdpi) fd->sysdpi = window_dpi(main_window); // Init
 		/* To cause full preview reset */
-		fs->size = 0;
-		gtk_widget_activate(fs->size_entry);
-		fs->size = size;
+		{
+			int size = fs->size;
+
+			fs->size = 0;
+			gtk_widget_activate(fs->size_entry);
+			fs->size = size;
+		}
 		break;
 	}
 #endif
@@ -9727,38 +9668,43 @@ void cmd_setv(void **slot, void *res, int idx)
 
 void cmd_repaint(void **slot)
 {
-	int op = GET_OP(slot);
+	int op = op;
 	if (IS_UNREAL(slot)) return;
+#ifdef U_LISTS_GTK1
+	op = GET_OP(slot);
 	if ((op == op_COLORLIST) || (op == op_COLORLISTN))
 	/* Stupid GTK+ does nothing for gtk_widget_queue_draw(allcol_list) */
 		gtk_container_foreach(GTK_CONTAINER(slot[0]),
 			(GtkCallback)gtk_widget_queue_draw, NULL);
-	else gtk_widget_queue_draw(slot[0]);
+	else
+#endif
+	gtk_widget_queue_draw(slot[0]);
 }
 
 #define SETCUR_KEY "mtPaint.cursor"
 
 static void reset_cursor(GtkWidget *widget, gpointer user_data)
 {
-	gpointer c = gtk_object_get_data_by_id(GTK_OBJECT(widget), (guint)user_data);
-	if (c != (gpointer)(-1)) gdk_window_set_cursor(widget->window, c);
+	gpointer c = gtk_object_get_data_by_id(GTK_OBJECT(widget), (GQuark)user_data);
+	if (c != (gpointer)(-1)) gdk_window_set_cursor(gtk_widget_get_window(widget), c);
 }
 
 void cmd_cursor(void **slot, void **cursor)
 {
-	static guint setcur_key;
+	static GQuark setcur_key;
 	GtkWidget *w = slot[0];
 
 	if (IS_UNREAL(slot)) return;
 	/* Remember cursor for restoring it after realize */
 	if (!setcur_key) setcur_key = g_quark_from_static_string(SETCUR_KEY);
 	if (!gtk_object_get_data_by_id(slot[0], setcur_key))
-		gtk_signal_connect_after(slot[0], "realize",
+		gtk_signal_connect(slot[0], "realize",
 			GTK_SIGNAL_FUNC(reset_cursor), (gpointer)setcur_key);
 	gtk_object_set_data_by_id(slot[0], setcur_key, cursor ? cursor[0] :
 		(gpointer)(-1));
 
-	if (w->window) gdk_window_set_cursor(w->window, cursor ? cursor[0] : NULL);
+	if (gtk_widget_get_window(w)) gdk_window_set_cursor(gtk_widget_get_window(w),
+		cursor ? cursor[0] : NULL);
 }
 
 int cmd_checkv(void **slot, int idx)
@@ -9805,7 +9751,7 @@ int cmd_checkv(void **slot, int idx)
 		{
 			GtkWidget *w = gtk_widget_get_toplevel(slot[0]);
 			if (!GTK_IS_WINDOW(w)) return (FALSE);
-			w = GTK_WINDOW(w)->focus_widget;
+			w = gtk_window_get_focus(GTK_WINDOW(w));
 			return (w && ((w == slot[0]) ||
 				gtk_widget_is_ancestor(w, slot[0])));
 		}

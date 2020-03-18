@@ -22,7 +22,7 @@
 #define XPM_ICON(X) xpm_##X##_xpm
 #define DEF_XPM_ICON(X) extern char *xpm_##X##_xpm[];
 
-#else /* if GTK_MAJOR_VERSION == 2 */
+#else /* if GTK_MAJOR_VERSION >= 2 */
 
 #define XPM_ICON(X) desc_##X##_xpm
 #ifdef DEFINE_ICONS

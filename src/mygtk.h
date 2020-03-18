@@ -40,15 +40,22 @@
 ///	List widgets to use
 
 #if GTK_MAJOR_VERSION == 1
+#undef U_LISTS_GTK1
 #define U_LISTS_GTK1
 
-#else /* GTK_MAJOR_VERSION == 2 */
+#elif GTK_MAJOR_VERSION == 2
 #if GTK2VERSION < 18
+#undef U_LISTS_GTK1
 #define U_LISTS_GTK1
 #endif
+
 #endif
 
 #define gtk_widget_get_parent(A) ((A)->parent)
+#define gtk_widget_get_window(A) ((A)->window)
+#define gdk_device_get_name(A) ((A)->name)
+#define gdk_device_get_n_axes(A) ((A)->num_axes)
+#define gdk_device_get_mode(A) ((A)->mode)
 #define KEY(A) GDK_##A
 
 ///	Icon descriptor type
@@ -58,7 +65,7 @@ typedef void *xpm_icon_desc[2];
 #if GTK_MAJOR_VERSION == 1
 #define XPM_TYPE char**
 
-#else /* if GTK_MAJOR_VERSION == 2 */
+#else /* if GTK_MAJOR_VERSION >= 2 */
 #define XPM_TYPE void**
 #endif
 
@@ -86,6 +93,17 @@ void progress_end();					// Close progress window
 
 int alert_box(char *title, char *message, char *text1, ...);
 
+//	Tablet handling
+
+#if GTK_MAJOR_VERSION == 1
+GdkDeviceInfo *tablet_device;
+#else /* #if GTK_MAJOR_VERSION >= 2 */
+GdkDevice *tablet_device;
+#endif
+void init_tablet();
+void conf_tablet(void **slot);
+void conf_done(void *cause);
+
 // Slider-spin combo (a decorated spinbutton)
 
 GtkWidget *mt_spinslide_new(int swidth, int sheight);
@@ -111,6 +129,7 @@ void spin_set_range(GtkWidget *spin, int min, int max);
 #endif
 
 // Box unpacking macros
+#if GTK_MAJOR_VERSION <= 2
 #define BOX_CHILD_0(box) \
 	(((GtkBoxChild*)GTK_BOX(box)->children->data)->widget)
 #define BOX_CHILD_1(box) \
@@ -119,6 +138,7 @@ void spin_set_range(GtkWidget *spin, int min, int max);
 	(((GtkBoxChild*)GTK_BOX(box)->children->next->next->data)->widget)
 #define BOX_CHILD(box, n) \
 	(((GtkBoxChild *)g_list_nth_data(GTK_BOX(box)->children, (n)))->widget)
+#endif
 
 // Wrapper for utf8->C and C->utf8 translation
 
@@ -195,8 +215,7 @@ int arrow_key_(unsigned key, unsigned state, int *dx, int *dy, int mult);
 
 // Create pixmap cursor
 
-GdkCursor *make_cursor(const char *icon, const char *mask, int w, int h,
-	int tip_x, int tip_y);
+GdkCursor *make_cursor(char *icon, char *mask, int w, int h, int tip_x, int tip_y);
 
 // Menu-like combo box
 
@@ -217,7 +236,7 @@ gpointer toggle_updates(GtkWidget *widget, gpointer unlock);
 #if GTK_MAJOR_VERSION == 1
 int is_maximized(GtkWidget *window);
 void set_maximized(GtkWidget *window);
-#else /* if GTK_MAJOR_VERSION == 2 */
+#elif GTK_MAJOR_VERSION == 2
 #define is_maximized(W) \
 	(!!(gdk_window_get_state((W)->window) & GDK_WINDOW_STATE_MAXIMIZED))
 #define set_maximized(W) gtk_window_maximize(W)
@@ -260,7 +279,7 @@ GtkWidget *xpm_image(XPM_TYPE xpm);
 /* !!! Mask needs be zeroed before the call - especially with GTK+1 :-) */
 #if GTK_MAJOR_VERSION == 1
 #define render_stock_pixmap(X,Y,Z) NULL
-#else
+#elif GTK_MAJOR_VERSION == 2
 GdkPixmap *render_stock_pixmap(GtkWidget *widget, const gchar *stock_id,
 	GdkBitmap **mask);
 #endif
@@ -276,6 +295,7 @@ GtkWidget *wjframe_new();
 // Scrollable canvas widget
 
 GtkWidget *wjcanvas_new();
+void wjcanvas_set_expose(GtkWidget *widget, GtkSignalFunc handler, gpointer user_data);
 void wjcanvas_size(GtkWidget *widget, int width, int height);
 void wjcanvas_get_vport(GtkWidget *widget, int *vport);
 int wjcanvas_scroll_in(GtkWidget *widget, int x, int y);

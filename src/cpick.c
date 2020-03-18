@@ -559,7 +559,7 @@ static void dropper_grab_colour(GtkWidget *widget, gint x, gint y,
 #if GTK_MAJOR_VERSION == 1
 	if (!wj_get_rgb_image((GdkWindow *)&gdk_root_parent, NULL,
 		rgb, x, y, 1, 1)) return;
-#else /* #if GTK_MAJOR_VERSION == 2 */
+#else /* #if GTK_MAJOR_VERSION >= 2 */
 	if (!wj_get_rgb_image(gdk_get_default_root_window(), NULL,
 		rgb, x, y, 1, 1)) return;
 #endif
@@ -584,7 +584,7 @@ static gboolean dropper_key_press(GtkWidget *widget, GdkEventKey *event,
 #if GTK_MAJOR_VERSION == 1
 		gdk_window_get_pointer((GdkWindow *)&gdk_root_parent,
 			&x, &y, NULL);
-#else /* #if GTK_MAJOR_VERSION == 2 */
+#else /* #if GTK_MAJOR_VERSION >= 2 */
 		gdk_display_get_pointer(gtk_widget_get_display(widget),	NULL,
 			&x, &y, NULL);
 #endif
@@ -738,9 +738,9 @@ GtkWidget *hexentry(int c, void **r)
 	GtkWidget *entry = gtk_entry_new();
 
 #if GTK_MAJOR_VERSION == 1
-	gtk_signal_connect_after(GTK_OBJECT(entry),
+	gtk_signal_connect(GTK_OBJECT(entry),
 		"size_request", GTK_SIGNAL_FUNC(hex_size_req), NULL);
-#else /* #if GTK_MAJOR_VERSION == 2 */
+#else /* #if GTK_MAJOR_VERSION >= 2 */
 	gtk_entry_set_width_chars(GTK_ENTRY(entry), 9);
 #endif
 	set_hexentry(entry, c);
@@ -1030,7 +1030,7 @@ GtkWidget *cpick_create(int opacity)
 	GtkWidget *w = gtk_color_selection_new();
 #if GTK_MAJOR_VERSION == 1
 	gtk_color_selection_set_opacity(GTK_COLOR_SELECTION(w), opacity);
-#else /* #if GTK_MAJOR_VERSION == 2 */
+#else /* #if GTK_MAJOR_VERSION >= 2 */
 	gtk_color_selection_set_has_palette(GTK_COLOR_SELECTION(w), TRUE);
 	gtk_color_selection_set_has_opacity_control(GTK_COLOR_SELECTION(w), opacity);
 #endif
@@ -1042,6 +1042,8 @@ void cpick_set_evt(GtkWidget *w, void **r)
 	gtk_signal_connect_object(GTK_OBJECT(w), "color_changed",
 		GTK_SIGNAL_FUNC(do_evt_1_d), (gpointer)r);
 }
+
+#if GTK_MAJOR_VERSION == 1
 
 int cpick_get_colour(GtkWidget *w, int *opacity)
 {
@@ -1059,20 +1061,16 @@ void cpick_set_colour(GtkWidget *w, int rgb, int opacity)
 	gdouble current[4] = { (gdouble)INT_2_R(rgb) / 255.0,
 		(gdouble)INT_2_G(rgb) / 255.0, (gdouble)INT_2_B(rgb) / 255.0,
 		(gdouble)opacity / 255.0 };
-
-#if GTK_MAJOR_VERSION == 1
 	gdouble previous[4];
 
 	// Set current without losing previous
 	memcpy(previous, cs->old_values + 3, sizeof(previous));
 	gtk_color_selection_set_color( cs, previous );
-#endif
 	gtk_color_selection_set_color( cs, current );
 }
 
 void cpick_set_colour_previous(GtkWidget *w, int rgb, int opacity)
 {
-#if GTK_MAJOR_VERSION == 1
 	gdouble current[4], previous[4] = { (gdouble)INT_2_R(rgb) / 255.0,
 		(gdouble)INT_2_G(rgb) / 255.0, (gdouble)INT_2_B(rgb) / 255.0,
 		(gdouble)opacity / 255.0 };
@@ -1082,16 +1080,42 @@ void cpick_set_colour_previous(GtkWidget *w, int rgb, int opacity)
 	memcpy(current, cs->values + 3, sizeof(current));
 	gtk_color_selection_set_color( cs, previous );
 	gtk_color_selection_set_color( cs, current );
-#else /* #if GTK_MAJOR_VERSION == 2 */
+}
+
+#else /* #if GTK_MAJOR_VERSION >= 2 */
+
+int cpick_get_colour(GtkWidget *w, int *opacity)
+{
+	GdkColor c;
+
+	gtk_color_selection_get_current_color(GTK_COLOR_SELECTION(w), &c);
+	if (opacity) *opacity = (gtk_color_selection_get_current_alpha(
+		GTK_COLOR_SELECTION(w)) + 128) / 257;
+	return (RGB_2_INT((c.red + 128) / 257, (c.green + 128) / 257,
+		(c.blue + 128) / 257));
+}
+
+void cpick_set_colour(GtkWidget *w, int rgb, int opacity)
+{
+	GdkColor c;
+
+	c.pixel = 0; c.red = INT_2_R(rgb) * 257; c.green = INT_2_G(rgb) * 257;
+	c.blue = INT_2_B(rgb) * 257;
+	gtk_color_selection_set_current_color(GTK_COLOR_SELECTION(w), &c);
+	gtk_color_selection_set_current_alpha(GTK_COLOR_SELECTION(w), opacity * 257);
+}
+
+void cpick_set_colour_previous(GtkWidget *w, int rgb, int opacity)
+{
 	GdkColor c;
 
 	c.pixel = 0; c.red = INT_2_R(rgb) * 257; c.green = INT_2_G(rgb) * 257;
 	c.blue = INT_2_B(rgb) * 257;
 	gtk_color_selection_set_previous_color(GTK_COLOR_SELECTION(w), &c);
 	gtk_color_selection_set_previous_alpha(GTK_COLOR_SELECTION(w), opacity * 257);
-#endif
 }
 
+#endif
 
 
 #endif		/* GtkColorSelection dialog */

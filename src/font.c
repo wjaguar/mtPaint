@@ -899,7 +899,7 @@ static unsigned char *render_to_1bpp(int *w, int *h)
 #else
 			"ISO-8859-1",	// Non-international verson so it must be this
 #endif
-#else /* if GTK_MAJOR_VERSION == 2 */
+#else /* if GTK_MAJOR_VERSION >= 2 */
 			"UTF-8",
 #endif
 

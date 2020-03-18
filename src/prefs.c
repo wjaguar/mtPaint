@@ -1,5 +1,5 @@
 /*	prefs.c
-	Copyright (C) 2005-2019 Mark Tyler and Dmitry Groshev
+	Copyright (C) 2005-2020 Mark Tyler and Dmitry Groshev
 
 	This file is part of mtPaint.
 
@@ -151,8 +151,8 @@ static void *pref_code[] = {
 	EVENT(DESTROY, prefs_evt),
 	MKSHRINK, // shrinkable
 	BORDER(SCROLL, 0),
-	XSCROLL(1, 1), // auto/auto
 	WANTMAX, // max size
+	XSCROLL(1, 1), // auto/auto
 	BORDER(NBOOK, 0),
 	NBOOKl,
 	BORDER(TABLE, 10),
@@ -211,7 +211,7 @@ static void *pref_code[] = {
 	CHECKb(_("Centre tool settings dialogs"), centre, "centerSettings"),
 	CHECKb(_("New image sets zoom to 100%"), zoom, "zoomToggle"),
 	CHECKv(_("Zoom on cursor position"), cursor_zoom),
-#if GTK_MAJOR_VERSION == 2
+#if GTK_MAJOR_VERSION >= 2
 	CHECKv(_("Mouse Scroll Wheel = Zoom"), scroll_zoom),
 	CHECKv(_("Use menu icons"), show_menu_icons),
 #endif
@@ -513,8 +513,8 @@ static void *keysel_code[] = {
 
 	BORDER(SCROLL, 0), BORDER(BUTTON, 0),
 	XHBOXBS,
-	XSCROLL(1, 2), // auto/always
 	WANTMAXW, // max width
+	XSCROLL(1, 2), // auto/always
 	WLIST,
 	PTXTCOLUMNp(slots, sizeof(char *), 0, 0),
 	PTXTCOLUMNp(keys, sizeof(char *), 0, 0),

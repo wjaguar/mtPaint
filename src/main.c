@@ -1,5 +1,5 @@
 /*	main.c
-	Copyright (C) 2004-2019 Mark Tyler and Dmitry Groshev
+	Copyright (C) 2004-2020 Mark Tyler and Dmitry Groshev
 
 	This file is part of mtPaint.
 
@@ -421,14 +421,14 @@ int main( int argc, char *argv[] )
 #ifdef U_NLS
 	{
 		char *locdir = extend_path(MT_LANG_DEST);
-#if GTK_MAJOR_VERSION == 2
+#if GTK_MAJOR_VERSION >= 2
 		/* !!! GTK+2 starts acting up if this is before gtk_init() - WJ */
 		setup_language();
 #endif
 		bindtextdomain("mtpaint", locdir);
 		g_free(locdir);
 		textdomain("mtpaint");
-#if GTK_MAJOR_VERSION == 2
+#if GTK_MAJOR_VERSION >= 2
 		bind_textdomain_codeset("mtpaint", "UTF-8");
 #endif
 	}
