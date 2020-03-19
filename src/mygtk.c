@@ -37,6 +37,9 @@
 #include <X11/Xlib.h>
 #include <X11/Xatom.h>
 #include <gdk/gdkx.h>
+#if GTK_MAJOR_VERSION == 3
+#include <cairo-xlib.h>
+#endif
 
 #elif defined GDK_WINDOWING_WIN32
 #define WIN32_LEAN_AND_MEAN
@@ -48,7 +51,11 @@ GtkWidget *main_window;
 
 ///	GENERIC WIDGET PRIMITIVES
 
+#if GTK_MAJOR_VERSION == 3
+#define GtkAdjustment_t GtkAdjustment
+#else
 #define GtkAdjustment_t GtkObject
+#endif
 
 static GtkWidget *spin_new_x(GtkAdjustment_t *adj, int fpart);
 
@@ -305,7 +312,14 @@ void init_tablet()
 		break;
 	}
 #else /* #if GTK_MAJOR_VERSION >= 2 */
+#if GTK_MAJOR_VERSION == 3
+G_GNUC_BEGIN_IGNORE_DEPRECATIONS /* Running in a wheel is for hamsters */
+	devs = gdk_device_manager_list_devices(gdk_display_get_device_manager(
+		gdk_display_get_default()), GDK_DEVICE_TYPE_SLAVE);
+G_GNUC_END_IGNORE_DEPRECATIONS
+#else
 	devs = gdk_devices_list();
+#endif
 	for (; devs; devs = devs->next)
 	{
 		GdkDevice *device = devs->data;
@@ -333,6 +347,22 @@ void init_tablet()
 static void **tablet_slot;
 static void *tablet_dlg;
 
+#if GTK_MAJOR_VERSION == 3
+
+#define MAX_AXES 128 /* Unlikely to exist, & too long a list to show this many */
+
+typedef struct {
+	int dev;
+	int mode; // GDK_MODE_DISABLED / GDK_MODE_SCREEN / GDK_MODE_WINDOW
+	int ax[7], ax0[7]; // GDK_AXIS_IGNORE .. GDK_AXIS_WHEEL
+	int lock;
+	char **devnames, **axes;
+	GdkDevice **devices;
+	char *xtra;
+	void **group, **use[7];
+} tablet_dd;
+
+#endif
 
 #if GTK_MAJOR_VERSION == 1
 
@@ -363,6 +393,9 @@ void conf_done(void *cause)
 		GdkDeviceInfo *dev = tablet_find(GTK_INPUT_DIALOG(tablet_dlg)->current_device);
 #elif GTK_MAJOR_VERSION == 2
 		GdkDevice *dev = GTK_INPUT_DIALOG(tablet_dlg)->current_device;
+#else /* #if GTK_MAJOR_VERSION == 3 */
+		tablet_dd *dt = GET_DDATA((void **)tablet_dlg);
+		GdkDevice *dev = dt->devices[dt->dev];
 #endif
 		if (dev && (gdk_device_get_mode(dev) != GDK_MODE_DISABLED))
 		{
@@ -386,14 +419,169 @@ void conf_done(void *cause)
 				tablet_device->axes[i]);
 #elif GTK_MAJOR_VERSION == 2
 				tablet_device->axes[i].use);
+#else /* #if GTK_MAJOR_VERSION == 3 */
+				gdk_device_get_axis_use(tablet_device, i));
 #endif
 		}
 	}
 	inifile_set_gboolean("tablet_USE", !!tablet_device);
 
+#if GTK_MAJOR_VERSION == 3
+	run_destroy(tablet_dlg);
+#else
 	gtk_widget_destroy(tablet_dlg);
+#endif
 	tablet_slot = NULL;
 }
+
+#if GTK_MAJOR_VERSION == 3
+
+static void tablet_changed(tablet_dd *dt, void **wdata, int what, void **where)
+{
+	int i, n, u, u0, axis, *cause = cmd_read(where, dt);
+	GdkDevice *dev = dt->devices[dt->dev];
+	GList *ids, *id;
+
+
+	if (dt->lock) return;
+	dt->lock++;
+
+	/* Select device */
+	if (cause == &dt->dev)
+	{
+		dt->mode = gdk_device_get_mode(dev);
+		memset(dt->ax, 0, sizeof(dt->ax)); // Clear axis use
+		n = gdk_device_get_n_axes(dev);
+		ids = id = gdk_device_list_axes(dev);
+		if (n > MAX_AXES) n = MAX_AXES; // Paranoia
+		for (i = 0; i < n; i++ , id = id->next)
+		{
+			/* Put axis name into list */
+			dt->axes[i + 1] = gdk_atom_name(GDK_POINTER_TO_ATOM(id->data));
+			/* Attach to use or not-use */
+			u = gdk_device_get_axis_use(dev, i);
+			dt->ax[u] = i + 1;
+		}
+		dt->axes[n + 1] = NULL;
+		g_list_free(ids);
+
+		/* Display all that */
+		cmd_reset(dt->group, dt);
+	}
+	/* Change mode */
+	else if (cause == &dt->mode)
+	{
+		if (!gdk_device_set_mode(dev, dt->mode))
+			/* Display actual mode if failed to set */
+			cmd_set(origin_slot(where), gdk_device_get_mode(dev));
+		else /* Report the change */
+		{
+			tablet_device = dt->mode == GDK_MODE_DISABLED ? NULL : dev;
+			cmd_event(tablet_slot, op_EVT_CHANGE);
+		}
+	}
+	/* Change axis use */
+	else
+	{
+		u = cause - dt->ax; // Use
+		axis = dt->ax[u];
+		u0 = axis ? gdk_device_get_axis_use(dev, axis - 1) : 0;
+		if (u0) cmd_set(dt->use[u0], 0); // Steal from other use
+		/* Previous axis, if there was one, becomes unused */
+		if (dt->ax0[u]) gdk_device_set_axis_use(dev, dt->ax0[u] - 1, 0);
+		/* The new one gets new use */
+		gdk_device_set_axis_use(dev, axis - 1, u);
+	}
+
+	memcpy(dt->ax0, dt->ax, sizeof(dt->ax)); // Save current state
+
+	dt->lock--;
+}
+
+#undef _
+#define _(X) X
+
+static char *input_modes[3] = { _("Disabled"), _("Screen"), _("Window") };
+
+#define WBbase tablet_dd
+static void *tablet_code[] = {
+	WINDOW(_("Input")), // nonmodal
+	EVENT(DESTROY, conf_done),
+	MKSHRINK, // shrinkable
+	HBOX,
+	MLABEL(_("Device:")), XOPTDe(devnames, dev, tablet_changed), TRIGGER,
+	REF(group), GROUPR,
+	MLABEL(_("Mode:")), OPTe(input_modes, 3, mode, tablet_changed),
+	WDONE,
+	BORDER(NBOOK, 0),
+	NBOOK,
+	BORDER(TABLE, 10),
+	PAGE(_("Axes")),
+	BORDER(SCROLL, 0),
+	WANTMAX, // max size
+	XSCROLL(1, 1), // auto/auto
+	TABLE2(6),
+	REF(use[1]), TOPTDe(_("X:"), axes, ax[1], tablet_changed),
+	REF(use[2]), TOPTDe(_("Y:"), axes, ax[2], tablet_changed),
+	REF(use[3]), TOPTDe(_("Pressure:"), axes, ax[3], tablet_changed),
+	REF(use[4]), TOPTDe(_("X tilt:"), axes, ax[4], tablet_changed),
+	REF(use[5]), TOPTDe(_("Y tilt:"), axes, ax[5], tablet_changed),
+	REF(use[6]), TOPTDe(_("Wheel:"), axes, ax[6], tablet_changed),
+	WDONE, // table
+	WDONE, // page
+	WDONE, // nbook
+	HBOX,
+	DEFBORDER(BUTTON),
+	OKBTN(_("OK"), conf_done),
+	CLEANUP(xtra),
+	WSHOW
+};
+#undef WBbase
+
+#undef _
+#define _(X) __(X)
+
+void conf_tablet(void **slot)
+{
+	tablet_dd tdata;
+	GList *devs, *d;
+	int n, i;
+
+	if (tablet_slot) return;	// There can be only one
+	tablet_slot = slot;
+
+	memset(&tdata, 0, sizeof(tdata));
+G_GNUC_BEGIN_IGNORE_DEPRECATIONS /* Running in a wheel is for hamsters */
+	devs = gdk_device_manager_list_devices(gdk_display_get_device_manager(
+		gdk_display_get_default()), GDK_DEVICE_TYPE_SLAVE);
+G_GNUC_END_IGNORE_DEPRECATIONS
+	n = g_list_length(devs);
+	tdata.xtra = multialloc(MA_ALIGN_DEFAULT,
+		&tdata.devices, sizeof(GdkDevice *) * n,
+		&tdata.devnames, sizeof(char *) * (n + 1),
+		&tdata.axes, sizeof(char *) * (MAX_AXES + 1),
+		NULL);
+
+	/* Store devices as array */
+	devs = g_list_reverse(devs); // To get GTK+2-like ordering
+	for (i = 0 , d = devs; d; d = d->next)
+	{
+		/* Skip keyboards */
+		if (gdk_device_get_source(d->data) == GDK_SOURCE_KEYBOARD)
+			continue;
+		tdata.devices[i] = d->data;
+		tdata.devnames[i] = (char *)gdk_device_get_name(d->data);
+		i++;
+	}
+	tdata.devnames[i] = NULL;
+	g_list_free(devs);
+
+	tdata.axes[0] = _("none");
+
+	tablet_dlg = run_create(tablet_code, &tdata, sizeof(tdata));
+}
+
+#else
 
 /* Use GtkInputDialog on GTK+1&2 */
 #if GTK_MAJOR_VERSION == 1
@@ -457,16 +645,25 @@ void conf_tablet(void **slot)
 	gtk_widget_show(inputd);
 }
 
+#endif /* GTK+1&2 */
+
 // Slider-spin combo (a decorated spinbutton)
 
 GtkWidget *mt_spinslide_new(int swidth, int sheight)
 {
 	GtkWidget *box, *slider, *spin;
 	GtkAdjustment_t *adj = gtk_adjustment_new(0, 0, 1, 1, 10, 0);
+#if GTK_MAJOR_VERSION == 3
+	box = gtk_box_new(GTK_ORIENTATION_HORIZONTAL, 0);
+
+	slider = gtk_scale_new(GTK_ORIENTATION_HORIZONTAL, GTK_ADJUSTMENT(adj));
+	gtk_widget_set_size_request(slider, swidth, sheight);
+#else
 	box = gtk_hbox_new(FALSE, 0);
 
 	slider = gtk_hscale_new(GTK_ADJUSTMENT(adj));
 	gtk_widget_set_usize(slider, swidth, sheight);
+#endif
 	gtk_box_pack_start(GTK_BOX(box), slider, swidth < 0, TRUE, 0);
 	gtk_scale_set_draw_value(GTK_SCALE(slider), FALSE);
 	gtk_scale_set_digits(GTK_SCALE(slider), 0);
@@ -478,6 +675,187 @@ GtkWidget *mt_spinslide_new(int swidth, int sheight)
 	return (spin);
 }
 
+// GTK+3 specific support code
+
+#if GTK_MAJOR_VERSION == 3
+
+void cairo_surface_fdestroy(cairo_surface_t *s)
+{
+	cairo_surface_flush(s); // In case it's actually needed
+	cairo_surface_destroy(s);
+}
+
+cairo_surface_t *cairo_upload_rgb(cairo_surface_t *ref, GdkWindow *win,
+	unsigned char *src, int w, int h, int len)
+{
+	cairo_surface_t *s;
+	unsigned char *dst0;
+	int i, n, st;
+
+	if (ref) s = cairo_surface_create_similar_image(ref, CAIRO_FORMAT_RGB24, w, h);
+	else s = gdk_window_create_similar_image_surface(win, CAIRO_FORMAT_RGB24, w, h, 1);
+// !!! See below CAIRO_FORMAT_ARGB32 // !!! But not for exported pixmap
+	cairo_surface_flush(s);
+	dst0 = cairo_image_surface_get_data(s);
+	st = cairo_image_surface_get_stride(s);
+	len -= w * 3;
+	for (i = h; i-- > 0; dst0 += st , src += len)
+	{
+		guint32 *dest = (void *)dst0;
+		for (n = w; n-- > 0; src += 3) *dest++ = MEM_2_INT(src, 0);
+// !!! Maybe need to upconvert to ARGB (by OR 0xFF000000U), at least for Windows:
+// see Cairo win32/cairo-win32-display-surface.c
+//		for (n = w; n-- > 0; src += 3) *dest++ = MEM_2_INT(src, 0) | 0xFF000000U;
+	}
+	cairo_surface_mark_dirty(s);
+	return (s);
+}
+
+void cairo_set_rgb(cairo_t *cr, int c)
+{
+	cairo_set_source_rgb(cr, INT_2_R(c) / 255.0, INT_2_G(c) / 255.0,
+		INT_2_B(c) / 255.0);
+}
+
+void css_restyle(GtkWidget *w, char *css, char *class, char *name)
+{
+	static GData *d;
+	static int dset;
+	GQuark q = g_quark_from_string(css);
+	GtkCssProvider *p;
+	GtkStyleContext *c;
+
+	if (!dset) g_datalist_init(&d); // First time
+	dset = TRUE;
+	p = g_datalist_id_get_data(&d, q);
+	if (!p)
+	{
+		p = gtk_css_provider_new();
+		gtk_css_provider_load_from_data(p, css, -1, NULL);
+		g_datalist_id_set_data(&d, q, p);
+	}
+	c = gtk_widget_get_style_context(w);
+	gtk_style_context_add_provider(c, GTK_STYLE_PROVIDER(p),
+		GTK_STYLE_PROVIDER_PRIORITY_USER);
+	if (class) gtk_style_context_add_class(c, class);
+	if (name) g_object_set(w, "name", name, NULL);
+}
+
+void add_css_class(GtkWidget *w, char *class)
+{
+	gtk_style_context_add_class(gtk_widget_get_style_context(w), class);
+}
+
+/* Add CSS, builtin and user-provided, to default screen */
+void init_css(char *cssfile)
+{
+	GdkScreen *scr = gdk_display_get_default_screen(gdk_display_get_default());
+	GtkCssProvider *p;
+	GtkIconTheme *theme;
+	char *s, *cp = NULL;
+
+	/* GTK+ 3.20 switched from classes to "CSS nodes", and added "min-width" &
+	 * "min-height" style properties, themed to some crazy values - WJ */
+	if (gtk3version >= 20) // Make entries same height as buttons
+	{
+		GtkWidget *btn = gtk_button_new();
+		GtkStyleContext *ctx = gtk_widget_get_style_context(btn);
+		gint n;
+
+		gtk_style_context_get(ctx, gtk_style_context_get_state(ctx),
+			"min-height", &n, NULL);
+		cp = g_strdup_printf("spinbutton, entry { min-height:%dpx; }", n);
+		g_object_ref_sink(btn);
+		g_object_unref(btn);
+	}
+	s = g_strconcat((gtk3version < 20 ? ".spinbutton *" : "spinbutton button"),
+		" { padding:0; }"
+		".image-button { padding:4px; }"
+		".wjpixmap { padding:4px; outline-offset:-1px; }"
+		".mtPaint_gradbar_button { padding:4px; }",
+		(gtk3version < 20 ? "" :
+		".mtPaint_gradbar_button { min-width:0; min-height:0; }"),
+		cp, NULL);
+	p = gtk_css_provider_new();
+	gtk_css_provider_load_from_data(p, s, -1, NULL);
+	gtk_style_context_add_provider_for_screen(scr, GTK_STYLE_PROVIDER(p),
+		GTK_STYLE_PROVIDER_PRIORITY_USER);
+	g_free(s);
+	g_free(cp);
+
+	if (!cssfile || !cssfile[0]) return;
+
+	/* Load user-provided CSS */
+	p = gtk_css_provider_new();
+	gtk_css_provider_load_from_path(p, cssfile, NULL);
+	gtk_style_context_add_provider_for_screen(scr, GTK_STYLE_PROVIDER(p),
+		GTK_STYLE_PROVIDER_PRIORITY_USER + 100);
+
+	/* Make the directory with it the first search dir for icons */
+	s = resolve_path(NULL, 0, cssfile);
+	cp = strrchr(s, DIR_SEP);
+	theme = gtk_icon_theme_get_for_screen(scr);
+	if (cp && theme) // Paranoia
+	{
+		*cp = '\0'; // Cut off filename
+		gtk_icon_theme_prepend_search_path(theme, s);
+	}
+	free(s);
+}
+
+static void combobox_scan(GtkWidget *widget, gpointer data)
+{
+	GtkWidget **scan = data;
+	if (GTK_IS_BOX(widget)) scan[1] = widget;
+	else if (GTK_IS_BUTTON(widget)) scan[0] = widget;
+}
+
+/* Find button widget of a GtkComboBox with entry */
+GtkWidget *combobox_button(GtkWidget *cbox)
+{
+	GtkWidget *scan[2] = { NULL, NULL };
+	gtk_container_forall(GTK_CONTAINER(cbox), combobox_scan, scan);
+	if (!scan[0] && scan[1]) // Structure changed after 3.18
+		gtk_container_forall(GTK_CONTAINER(scan[1]), combobox_scan, scan);
+	return (scan[0]);
+}
+
+static GQuark radio_key;
+
+/* Properties for GtkScrollable */
+static char *scroll_pnames[] = { NULL, "hadjustment", "vadjustment",
+	"hscroll-policy", "vscroll-policy" };
+enum {
+	P_HADJ = 1,
+	P_VADJ,
+	P_HSCP,
+	P_VSCP
+};
+
+static void get_padding_and_border(GtkStyleContext *ctx, GtkBorder *pad,
+	GtkBorder *bor, GtkBorder *both)
+{
+	GtkStateFlags state = gtk_style_context_get_state(ctx);
+	GtkBorder tmp;
+
+	if (both)
+	{
+		if (!pad) pad = &tmp;
+		if (!bor) bor = both;
+	}
+	if (pad) gtk_style_context_get_padding(ctx, state, pad); // ~ xthickness
+	if (bor) gtk_style_context_get_border(ctx, state, bor);
+	if (both)
+	{
+		both->left = pad->left + bor->left;
+		both->right = pad->right + bor->right;
+		both->top = pad->top + bor->top;
+		both->bottom = pad->bottom + bor->bottom;
+	}
+}
+
+#endif
+
 // Managing batches of radio buttons with minimum of fuss
 
 /* void handler(GtkWidget *btn, gpointer user_data); */
@@ -487,18 +865,32 @@ GtkWidget *wj_radio_pack(char **names, int cnt, int vnum, int idx, void **r,
 	int i, j, x;
 	GtkWidget *table, *button = NULL;
 
+#if GTK_MAJOR_VERSION == 3
+	radio_key = g_quark_from_static_string("mtPaint.radio");
+	table = gtk_grid_new();
+	gtk_widget_set_hexpand(table, FALSE); // No "inheriting" it from buttons
+#else
 	table = gtk_table_new(1, 1, FALSE);
+#endif
 	for (i = j = x = 0; (i != cnt) && names[i]; i++)
 	{
 		if (!names[i][0]) continue;
 		button = gtk_radio_button_new_with_label_from_widget(
 			GTK_RADIO_BUTTON_0(button), __(names[i]));
 		if (vnum > 0) x = j / vnum;
+#if GTK_MAJOR_VERSION == 3
+		g_object_set_qdata(G_OBJECT(button), radio_key, (gpointer)i);
+		/* Adjusted to account for GTK+3 adding more padding */
+		gtk_container_set_border_width(GTK_CONTAINER(button), 2);
+		gtk_grid_attach(GTK_GRID(table), button, x, j - x * vnum, 1, 1);
+		if (vnum != 1) gtk_widget_set_hexpand(button, TRUE);
+#else
 		gtk_object_set_user_data(GTK_OBJECT(button), (gpointer)i);
 		gtk_container_set_border_width(GTK_CONTAINER(button), 5);
 		gtk_table_attach(GTK_TABLE(table), button, x, x + 1,
 			j - x * vnum, j - x * vnum + 1,
 			vnum != 1 ? GTK_EXPAND | GTK_FILL : GTK_FILL, 0, 0, 0);
+#endif
 		if (i == idx) gtk_toggle_button_set_active(
 			GTK_TOGGLE_BUTTON(button), TRUE);
 		if (handler) gtk_signal_connect(GTK_OBJECT(button), "toggled",
@@ -509,6 +901,26 @@ GtkWidget *wj_radio_pack(char **names, int cnt, int vnum, int idx, void **r,
 
 	return (table);
 }
+
+#if GTK_MAJOR_VERSION == 3
+
+int wj_radio_pack_get_active(GtkWidget *widget)
+{
+	GList *curr, *ch = gtk_container_get_children(GTK_CONTAINER(widget));
+	int res = 0;
+
+	for (curr = ch; curr; curr = curr->next)
+	{
+		widget = curr->data;
+		if (!gtk_toggle_button_get_active(GTK_TOGGLE_BUTTON(widget))) continue;
+		res = (int)g_object_get_qdata(G_OBJECT(widget), radio_key);
+		break;
+	}
+	g_list_free(ch);
+	return (res);
+}
+
+#else
 
 int wj_radio_pack_get_active(GtkWidget *widget)
 {
@@ -523,6 +935,8 @@ int wj_radio_pack_get_active(GtkWidget *widget)
 	return (0);
 }
 
+#endif
+
 // Easier way with spinbuttons
 
 int read_spin(GtkWidget *spin)
@@ -536,7 +950,11 @@ double read_float_spin(GtkWidget *spin)
 {
 	/* Needed in GTK+2 for late changes */
 	gtk_spin_button_update(GTK_SPIN_BUTTON(spin));
+#if GTK_MAJOR_VERSION == 3
+	return (gtk_spin_button_get_value(GTK_SPIN_BUTTON(spin)));
+#else
 	return (GTK_SPIN_BUTTON(spin)->adjustment->value);
+#endif
 }
 
 #if (GTK_MAJOR_VERSION == 1) && !defined(U_MTK)
@@ -733,6 +1151,41 @@ GtkWidget *widget_align_minsize(GtkWidget *widget, int width, int height)
 
 // Make widget request no less size than before (in one direction)
 
+#if GTK_MAJOR_VERSION == 3
+
+static void widget_size_keep(GtkWidget *widget, GtkAllocation *alloc,
+	gpointer user_data)
+{
+	gint w, h, w0, h0;
+
+	gtk_widget_get_size_request(widget, &w0, &h0);
+	if (user_data) // Adjust height if set, width if clear
+	{
+		gtk_widget_get_preferred_height(widget, &h, NULL);
+		h -= gtk_widget_get_margin_top(widget) +
+			gtk_widget_get_margin_bottom(widget);
+		if (h0 >= h) return;
+		h0 = h;
+	}
+	else
+	{
+		gtk_widget_get_preferred_width(widget, &w, NULL);
+		w -= gtk_widget_get_margin_start(widget) +
+			gtk_widget_get_margin_end(widget);
+		if (w0 >= w) return;
+		w0 = w;
+	}
+	gtk_widget_set_size_request(widget, w0, h0);
+}
+
+void widget_set_keepsize(GtkWidget *widget, int keep_height)
+{
+	g_signal_connect(widget, "size_allocate",
+		G_CALLBACK(widget_size_keep), (gpointer)keep_height);
+}
+
+#else /* #if GTK_MAJOR_VERSION <= 2 */
+
 #define KEEPSIZE_KEY "mtPaint.keepsize"
 
 static GQuark keepsize_key;
@@ -763,6 +1216,8 @@ void widget_set_keepsize(GtkWidget *widget, int keep_height)
 	gtk_signal_connect(GTK_OBJECT(widget), "size_request",
 		GTK_SIGNAL_FUNC(widget_size_keep), (gpointer)keep_height);
 }
+
+#endif
 
 // Workaround for GtkCList reordering bug
 
@@ -819,7 +1274,11 @@ GtkWidget *pack_end(GtkWidget *box, GtkWidget *widget)
 
 GtkWidget *add_vbox(GtkWidget *cont)
 {
+#if GTK_MAJOR_VERSION == 3
+	GtkWidget *box = gtk_box_new(GTK_ORIENTATION_VERTICAL, 0);
+#else
 	GtkWidget *box = gtk_vbox_new(FALSE, 0);
+#endif
 	gtk_widget_show(box);
 	gtk_container_add(GTK_CONTAINER(cont), box);
 	return (box);
@@ -1033,11 +1492,66 @@ void gtk_init_bugfixes()
 #endif
 }
 
+#else /* if GTK_MAJOR_VERSION == 3 */
+
+#if defined GDK_WINDOWING_WIN32
+#error "GTK+3/Win32 not supported yet"
 #endif
+
+int gtk3version;
+
+void gtk_init_bugfixes()
+{
+	GtkContainerClass *c;
+	GtkBindingSet *bs;
+
+	gtk3version = gtk_get_minor_version();
+
+	if (gtk3version < 20)
+	{
+		/* Fix counting border width twice */
+		c = g_type_class_ref(GTK_TYPE_RADIO_BUTTON);
+		c->_handle_border_width = 0;
+		c = g_type_class_ref(GTK_TYPE_CHECK_BUTTON);
+		c->_handle_border_width = 0;
+/* !!! The wrong idea is introduced at GTK_CHECK_BUTTON level; descendants of
+ * GTK_BUTTON should let gtk_container_class_handle_border_width() do its thing,
+ * not add gtk_container_get_border_width() to size by themselves. */
+	}
+
+	/* Remove crazier keybindings from GtkTreeView */
+	bs = gtk_binding_set_by_class(g_type_class_ref(GTK_TYPE_TREE_VIEW));
+	gtk_binding_entry_remove(bs, KEY(space), 0); // Activate
+	gtk_binding_entry_remove(bs, KEY(KP_Space), 0);
+	gtk_binding_entry_remove(bs, KEY(f), GDK_CONTROL_MASK); // Search
+	gtk_binding_entry_remove(bs, KEY(F), GDK_CONTROL_MASK);
+}
+
+#endif /* GTK+3 */
 
 // Whatever is needed to move mouse pointer 
 
-#if (GTK_MAJOR_VERSION == 1) || defined GDK_WINDOWING_X11 /* Call X */
+#if GTK_MAJOR_VERSION == 3
+
+int move_mouse_relative(int dx, int dy)
+{
+	gint x0, y0;
+	GdkScreen *screen;
+	GdkDisplay *dp = gtk_widget_get_display(main_window);
+	GdkDevice *dev;
+
+	/* I'm totally sick and tired of this "deprecation" game. Deprecate them
+	 * players and the scooter they rode in on - WJ */
+G_GNUC_BEGIN_IGNORE_DEPRECATIONS
+	dev = gdk_device_manager_get_client_pointer(gdk_display_get_device_manager(dp));
+G_GNUC_END_IGNORE_DEPRECATIONS
+
+	gdk_device_get_position(dev, &screen, &x0, &y0);
+	gdk_device_warp(dev, screen, x0 + dx, y0 + dy);
+	return (TRUE);
+}
+
+#elif (GTK_MAJOR_VERSION == 1) || defined GDK_WINDOWING_X11 /* Call X */
 
 int move_mouse_relative(int dx, int dy)
 {
@@ -1210,6 +1724,43 @@ int arrow_key_(unsigned key, unsigned state, int *dx, int *dy, int mult)
 
 // Create pixmap cursor
 
+#if GTK_MAJOR_VERSION == 3
+
+/* Assemble two XBMs into one BW ARGB32 surface */
+static cairo_surface_t *xbms_to_surface(unsigned char *image, unsigned char *mask,
+	int w, int h)
+{
+	cairo_surface_t *s = cairo_image_surface_create(CAIRO_FORMAT_ARGB32, w, h);
+	unsigned char *dst0 = cairo_image_surface_get_data(s);
+	int st = cairo_image_surface_get_stride(s);
+	unsigned int b = 0;
+
+	cairo_surface_flush(s);
+	while (h-- > 0)
+	{
+		guint32 *dest = (void *)dst0;
+		int n;
+
+		for (n = w; n-- > 0; b++)
+			*dest++ = ((image[b >> 3] >> (b & 7)) & 1) * 0x00FFFFFFU +
+				((mask[b >> 3] >> (b & 7)) & 1) * 0xFF000000U;
+		dst0 += st; b += (~b + 1) & 7;
+	}
+	cairo_surface_mark_dirty(s);
+	return (s);
+}
+
+GdkCursor *make_cursor(char *icon, char *mask, int w, int h, int tip_x, int tip_y)
+{
+	cairo_surface_t *s = xbms_to_surface(icon, mask, w, h);
+	GdkCursor *cursor = gdk_cursor_new_from_surface(
+		gtk_widget_get_display(main_window), s, tip_x, tip_y);
+	cairo_surface_fdestroy(s);
+	return (cursor);
+}
+
+#else /* GTK_MAJOR_VERSION <= 2 */
+
 GdkCursor *make_cursor(char *icon, char *mask, int w, int h, int tip_x, int tip_y)
 {
 	static GdkColor cfg = { -1, -1, -1, -1 }, cbg = { 0, 0, 0, 0 };
@@ -1224,10 +1775,58 @@ GdkCursor *make_cursor(char *icon, char *mask, int w, int h, int tip_x, int tip_
 	return (cursor);
 }
 
+#endif
+
 // Menu-like combo box
 
+#if GTK_MAJOR_VERSION == 3
+
+/* Making GtkComboBox behave is quite nontrivial, here */
+
+static gboolean wj_combo_click(GtkWidget *widget, GdkEventButton *event,
+	gpointer user_data)
+{
+	if (user_data)
+		gtk_toggle_button_set_active(GTK_TOGGLE_BUTTON(user_data), TRUE);
+	return (TRUE);
+}
+
+/* void handler(GtkWidget *combo, gpointer user_data); */
+GtkWidget *wj_combo_box(char **names, int cnt, int u, int idx, void **r,
+	GCallback handler)
+{
+	GtkWidget *cbox, *entry, *button;
+	int i;
+
+	if (idx >= cnt) idx = 0;
+	cbox = gtk_combo_box_text_new_with_entry();
+	/* Find the button */
+	button = combobox_button(cbox);
+
+	/* Make the entry a dumb display */
+	entry = gtk_bin_get_child(GTK_BIN(cbox));
+	g_object_set(entry, "editable", FALSE, NULL);
+	gtk_widget_set_can_focus(entry, FALSE);
+	/* Make click on entry do popup too */
+	g_signal_connect(entry, "button_press_event", G_CALLBACK(wj_combo_click), NULL);
+	g_signal_connect(entry, "button_release_event", G_CALLBACK(wj_combo_click), button);
+
+	for (i = 0; i < cnt; i++)
+		gtk_combo_box_text_append_text(GTK_COMBO_BOX_TEXT(cbox), __(names[i]));
+	gtk_combo_box_set_active(GTK_COMBO_BOX(cbox), idx);
+	if (handler) g_signal_connect(G_OBJECT(cbox), "changed",
+		handler, r);
+
+	return (cbox);
+}
+
+int wj_combo_box_get_history(GtkWidget *combobox)
+{
+	return (gtk_combo_box_get_active(GTK_COMBO_BOX(combobox)));
+}
+
 /* Use GtkComboBox when available */
-#if GTK2VERSION >= 4 /* GTK+ 2.4+ */
+#elif GTK2VERSION >= 4 /* GTK+ 2.4+ */
 
 /* Tweak style settings for combo box */
 static void wj_combo_restyle(GtkWidget *cbox)
@@ -1370,7 +1969,118 @@ int wj_combo_box_get_history(GtkWidget *combobox)
 
 #endif
 
-#if GTK_MAJOR_VERSION <= 2
+#if GTK_MAJOR_VERSION == 3
+
+// Bin widget with customizable size handling
+
+/* The only way to intercept size requests in GTK+3 is a wrapper widget. This is
+ * such a widget, with installable handlers */
+
+#define WJSIZEBIN(obj)		G_TYPE_CHECK_INSTANCE_CAST(obj, wjsizebin_get_type(), wjsizebin)
+#define IS_WJSIZEBIN(obj)	G_TYPE_CHECK_INSTANCE_TYPE(obj, wjsizebin_get_type())
+
+typedef void (*size_alloc_f)(GtkWidget *widget, GtkAllocation *allocation,
+	gpointer user_data);
+typedef void (*get_size_f)(GtkWidget *widget, gint vert, gint *min, gint *nat,
+	gint for_width, gpointer user_data);
+
+typedef struct
+{
+	GtkBin		bin;		// Parent class
+	size_alloc_f	size_alloc;	// Allocate child
+	get_size_f	get_size;	// Modify requested size
+	gpointer	udata;
+} wjsizebin;
+
+typedef struct
+{
+	GtkBinClass parent_class;
+} wjsizebinClass;
+
+G_DEFINE_TYPE(wjsizebin, wjsizebin, GTK_TYPE_BIN)
+
+static void wjsizebin_size_allocate(GtkWidget *widget, GtkAllocation *allocation)
+{
+	wjsizebin *sbin = WJSIZEBIN(widget);
+	GtkWidget *child = gtk_bin_get_child(GTK_BIN(widget));
+
+	gtk_widget_set_allocation(widget, allocation);
+	if (!child || !gtk_widget_get_visible(child)) return;
+	/* Call handler if installed, do default thing if not */
+	if (sbin->size_alloc) sbin->size_alloc(child, allocation, sbin->udata);
+	else gtk_widget_size_allocate(child, allocation);
+}
+
+static void wjsizebin_get_size(GtkWidget *widget, gint vert, gint *min, gint *nat,
+	gint for_width)
+{
+	wjsizebin *sbin = WJSIZEBIN(widget);
+	GtkWidget *child = gtk_bin_get_child(GTK_BIN(widget));
+
+	/* Preset the size */
+	*min = *nat = 0; // Default
+	if (!child || !gtk_widget_get_visible(child)); // Invisible doesn't matter
+	else if (for_width >= 0)
+		gtk_widget_get_preferred_height_for_width(child, for_width, min, nat);
+	else (vert ? gtk_widget_get_preferred_height :
+		gtk_widget_get_preferred_width)(child, min, nat);
+	/* Let handler modify it */
+	if (sbin->get_size)
+		sbin->get_size(child, vert, min, nat, for_width, sbin->udata);
+}
+
+static void wjsizebin_get_preferred_width(GtkWidget *widget, gint *min, gint *nat)
+{
+	wjsizebin_get_size(widget, FALSE, min, nat, -1);
+}
+
+static void wjsizebin_get_preferred_height(GtkWidget *widget, gint *min, gint *nat)
+{
+	wjsizebin_get_size(widget, TRUE, min, nat, -1);
+}
+
+static void wjsizebin_get_preferred_width_for_height(GtkWidget *widget, gint h,
+	 gint *min, gint *nat)
+{
+	wjsizebin_get_size(widget, FALSE, min, nat, -1);
+}
+
+/* Specialcase only height-for-width, same as GtkFrame does */
+static void wjsizebin_get_preferred_height_for_width(GtkWidget *widget, gint w,
+	 gint *min, gint *nat)
+{
+	wjsizebin_get_size(widget, TRUE, min, nat, w);
+}
+
+static void wjsizebin_class_init(wjsizebinClass *class)
+{
+	GtkWidgetClass *wclass = GTK_WIDGET_CLASS(class);
+
+	wclass->size_allocate = wjsizebin_size_allocate;
+	wclass->get_preferred_width = wjsizebin_get_preferred_width;
+	wclass->get_preferred_height = wjsizebin_get_preferred_height;
+	wclass->get_preferred_width_for_height = wjsizebin_get_preferred_width_for_height;
+	wclass->get_preferred_height_for_width = wjsizebin_get_preferred_height_for_width;
+	/* !!! Leave my bin alone */
+	wclass->style_updated = NULL;
+}
+
+static void wjsizebin_init(wjsizebin *sbin)
+{
+	gtk_widget_set_has_window(GTK_WIDGET(sbin), FALSE);
+}
+
+GtkWidget *wjsizebin_new(GCallback get_size, GCallback size_alloc, gpointer user_data)
+{
+	GtkWidget *w = g_object_new(wjsizebin_get_type(), NULL);
+	wjsizebin *sbin = WJSIZEBIN(w);
+	sbin->get_size = (get_size_f)get_size;
+	sbin->size_alloc = (size_alloc_f)size_alloc;
+	sbin->udata = user_data;
+	return (w);
+}
+
+#else /* #if GTK_MAJOR_VERSION <= 2 */
 
 // Box widget with customizable size handling
 
@@ -1681,6 +2391,52 @@ unsigned char *wj_get_rgb_image(GdkWindow *window, GdkPixmap *pixmap,
 	return (NULL);
 }
 
+#else /* if GTK_MAJOR_VERSION == 3 */
+
+unsigned char *wj_get_rgb_image(GdkWindow *window, cairo_surface_t *s,
+	unsigned char *buf, int x, int y, int width, int height)
+{
+	GdkPixbuf *pix;
+
+	if (s) pix = gdk_pixbuf_get_from_surface(s, x, y, width, height);
+	else pix = gdk_pixbuf_get_from_window(window, x, y, width, height);
+	if (!pix) return (NULL);
+
+	if (!buf) buf = calloc(1, width * height * 3);
+	if (buf) /* Copy data to 3bpp continuous buffer */
+	{
+		unsigned char *dest, *src;
+		int x, y, d, ww, wh, nc, stride;
+
+		ww = gdk_pixbuf_get_width(pix);
+		wh = gdk_pixbuf_get_height(pix);
+		nc = gdk_pixbuf_get_n_channels(pix);
+		stride = gdk_pixbuf_get_rowstride(pix);
+
+		/* If result is somehow larger (scaling?), clip it */
+		if (ww > width) ww = width;
+		if (wh > height) wh = height;
+		src = gdk_pixbuf_get_pixels(pix);
+		dest = buf;
+		stride -= nc * ww;
+		d = (width - ww) * 3;
+		for (y = 0; y < wh; y++)
+		{
+			for (x = 0; x < ww; x++)
+			{
+				*dest++= src[0];
+				*dest++= src[1];
+				*dest++= src[2];
+				src += nc;
+			}
+			src += stride;
+			dest += d;
+		}
+	}
+	g_object_unref(pix);
+	return (buf);
+}
+
 #endif
 
 // Clipboard
@@ -1724,6 +2480,59 @@ typedef char Mismatched_XID_type[2 * (sizeof(Pixmap) == sizeof(XID_type)) - 1];
  * thing Qt does, destroying the next-to-last allocated pixmap each time a new
  * one is allocated - WJ */
 
+#if GTK_MAJOR_VERSION == 3
+
+int export_pixmap(pixmap_info *p, int w, int h)
+{
+	static cairo_surface_t *exported[2];
+	cairo_surface_t *s = gdk_window_create_similar_surface(
+		gtk_widget_get_window(main_window), CAIRO_CONTENT_COLOR, w, h);
+
+	if (cairo_surface_get_type(s) != CAIRO_SURFACE_TYPE_XLIB)
+	{
+		cairo_surface_destroy(s);
+		return (FALSE);
+	}
+	if (exported[0])
+	{
+		if (exported[1])
+		{
+			/* Someone might have destroyed the X pixmap already,
+			 * so get ready to live through an X error */
+			GdkDisplay *d = gtk_widget_get_display(main_window);
+			gdk_x11_display_error_trap_push(d);
+			cairo_surface_destroy(exported[1]);
+			gdk_x11_display_error_trap_pop_ignored(d);
+		}
+		exported[1] = exported[0];
+	}
+	exported[0] = p->pm = s;
+	p->w = w;
+	p->h = h;
+	p->depth = -1;
+	p->xid = cairo_xlib_surface_get_drawable(s);
+	
+	return (TRUE);
+}
+
+void pixmap_put_rows(pixmap_info *p, unsigned char *src, int y, int cnt)
+{
+	cairo_surface_t *s;
+	cairo_t *cr;
+
+	s = cairo_upload_rgb(p->pm, NULL, src, p->w, cnt, p->w * 3);
+	cr = cairo_create(p->pm);
+	cairo_set_operator(cr, CAIRO_OPERATOR_SOURCE);
+	cairo_set_source_surface(cr, s, 0, y);
+	cairo_rectangle(cr, 0, y, p->w, cnt);
+	cairo_fill(cr);
+	cairo_destroy(cr);
+
+	cairo_surface_fdestroy(s);
+}
+
+#else /* if GTK_MAJOR_VERSION <= 2 */
+
 int export_pixmap(pixmap_info *p, int w, int h)
 {
 	static GdkPixmap *exported[2];
@@ -1757,6 +2566,8 @@ void pixmap_put_rows(pixmap_info *p, unsigned char *src, int y, int cnt)
 		0, y, p->w, cnt, GDK_RGB_DITHER_NONE, src, p->w * 3);
 }
 
+#endif
+
 #endif /* HAVE_PIXMAPS */
 
 int import_pixmap(pixmap_info *p, XID_type *xid)
@@ -1765,7 +2576,33 @@ int import_pixmap(pixmap_info *p, XID_type *xid)
 	{
 /* This ugly code imports X Window System's pixmaps; this allows mtPaint to
  * receive images from programs such as XPaint */
-#if (GTK_MAJOR_VERSION == 1) || defined GDK_WINDOWING_X11
+#if (GTK_MAJOR_VERSION == 3) && defined GDK_WINDOWING_X11
+		cairo_surface_t *s;
+		GdkDisplay *d = gtk_widget_get_display(main_window);
+		Display *disp = GDK_DISPLAY_XDISPLAY(d);
+		XWindowAttributes attr;
+		Window root;
+		unsigned int x, y, w, h, bor, depth;
+		int res;
+
+		gdk_x11_display_error_trap_push(d); // No guarantee that we got a valid pixmap
+		res = XGetGeometry(disp, *xid, &root, &x, &y, &w, &h, &bor, &depth);
+		if (res) res = XGetWindowAttributes(disp, root, &attr);
+		gdk_x11_display_error_trap_pop_ignored(d);
+		if (!res) return (FALSE);
+
+		s = cairo_xlib_surface_create(disp, *xid, attr.visual, w, h);
+		if (cairo_surface_get_type(s) == CAIRO_SURFACE_TYPE_XLIB)
+		{
+			p->xid = *xid;
+			p->pm = s;
+			p->w = w;
+			p->h = h;
+			p->depth = depth;
+			return (TRUE);
+		}
+		cairo_surface_destroy(s);
+#elif (GTK_MAJOR_VERSION == 1) || defined GDK_WINDOWING_X11
 		int w, h, d, dd;
 
 		gdk_error_trap_push(); // No guarantee that we got a valid pixmap
@@ -1804,7 +2641,10 @@ int import_pixmap(pixmap_info *p, XID_type *xid)
 
 void drop_pixmap(pixmap_info *p)
 {
-#if (GTK_MAJOR_VERSION == 1) || defined GDK_WINDOWING_X11
+#if (GTK_MAJOR_VERSION == 3) && defined GDK_WINDOWING_X11
+	if (!p->pm) return;
+	cairo_surface_destroy(p->pm);
+#elif (GTK_MAJOR_VERSION == 1) || defined GDK_WINDOWING_X11
 	if (!p->pm) return;
 #if GTK_MAJOR_VERSION == 1
 	/* Don't let gdk_pixmap_unref() destroy another process's pixmap -
@@ -1831,7 +2671,24 @@ int pixmap_get_rows(pixmap_info *p, unsigned char *dest, int y, int cnt)
 
 // Render stock icons to pixmaps
 
-#if GTK_MAJOR_VERSION == 2
+#if GTK_MAJOR_VERSION == 3
+
+/* Actually loads a named icon, not stock */
+static GdkPixbuf *render_stock_pixbuf(GtkWidget *widget, const gchar *stock_id)
+{
+	GtkIconTheme *theme;
+	gint w, h;
+
+// !!! The theme need be modifiable by theme file loaded from prefs
+	theme = gtk_icon_theme_get_for_screen(gtk_style_context_get_screen(
+		gtk_widget_get_style_context(widget)));
+	if (!theme) return (NULL); // Paranoia
+	gtk_icon_size_lookup(GTK_ICON_SIZE_SMALL_TOOLBAR, &w, &h);
+	return (gtk_icon_theme_load_icon(theme, stock_id, (w < h ? w : h),
+		GTK_ICON_LOOKUP_USE_BUILTIN, NULL));
+}
+
+#elif GTK_MAJOR_VERSION == 2
 
 static GdkPixbuf *render_stock_pixbuf(GtkWidget *widget, const gchar *stock_id)
 {
@@ -1904,6 +2761,11 @@ GtkWidget *xpm_image(XPM_TYPE xpm)
 	}
 #endif
 	/* Fall back to builtin XPM icon */
+#if GTK_MAJOR_VERSION == 3
+	buf = gdk_pixbuf_new_from_xpm_data((const char **)xpm[1]);
+	widget = gtk_image_new_from_pixbuf(buf);
+	g_object_unref(buf);
+#else /* if GTK_MAJOR_VERSION <= 2 */
 	{
 		GdkPixmap *icon, *mask;
 		icon = gdk_pixmap_create_from_xpm_d(main_window->window, &mask,
@@ -1916,6 +2778,7 @@ GtkWidget *xpm_image(XPM_TYPE xpm)
 		gdk_pixmap_unref(icon);
 		gdk_pixmap_unref(mask);
 	}
+#endif
 	gtk_widget_show(widget);
 #if GTK_MAJOR_VERSION == 2
 	gtk_signal_connect(GTK_OBJECT(widget), "realize",
@@ -1926,6 +2789,35 @@ GtkWidget *xpm_image(XPM_TYPE xpm)
 
 // Release outstanding pointer grabs
 
+#if GTK_MAJOR_VERSION == 3
+
+G_GNUC_BEGIN_IGNORE_DEPRECATIONS /* Running in a wheel is for hamsters */
+int release_grab()
+{
+	GdkDisplay *dp = gdk_display_get_default();
+	GList *l, *ll;
+	int res = FALSE;
+
+	ll = gdk_device_manager_list_devices(gdk_display_get_device_manager(dp),
+		GDK_DEVICE_TYPE_MASTER);
+	for (l = ll; l; l = l->next)
+	{
+		GdkDevice *dev = l->data;
+		if ((gdk_device_get_source(dev) == GDK_SOURCE_MOUSE) &&
+			gdk_display_device_is_grabbed(dp, dev))
+		{
+			gdk_device_ungrab(dev, GDK_CURRENT_TIME);
+			res = TRUE;
+		}
+	}
+	g_list_free(ll);
+
+	return (res);
+}
+G_GNUC_END_IGNORE_DEPRECATIONS
+
+#else /* if GTK_MAJOR_VERSION <= 2 */
+
 int release_grab()
 {
 	if (!gdk_pointer_is_grabbed()) return (FALSE);
@@ -1933,7 +2825,259 @@ int release_grab()
 	return (TRUE);
 }
 
+#endif
+
 // Frame widget with passthrough scrolling
+
+#if GTK_MAJOR_VERSION == 3
+
+#define WJFRAME(obj)		G_TYPE_CHECK_INSTANCE_CAST(obj, wjframe_get_type(), wjframe)
+#define IS_WJFRAME(obj)		G_TYPE_CHECK_INSTANCE_TYPE(obj, wjframe_get_type())
+
+typedef struct
+{
+	GtkBin		bin;		// Parent class
+	GtkAdjustment	*adjustments[2];
+	GtkAllocation	inside;
+} wjframe;
+
+typedef struct
+{
+	GtkBinClass parent_class;
+} wjframeClass;
+
+G_DEFINE_TYPE_WITH_CODE(wjframe, wjframe, GTK_TYPE_BIN,
+	G_IMPLEMENT_INTERFACE(GTK_TYPE_SCROLLABLE, NULL))
+
+#define WJFRAME_SHADOW 1 /* Line width, limited only by common sense */
+
+static gboolean wjframe_draw(GtkWidget *widget, cairo_t *cr)
+{
+G_GNUC_BEGIN_IGNORE_DEPRECATIONS /* I know, I know, now be silent */
+	wjframe *frame = WJFRAME(widget);
+	/* !!! Using deprecated struct to avoid recalculating the colors */
+	GtkStyle *style = gtk_widget_get_style(widget);
+	GtkAllocation alloc;
+	double dxy = WJFRAME_SHADOW * 0.5;
+	int x, y, x1, y1;
+
+
+	gtk_widget_get_allocation(widget, &alloc);
+	x1 = (x = frame->inside.x - alloc.x) + frame->inside.width - 1;
+	y1 = (y = frame->inside.y - alloc.y) + frame->inside.height - 1;
+
+	cairo_save(cr);
+	cairo_set_line_width(cr, WJFRAME_SHADOW);
+	cairo_set_line_cap(cr, CAIRO_LINE_CAP_SQUARE);
+	gdk_cairo_set_source_color(cr, style->light + GTK_STATE_NORMAL);
+	cairo_move_to(cr, x1 + dxy,  y - dxy);
+	cairo_line_to(cr, x1 + dxy, y1 + dxy); // Right
+	cairo_line_to(cr,  x - dxy, y1 + dxy); // Bottom
+	cairo_stroke(cr);
+	gdk_cairo_set_source_color(cr, style->dark + GTK_STATE_NORMAL);
+	cairo_move_to(cr, x1 + dxy,  y - dxy);
+	cairo_line_to(cr,  x - dxy,  y - dxy); // Top
+	cairo_line_to(cr,  x - dxy, y1 + dxy); // Left
+	cairo_stroke(cr);
+	cairo_restore(cr);
+
+	/* To draw child widget */
+	GTK_WIDGET_CLASS(wjframe_parent_class)->draw(widget, cr);
+
+	return (FALSE);
+G_GNUC_END_IGNORE_DEPRECATIONS
+}
+
+static void wjframe_size_allocate(GtkWidget *widget, GtkAllocation *allocation)
+{
+	wjframe *frame = WJFRAME(widget);
+	GtkWidget *child = gtk_bin_get_child(GTK_BIN(widget));
+	int border = gtk_container_get_border_width(GTK_CONTAINER(widget)) +
+		WJFRAME_SHADOW;
+	GtkAllocation now_inside;
+
+	gtk_widget_set_allocation(widget, allocation);
+	now_inside.x = allocation->x + border;
+	now_inside.y = allocation->y + border;
+	now_inside.width = MAX(allocation->width - border * 2, 1);
+	now_inside.height = MAX(allocation->height - border * 2, 1);
+
+	/* Redraw if inside moved while visible */
+	if (gtk_widget_get_mapped(widget) &&
+		((frame->inside.x ^ now_inside.x) |
+		(frame->inside.y ^ now_inside.y) |
+		(frame->inside.width ^ now_inside.width) |
+		(frame->inside.height ^ now_inside.height)))
+		gdk_window_invalidate_rect(gtk_widget_get_window(widget),
+			allocation, FALSE);
+	frame->inside = now_inside;
+
+	if (child && gtk_widget_get_visible(child))
+		gtk_widget_size_allocate(child, &now_inside);
+}
+
+static void wjframe_get_size(GtkWidget *widget, gint vert, gint *min, gint *nat)
+{
+	GtkWidget *child = gtk_bin_get_child(GTK_BIN(widget));
+	int border = gtk_container_get_border_width(GTK_CONTAINER(widget)) +
+		WJFRAME_SHADOW;
+	gint cmin = 0, cnat = 0;
+
+	if (child && gtk_widget_get_visible(child))
+		(vert ? gtk_widget_get_preferred_height :
+			gtk_widget_get_preferred_width)(child, &cmin, &cnat);
+	*min = cmin + border * 2;
+	*nat = cnat + border * 2;
+}
+
+static void wjframe_get_preferred_width(GtkWidget *widget, gint *min, gint *nat)
+{
+	wjframe_get_size(widget, FALSE, min, nat);
+}
+
+static void wjframe_get_preferred_height(GtkWidget *widget, gint *min, gint *nat)
+{
+	wjframe_get_size(widget, TRUE, min, nat);
+}
+
+static void wjframe_get_preferred_width_for_height(GtkWidget *widget, gint h,
+	 gint *min, gint *nat)
+{
+	wjframe_get_size(widget, FALSE, min, nat);
+}
+
+/* Specialcase only height-for-width, same as GtkFrame does */
+static void wjframe_get_preferred_height_for_width(GtkWidget *widget, gint w,
+	 gint *min, gint *nat)
+{
+	GtkWidget *child = gtk_bin_get_child(GTK_BIN(widget));
+	int border = gtk_container_get_border_width(GTK_CONTAINER(widget)) +
+		WJFRAME_SHADOW;
+	gint cmin = 0, cnat = 0;
+
+	if (child && gtk_widget_get_visible(child))
+		gtk_widget_get_preferred_height_for_width(child, w - border * 2,
+			&cmin, &cnat);
+	*min = cmin + border * 2;
+	*nat = cnat + border * 2;
+}
+
+static void wjframe_set_property(GObject *object, guint prop_id,
+	const GValue *value, GParamSpec *pspec)
+{
+	wjframe *frame = WJFRAME(object);
+	GtkWidget *child = gtk_bin_get_child(GTK_BIN(object));
+
+	if ((prop_id == P_HADJ) || (prop_id == P_VADJ))
+	{
+		/* Cache the object */
+		GtkAdjustment *adj, **slot = frame->adjustments + prop_id - P_HADJ;
+
+		adj = g_value_get_object(value);
+		if (adj) g_object_ref(adj);
+		if (*slot) g_object_unref(*slot);
+		*slot = adj;
+	}
+	// !!! React to "*scroll-policy" as an invalid ID when empty
+	else if (child && ((prop_id == P_HSCP) || (prop_id == P_VSCP)));
+	else
+	{
+		G_OBJECT_WARN_INVALID_PROPERTY_ID(object, prop_id, pspec);
+		return;
+	}
+	/* Send the thing to child to handle */
+	if (child) g_object_set_property(G_OBJECT(child), scroll_pnames[prop_id], value);
+}
+
+static void wjframe_get_property(GObject *object, guint prop_id, GValue *value,
+	GParamSpec *pspec)
+{
+	wjframe *frame = WJFRAME(object);
+
+	if ((prop_id == P_HADJ) || (prop_id == P_VADJ))
+		/* Returning cached object */
+		g_value_set_object(value, frame->adjustments[prop_id - P_HADJ]);
+	else if ((prop_id == P_HSCP) || (prop_id == P_VSCP))
+	{
+		/* Proxying for child */
+		GtkWidget *child = gtk_bin_get_child(GTK_BIN(object));
+		if (child) g_object_get_property(G_OBJECT(child),
+			scroll_pnames[prop_id], value);
+		else g_value_set_enum(value, GTK_SCROLL_NATURAL); // Default
+	}
+	else G_OBJECT_WARN_INVALID_PROPERTY_ID(object, prop_id, pspec);
+}
+
+static void wjframe_add(GtkContainer *container, GtkWidget *child)
+{
+	wjframe *frame = WJFRAME(container);
+
+	if (gtk_bin_get_child(GTK_BIN(container))) return;
+	GTK_CONTAINER_CLASS(wjframe_parent_class)->add(container, child);
+
+	/* Set only existing adjustments */
+	if (frame->adjustments[0] || frame->adjustments[1])
+		g_object_set(child, "hadjustment", frame->adjustments[0],
+			"vadjustment", frame->adjustments[1], NULL);
+}
+
+static void wjframe_remove(GtkContainer *container, GtkWidget *child)
+{
+	wjframe *frame = WJFRAME(container);
+	GtkWidget *child0 = gtk_bin_get_child(GTK_BIN(container));
+
+	if (!child || (child0 != child)) return;
+
+	/* Remove only existing adjustments */
+	if (frame->adjustments[0] || frame->adjustments[1])
+		g_object_set(child, "hadjustment", NULL, "vadjustment", NULL, NULL);
+
+	GTK_CONTAINER_CLASS(wjframe_parent_class)->remove(container, child);
+}
+
+static void wjframe_destroy(GtkWidget *widget)
+{
+	wjframe *frame = WJFRAME(widget);
+
+	if (frame->adjustments[0]) g_object_unref(frame->adjustments[0]);
+	if (frame->adjustments[1]) g_object_unref(frame->adjustments[1]);
+	frame->adjustments[0] = frame->adjustments[1] = NULL;
+	GTK_WIDGET_CLASS(wjframe_parent_class)->destroy(widget);
+}
+
+static void wjframe_class_init(wjframeClass *class)
+{
+	GtkContainerClass *cclass = GTK_CONTAINER_CLASS(class);
+	GtkWidgetClass *wclass = GTK_WIDGET_CLASS(class);
+	GObjectClass *oclass = G_OBJECT_CLASS(class);
+
+	oclass->set_property = wjframe_set_property;
+	oclass->get_property = wjframe_get_property;
+	wclass->destroy = wjframe_destroy;
+	wclass->draw = wjframe_draw;
+	wclass->size_allocate = wjframe_size_allocate;
+	wclass->get_preferred_width = wjframe_get_preferred_width;
+	wclass->get_preferred_height = wjframe_get_preferred_height;
+	wclass->get_preferred_width_for_height = wjframe_get_preferred_width_for_height;
+	wclass->get_preferred_height_for_width = wjframe_get_preferred_height_for_width;
+	/* !!! Leave my frame alone */
+	wclass->style_updated = NULL;
+	cclass->add = wjframe_add;
+	cclass->remove = wjframe_remove;
+
+	g_object_class_override_property(oclass, P_HADJ, "hadjustment");
+	g_object_class_override_property(oclass, P_VADJ, "vadjustment");
+	g_object_class_override_property(oclass, P_HSCP, "hscroll-policy");
+	g_object_class_override_property(oclass, P_VSCP, "vscroll-policy");
+}
+
+static void wjframe_init(wjframe *frame)
+{
+//	gtk_widget_set_has_window(GTK_WIDGET(frame), FALSE); // GtkBin done it
+	frame->adjustments[0] = frame->adjustments[1] = NULL;
+}
+
+#else /* if GTK_MAJOR_VERSION <= 2 */
 
 /* !!! Windows builds of GTK+ are made with G_ENABLE_DEBUG, which means also
  * marshallers checking what passes through. Since "OBJECT" is, from their
@@ -2267,12 +3411,692 @@ static GtkType wjframe_get_type()
 	return (wjframe_type);
 }
 
+#endif /* GTK+1&2 */
+
 GtkWidget *wjframe_new()
 {
 	return (gtk_widget_new(wjframe_get_type(), NULL));
 }
 
 // Scrollable canvas widget
+
+#if GTK_MAJOR_VERSION == 3
+
+#define WCACHE_STEP 64	/* Dimensions are multiples of this */
+#define WCACHE_FRAC 2	/* Can be this larger than necessary */
+
+typedef struct {
+	cairo_surface_t *s;	// Surface
+	int	xy[4];		// Viewport
+	int	dx;		// X offset
+	int	dy;		// Y offset
+	int	w;		// Cache line width
+	int	h;		// Cache height including boundary rows
+} wcache;
+
+//	Create cache for viewport
+static void wcache_init(wcache *cache, int *vport, GdkWindow *win)
+{
+	cache->w = vport[2] - vport[0] + WCACHE_STEP - 1;
+	cache->h = vport[3] - vport[1] + WCACHE_STEP - 1;
+	cache->w -= cache->w % WCACHE_STEP;
+	cache->h -= cache->h % WCACHE_STEP;
+	copy4(cache->xy, vport);
+	cache->dx = cache->dy = 0;
+	cache->s = gdk_window_create_similar_surface(win,
+		CAIRO_CONTENT_COLOR, cache->w, cache->h);
+}	
+
+//	Check if cache need be replaced, align it to vport if not
+static int wcache_check(wcache *cache, int *vport, int empty)
+{
+	int tw = vport[2] - vport[0], th = vport[3] - vport[1];
+
+	if (!cache->s) return (TRUE);
+	while ((tw <= cache->w) && (th <= cache->h))
+	{
+		tw += WCACHE_STEP - 1; tw -= tw % WCACHE_STEP;
+		th += WCACHE_STEP - 1; th -= th % WCACHE_STEP;
+		if (tw * th * WCACHE_FRAC < cache->w * cache->h) break;
+		/* Adjust for new vport */
+		if (empty)
+		{
+			cache->dx = 0;
+			cache->dy = 0;
+		}
+		else if (memcmp(cache->xy, vport, sizeof(cache->xy)))
+		{
+			cache->dx = floor_mod(cache->dx + vport[0] - cache->xy[0],
+				cache->w);
+			cache->dy = floor_mod(cache->dy + vport[1] - cache->xy[1],
+				cache->h);
+		}
+		copy4(cache->xy, vport);
+
+		return (FALSE); // Leave be
+	}
+	/* Drop the cache if no data inside */
+	if (empty)
+	{
+		cairo_surface_fdestroy(cache->s);
+		cache->s = NULL;
+	}
+	return (TRUE);
+}
+
+//	Move data from old cache to new
+static void wcache_move(wcache *new, wcache *old)
+{
+	int rxy[4];
+	cairo_t *cr;
+
+	if (!old->s) return;
+	/* Copy matching part of old's spans into new */
+	if (clip(rxy, old->xy[0], old->xy[1], old->xy[2], old->xy[3], new->xy))
+	{
+		cr = cairo_create(new->s);
+		cairo_set_operator(cr, CAIRO_OPERATOR_SOURCE);
+		cairo_set_source_surface(cr, old->s, old->xy[0] - new->xy[0] - old->dx, 
+			old->xy[1] - new->xy[1] - old->dy);
+		cairo_pattern_set_extend(cairo_get_source(cr), CAIRO_EXTEND_REPEAT);
+		cairo_rectangle(cr, rxy[0] - new->xy[0], rxy[1] - new->xy[1],
+			rxy[2] - rxy[0], rxy[3] - rxy[1]);
+		cairo_fill(cr);
+		cairo_destroy(cr);
+	}
+
+	/* Drop the old cache */
+	cairo_surface_fdestroy(old->s);
+	old->s = NULL;
+}
+
+static void wcache_render(wcache *cache, cairo_t *cr)
+{
+	int h = cache->xy[3] - cache->xy[1], w = cache->xy[2] - cache->xy[0];
+
+	cairo_save(cr);
+	cairo_set_operator(cr, CAIRO_OPERATOR_SOURCE);
+	cairo_set_source_surface(cr, cache->s, -cache->dx, -cache->dy);
+	cairo_pattern_set_extend(cairo_get_source(cr), CAIRO_EXTEND_REPEAT);
+	cairo_rectangle(cr, 0, 0, w, h);
+	cairo_fill(cr);
+	cairo_restore(cr);
+}
+
+#define WJCANVAS(obj)		G_TYPE_CHECK_INSTANCE_CAST(obj, wjcanvas_get_type(), wjcanvas)
+#define IS_WJCANVAS(obj)	G_TYPE_CHECK_INSTANCE_TYPE(obj, wjcanvas_get_type())
+
+typedef void (*wjc_expose_f)(GtkWidget *widget, cairo_region_t *clip, gpointer user_data);
+
+typedef struct
+{
+	GtkWidget	widget;		// Parent class
+	GtkAdjustment	*adjustments[2];
+	cairo_region_t	*r;		// Cached region
+	int		xy[4];		// Viewport
+	int		size[2];	// Requested (virtual) size
+	int		resize;		// Resize was requested
+	int		resizing;	// Requested resize is happening
+	guint32		scrolltime;	// For autoscroll rate-limiting
+	wcache		cache;		// Pixel cache
+	wjc_expose_f	expose;		// Drawing function
+	gpointer	udata;		// Link to slot
+} wjcanvas;
+
+typedef struct
+{
+	GtkWidgetClass parent_class;
+} wjcanvasClass;
+
+G_DEFINE_TYPE_WITH_CODE(wjcanvas, wjcanvas, GTK_TYPE_WIDGET,
+	G_IMPLEMENT_INTERFACE(GTK_TYPE_SCROLLABLE, NULL))
+
+static gboolean wjcanvas_draw(GtkWidget *widget, cairo_t *cr)
+{
+	wjcanvas *canvas = WJCANVAS(widget);
+	cairo_region_t *clip;
+	cairo_rectangle_list_t *rl;
+	cairo_rectangle_int_t re;
+	wcache ncache;
+	int i;
+
+	/* Check if anything useful remains in cache */
+	if (canvas->r)
+	{
+		cairo_rectangle_int_t vport = { canvas->xy[0], canvas->xy[1],
+			canvas->xy[2] - canvas->xy[0], canvas->xy[3] - canvas->xy[1] };
+		cairo_region_intersect_rectangle(canvas->r, &vport);
+		if (cairo_region_is_empty(canvas->r))
+		{
+			cairo_region_destroy(canvas->r);
+			canvas->r = NULL;
+		}
+	}
+
+	/* Check if need a new cache */
+	if (wcache_check(&canvas->cache, canvas->xy, !canvas->r))
+	{
+		wcache_init(&ncache, canvas->xy, gtk_widget_get_window(widget)); // Create it
+		wcache_move(&ncache, &canvas->cache); // Move contents if needed
+		canvas->cache = ncache;
+	}
+
+	/* Convert clip to image-space region */
+	clip = cairo_region_create();
+	rl = cairo_copy_clip_rectangle_list(cr);
+	if (rl->status != CAIRO_STATUS_SUCCESS) // Paranoia fallback
+	{
+		// The two rectangle types documented as identical in GTK+3 docs
+		if (gdk_cairo_get_clip_rectangle(cr, (GdkRectangle*)&re))
+			cairo_region_union_rectangle(clip, &re);
+	}
+	else for (i = 0; i < rl->num_rectangles; i++)
+	{
+		cairo_rectangle_t *rd = rl->rectangles + i;
+		// GTK+3 assumes the values are converted ints
+		re.x = rd->x; re.y = rd->y;
+		re.width = rd->width; re.height = rd->height;
+		cairo_region_union_rectangle(clip, &re);
+	}
+	cairo_rectangle_list_destroy(rl);
+	cairo_region_translate(clip, canvas->xy[0], canvas->xy[1]);
+
+	/* Check if we need draw anything anew */
+	if (canvas->r) cairo_region_subtract(clip, canvas->r);
+	if (!cairo_region_is_empty(clip) && canvas->expose) // Do nothing if unset
+		canvas->expose((GtkWidget *)canvas, clip, canvas->udata);
+	cairo_region_destroy(clip);
+
+	wcache_render(&canvas->cache, cr);
+
+	return (FALSE);
+}
+
+static void wjcanvas_send_configure(GtkWidget *widget, GtkAllocation *alloc)
+{
+	GdkEvent *event = gdk_event_new(GDK_CONFIGURE);
+
+	event->configure.window = g_object_ref(gtk_widget_get_window(widget));
+	event->configure.send_event = TRUE;
+	event->configure.x = alloc->x;
+	event->configure.y = alloc->y;
+	event->configure.width = alloc->width;
+	event->configure.height = alloc->height;
+
+	gtk_widget_event(widget, event);
+	gdk_event_free(event);
+}
+
+static void wjcanvas_realize(GtkWidget *widget)
+{
+//	static const GdkRGBA black = { 0, 0, 0, 0 };
+	GdkWindow *win;
+	GdkWindowAttr attrs;
+	GtkAllocation alloc;
+
+	gtk_widget_set_realized(widget, TRUE);
+	gtk_widget_get_allocation(widget, &alloc);
+
+	attrs.x = alloc.x;
+	attrs.y = alloc.y;
+	attrs.width = alloc.width;
+	attrs.height = alloc.height;
+	attrs.window_type = GDK_WINDOW_CHILD;
+	attrs.wclass = GDK_INPUT_OUTPUT;
+	attrs.visual = gtk_widget_get_visual(widget);
+	/* !!! GtkViewport also sets GDK_TOUCH_MASK and GDK_SMOOTH_SCROLL_MASK,
+	 * but the latter blocks non-smooth scroll events if device sends
+	 * smooth ones, and the former, I do not (yet?) handle anyway - WJ */
+	attrs.event_mask = gtk_widget_get_events(widget) | GDK_SCROLL_MASK;
+	/* !!! GDK_EXPOSURE_MASK seems really not be needed (as advertised),
+	 * despite GtkDrawingArea still having it */
+	win = gdk_window_new(gtk_widget_get_parent_window(widget),
+		&attrs, GDK_WA_X | GDK_WA_Y | GDK_WA_VISUAL);
+	/* !!! Versions without this (below 3.12) are useless */
+	gdk_window_set_event_compression(win, FALSE);
+
+	gtk_widget_register_window(widget, win);
+	gtk_widget_set_window(widget, win);
+
+//	gdk_window_set_background_rgba(win, &black);
+// !!! In hope this (parent's bkg) isn't drawn twice
+	gdk_window_set_background_pattern(win, NULL);
+
+	/* Replicate behaviour of GtkDrawingCanvas */
+	wjcanvas_send_configure(widget, &alloc);
+}
+
+static int wjcanvas_readjust(wjcanvas *canvas, int which, GtkAllocation *alloc)
+{
+	GtkAdjustment *adj = canvas->adjustments[which];
+	int sz, wp;
+	double oldv, newv;
+
+	oldv = gtk_adjustment_get_value(adj);
+	wp = which ? alloc->height : alloc->width;
+	sz = canvas->size[which];
+	if (sz < wp) sz = wp;
+	newv = oldv < 0.0 ? 0.0 : oldv > sz - wp ? sz - wp : oldv;
+	gtk_adjustment_configure(adj, newv, 0, sz, wp * 0.1, wp * 0.9, wp);
+
+	return (newv != oldv);
+}
+
+static void wjcanvas_set_extents(wjcanvas *canvas, GtkAllocation *alloc)
+{
+	canvas->xy[2] = alloc->width + (canvas->xy[0] = 
+		(int)rint(gtk_adjustment_get_value(canvas->adjustments[0])));
+	canvas->xy[3] = alloc->height + (canvas->xy[1] =
+		(int)rint(gtk_adjustment_get_value(canvas->adjustments[1])));
+}
+
+static void wjcanvas_size_allocate(GtkWidget *widget, GtkAllocation *allocation)
+{
+	wjcanvas *canvas = WJCANVAS(widget);
+	GtkAllocation alloc0;
+	int conf;
+
+
+	/* Don't send useless configure events */
+	gtk_widget_get_allocation(widget, &alloc0);
+	conf = canvas->resize | (allocation->width ^ alloc0.width) |
+		(allocation->height ^ alloc0.height);
+	canvas->resizing = canvas->resize;
+	canvas->resize = FALSE;
+
+	gtk_widget_set_allocation(widget, allocation);
+
+	g_object_freeze_notify(G_OBJECT(canvas->adjustments[0]));
+	g_object_freeze_notify(G_OBJECT(canvas->adjustments[1]));
+	wjcanvas_readjust(canvas, 0, allocation);
+	wjcanvas_readjust(canvas, 1, allocation);
+	wjcanvas_set_extents(canvas, allocation);
+
+	if (gtk_widget_get_realized(widget))
+	{
+		/* In GTK+3 this'll do whole window redraw for any change */
+		gdk_window_move_resize(gtk_widget_get_window(widget),
+			allocation->x, allocation->y,
+			allocation->width, allocation->height);
+
+		/* Replicate behaviour of GtkDrawingCanvas */
+		if (conf) wjcanvas_send_configure(widget, allocation);
+	}
+
+	g_object_thaw_notify(G_OBJECT(canvas->adjustments[0]));
+	g_object_thaw_notify(G_OBJECT(canvas->adjustments[1]));
+	canvas->resizing = FALSE;
+}
+
+static void wjcanvas_get_preferred_width(GtkWidget *widget, gint *min, gint *nat)
+{
+	*min = 1;
+	*nat = WJCANVAS(widget)->size[0];
+}
+
+static void wjcanvas_get_preferred_height(GtkWidget *widget, gint *min, gint *nat)
+{
+	*min = 1;
+	*nat = WJCANVAS(widget)->size[1];
+}
+
+#if 0 /* Direct descendants of GtkWidget can let it redirect these two */
+static void wjcanvas_get_preferred_width_for_height(GtkWidget *widget, gint h,
+	 gint *min, gint *nat)
+{
+	*min = 1;
+	*nat = WJCANVAS(widget)->size[0];
+}
+
+static void wjcanvas_get_preferred_height_for_width(GtkWidget *widget, gint w,
+	 gint *min, gint *nat)
+{
+	*min = 1;
+	*nat = WJCANVAS(widget)->size[1];
+}
+#endif
+
+/* We do scrolling in both directions at once if possible, to avoid ultimately
+ * useless repaint ops and associated flickers - WJ */
+static void wjcanvas_adjustment_value_changed(GtkAdjustment *adjustment, gpointer data)
+{
+	GtkWidget *widget = data;
+	wjcanvas *canvas = data;
+	GtkAllocation alloc;
+	int oxy[4];
+
+	if (!GTK_IS_ADJUSTMENT(adjustment) || !IS_WJCANVAS(data)) return;
+	gtk_widget_get_allocation(widget, &alloc);
+	copy4(oxy, canvas->xy);
+	wjcanvas_set_extents(data, &alloc); // Set new window extents
+	/* No scrolling in GTK+3, rely on caching */
+	if (!gtk_widget_get_mapped(widget)) return;
+	if ((oxy[0] ^ canvas->xy[0]) | (oxy[1] ^ canvas->xy[1])) // If moved
+		gtk_widget_queue_draw(widget);
+}
+
+static void wjcanvas_drop_adjustment(wjcanvas *canvas, int which)
+{
+	GtkAdjustment **slot = canvas->adjustments + which;
+
+	if (!*slot) return;
+	g_signal_handlers_disconnect_by_func(*slot,
+		wjcanvas_adjustment_value_changed, canvas);
+	g_object_unref(*slot);
+	*slot = NULL;
+}
+
+static GtkAdjustment *wjcanvas_prepare_adjustment(wjcanvas *canvas, int which,
+	GtkAdjustment *adjustment)
+{
+	GtkAdjustment **slot = canvas->adjustments + which;
+
+	if (adjustment && (adjustment == *slot)) return (NULL); // Leave alone
+	if (!adjustment) adjustment = gtk_adjustment_new(0, 0, 0, 0, 0, 0);
+	wjcanvas_drop_adjustment(canvas, which);
+	g_object_ref_sink(*slot = adjustment);
+	g_signal_connect(adjustment, "value-changed",
+		G_CALLBACK(wjcanvas_adjustment_value_changed), canvas);
+	return (adjustment);
+}
+
+static void wjcanvas_set_property(GObject *object, guint prop_id,
+	const GValue *value, GParamSpec *pspec)
+{
+	if ((prop_id == P_HADJ) || (prop_id == P_VADJ))
+	{
+		wjcanvas *canvas = WJCANVAS(object);
+		GtkAllocation alloc;
+		GtkAdjustment *adj;
+		int which = prop_id - P_HADJ;
+
+		gtk_widget_get_allocation(GTK_WIDGET(canvas), &alloc);
+		adj = wjcanvas_prepare_adjustment(
+			canvas, which, g_value_get_object(value));
+		if (adj && !wjcanvas_readjust(canvas, which, &alloc))
+			wjcanvas_adjustment_value_changed(adj, canvas); // Readjust anyway
+	}
+	// !!! React to "*scroll-policy" as an invalid ID if trying to set
+	else G_OBJECT_WARN_INVALID_PROPERTY_ID(object, prop_id, pspec);
+}
+
+static void wjcanvas_get_property(GObject *object, guint prop_id, GValue *value,
+	GParamSpec *pspec)
+{
+	wjcanvas *canvas = WJCANVAS(object);
+
+	if ((prop_id == P_HADJ) || (prop_id == P_VADJ))
+		g_value_set_object(value, canvas->adjustments[prop_id - P_HADJ]);
+	else if ((prop_id == P_HSCP) || (prop_id == P_VSCP))
+		g_value_set_enum(value, GTK_SCROLL_NATURAL);
+	else G_OBJECT_WARN_INVALID_PROPERTY_ID(object, prop_id, pspec);
+}
+
+static void wjcanvas_unmap(GtkWidget *widget)
+{
+	wjcanvas *canvas = WJCANVAS(widget);
+
+	GTK_WIDGET_CLASS(wjcanvas_parent_class)->unmap(widget);
+	cairo_region_destroy(canvas->r);
+	canvas->r = NULL;
+	if (canvas->cache.s)
+	{
+		cairo_surface_fdestroy(canvas->cache.s);
+		canvas->cache.s = NULL;
+	}
+}
+
+static void wjcanvas_destroy(GtkWidget *widget)
+{
+	wjcanvas *canvas = WJCANVAS(widget);
+
+	wjcanvas_drop_adjustment(canvas, 0);
+	wjcanvas_drop_adjustment(canvas, 1);
+	cairo_region_destroy(canvas->r);
+	canvas->r = NULL;
+	if (canvas->cache.s)
+	{
+		cairo_surface_fdestroy(canvas->cache.s);
+		canvas->cache.s = NULL;
+	}
+	GTK_WIDGET_CLASS(wjcanvas_parent_class)->destroy(widget);
+}
+
+static void wjcanvas_class_init(wjcanvasClass *class)
+{
+	GtkWidgetClass *wclass = GTK_WIDGET_CLASS(class);
+	GObjectClass *oclass = G_OBJECT_CLASS(class);
+
+	oclass->set_property = wjcanvas_set_property;
+	oclass->get_property = wjcanvas_get_property;
+	wclass->destroy = wjcanvas_destroy;
+	wclass->realize = wjcanvas_realize;
+	wclass->unmap = wjcanvas_unmap;
+	wclass->draw = wjcanvas_draw;
+	wclass->size_allocate = wjcanvas_size_allocate;
+	wclass->get_preferred_width = wjcanvas_get_preferred_width;
+	wclass->get_preferred_height = wjcanvas_get_preferred_height;
+	/* Default handlers in GtkWidget redirect these two anyway */
+//	wclass->get_preferred_width_for_height = wjcanvas_get_preferred_width_for_height;
+//	wclass->get_preferred_height_for_width = wjcanvas_get_preferred_height_for_width;
+	/* !!! Do not disturb my circles */
+	wclass->style_updated = NULL;
+
+	g_object_class_override_property(oclass, P_HADJ, "hadjustment");
+	g_object_class_override_property(oclass, P_VADJ, "vadjustment");
+	g_object_class_override_property(oclass, P_HSCP, "hscroll-policy");
+	g_object_class_override_property(oclass, P_VSCP, "vscroll-policy");
+}
+
+static void wjcanvas_init(wjcanvas *canvas)
+{
+	gtk_widget_set_has_window(GTK_WIDGET(canvas), TRUE);
+	gtk_widget_set_redraw_on_allocate(GTK_WIDGET(canvas), FALSE);
+	/* Ensure 1x1 at least */
+	canvas->size[0] = canvas->size[1] = 1;
+	/* Install fake adjustments */
+	canvas->adjustments[0] = canvas->adjustments[1] = NULL;
+	wjcanvas_prepare_adjustment(canvas, 0, NULL);
+	wjcanvas_prepare_adjustment(canvas, 1, NULL);
+	/* No cached things yet */
+	canvas->r = NULL;
+	/* And no cache, too */
+	memset(&canvas->cache, 0, sizeof(canvas->cache));
+}
+
+void wjcanvas_draw_rgb(GtkWidget *widget, int x, int y, int w, int h,
+	unsigned char *rgb, int step, int fill, int repaint)
+{
+	wjcanvas *canvas;
+	wcache *cache;
+	cairo_surface_t *s = NULL;
+	cairo_t *cr;
+	cairo_rectangle_int_t re;
+	int y1, x1, rxy[4];
+
+	if (!IS_WJCANVAS(widget)) return;
+	canvas = WJCANVAS(widget);
+	cache = &canvas->cache;
+	if (!cache->s) return; // Not visible yet, draw it later
+	if (!clip(rxy, x, y, x + w, y + h, cache->xy)) return;
+
+	if (rgb) s = cairo_upload_rgb(cache->s, NULL, rgb + (rxy[1] - y) * step +
+		(rxy[0] - x) * 3, rxy[2] - rxy[0], rxy[3] - rxy[1], step);
+
+	/* Find out whether area wraps around on X */
+	x = (cache->dx + rxy[0] - cache->xy[0]) % cache->w;
+	w = rxy[2] - rxy[0];
+	x1 = (x + w) % cache->w;
+	if (x1 < w) w -= x1;
+	else x1 = 0;
+
+	/* Same thing on Y */
+	y = (cache->dy + rxy[1] - cache->xy[1]) % cache->h;
+	h = rxy[3] - rxy[1];
+	y1 = (y + h) % cache->h;
+	if (y1 < h) h -= y1;
+	else y1 = 0;
+
+	cr = cairo_create(cache->s);
+	cairo_set_operator(cr, CAIRO_OPERATOR_SOURCE);
+	if (!s) cairo_set_rgb(cr, fill); // If no bitmap, fill by color
+
+	/* Paint the area into cache, in up to 4 pieces */
+	if (s) cairo_set_source_surface(cr, s, x, y);
+	cairo_rectangle(cr, x, y, w, h);
+	cairo_fill(cr);
+	if (y1)
+	{
+		if (s) cairo_set_source_surface(cr, s, x, -h);
+		cairo_rectangle(cr, x, 0, w, y1);
+		cairo_fill(cr);
+	}
+	if (x1)
+	{
+		if (s) cairo_set_source_surface(cr, s, -w, y);
+		cairo_rectangle(cr, 0, y, x1, h);
+		cairo_fill(cr);
+		if (y1)
+		{
+			if (s) cairo_set_source_surface(cr, s, -w, -h);
+			cairo_rectangle(cr, 0, 0, x1, y1);
+			cairo_fill(cr);
+		}
+	}
+	cairo_destroy(cr);
+
+	if (s) cairo_surface_fdestroy(s);
+
+	/* Remember this part is up to date */
+	if (!canvas->r) canvas->r = cairo_region_create();
+	re.width = rxy[2] - (re.x = rxy[0]);
+	re.height = rxy[3] - (re.y = rxy[1]);
+	cairo_region_union_rectangle(canvas->r, &re);
+
+	/* Invalidate part of window if asked to */
+	if (repaint)
+	{
+		re.x -= canvas->xy[0];
+		re.y -= canvas->xy[1];
+		// The two rectangle types documented as identical in GTK+3 docs
+		gdk_window_invalidate_rect(gtk_widget_get_window(widget),
+			(GdkRectangle*)&re, FALSE);
+	}
+}
+
+// !!! To be called from CANVAS_REPAINT w/area, & from cmd_repaint() with NULL
+void wjcanvas_uncache(GtkWidget *widget, int *rxy)
+{
+	wjcanvas *canvas = WJCANVAS(widget);
+	if (!canvas->r); // Nothing more to do
+	else if (!rxy) // Total clear
+	{
+		cairo_region_destroy(canvas->r);
+		canvas->r = NULL;
+	}
+	else // Partial clear
+	{
+		cairo_rectangle_int_t re = {
+			rxy[0], rxy[1], rxy[2] - rxy[0], rxy[3] - rxy[1] };
+		cairo_region_subtract_rectangle(canvas->r, &re);
+	}
+}
+
+void wjcanvas_set_expose(GtkWidget *widget, GCallback handler, gpointer user_data)
+{
+	wjcanvas *canvas;
+
+	if (!IS_WJCANVAS(widget)) return;
+	canvas = WJCANVAS(widget);
+	canvas->expose = (wjc_expose_f)handler;
+	canvas->udata = user_data;
+}
+
+void wjcanvas_size(GtkWidget *widget, int width, int height)
+{
+	wjcanvas *canvas;
+
+	if (!IS_WJCANVAS(widget)) return;
+	canvas = WJCANVAS(widget);
+	if ((canvas->size[0] == width) && (canvas->size[1] == height)) return;
+	canvas->size[0] = width;
+	canvas->size[1] = height;
+	canvas->resize = TRUE;
+	/* Forget cached rectangles */
+	cairo_region_destroy(canvas->r);
+	canvas->r = NULL;
+	gtk_widget_queue_resize(widget);
+}
+
+static int wjcanvas_offset(GtkAdjustment *adj, int dv)
+{
+	double nv, up, v;
+	int step, dw = dv;
+
+	step = (int)(gtk_adjustment_get_step_increment(adj) + 0.5);
+	if (step)
+	{
+		dw = abs(dw) + step - 1;
+		dw -= dw % step;
+		if (dv < 0) dw = -dw;
+	}
+
+	up = gtk_adjustment_get_upper(adj) - gtk_adjustment_get_page_size(adj);
+	nv = (v = gtk_adjustment_get_value(adj)) + dw;
+	if (nv > up) nv = up;
+	if (nv < 0.0) nv = 0.0;
+	gtk_adjustment_set_value(adj, nv);
+	return (v != nv);
+}
+
+int wjcanvas_scroll_in(GtkWidget *widget, int x, int y)
+{
+	wjcanvas *canvas = WJCANVAS(widget);
+	int dx = 0, dy = 0;
+
+	if (!canvas->adjustments[0] || !canvas->adjustments[1]) return (FALSE);
+
+	if (x < canvas->xy[0]) dx = (x < 0 ? 0 : x) - canvas->xy[0];
+	else if (x >= canvas->xy[2]) dx = (x >= canvas->size[0] ?
+		canvas->size[0] : x + 1) - canvas->xy[2];
+	if (y < canvas->xy[1]) dy = (y < 0 ? 0 : y) - canvas->xy[1];
+	else if (y >= canvas->xy[3]) dy = (y >= canvas->size[1] ?
+		canvas->size[1] : y + 1) - canvas->xy[3];
+	if (!(dx | dy)) return (FALSE);
+
+	g_object_freeze_notify(G_OBJECT(canvas->adjustments[0]));
+	g_object_freeze_notify(G_OBJECT(canvas->adjustments[1]));
+
+	dx = wjcanvas_offset(canvas->adjustments[0], dx);
+	dy = wjcanvas_offset(canvas->adjustments[1], dy);
+
+	g_object_thaw_notify(G_OBJECT(canvas->adjustments[0]));
+	g_object_thaw_notify(G_OBJECT(canvas->adjustments[1]));
+	return (dx | dy);
+}
+
+#define WJCANVAS_SCROLL_LIMIT 333 /* 3 steps/second */
+
+/* If mouse moved outside canvas, scroll canvas & warp cursor back in */
+int wjcanvas_bind_mouse(GtkWidget *widget, GdkEventMotion *event, int x, int y)
+{
+	wjcanvas *canvas = WJCANVAS(widget);
+	int oldv[4];
+
+	copy4(oldv, canvas->xy);
+	x += oldv[0]; y += oldv[1];
+	if ((x >= oldv[0]) && (x < oldv[2]) && (y >= oldv[1]) && (y < oldv[3]))
+		return (FALSE);
+	/* Limit scrolling rate for absolute pointing devices */
+	if ((gdk_device_get_source(event->device) != GDK_SOURCE_MOUSE) &&
+		(event->time < canvas->scrolltime + WJCANVAS_SCROLL_LIMIT))
+		return (FALSE);
+	if (!wjcanvas_scroll_in(widget, x, y)) return (FALSE);
+	canvas->scrolltime = event->time;
+	return (move_mouse_relative(oldv[0] - canvas->xy[0], oldv[1] - canvas->xy[1]));
+}
+
+#else /* if GTK_MAJOR_VERSION <= 2 */
 
 #define WJCANVAS(obj)		GTK_CHECK_CAST(obj, wjcanvas_get_type(), wjcanvas)
 #define IS_WJCANVAS(obj)	GTK_CHECK_TYPE(obj, wjcanvas_get_type())
@@ -2802,6 +4626,8 @@ int wjcanvas_bind_mouse(GtkWidget *widget, GdkEventMotion *event, int x, int y)
 	return (move_mouse_relative(oldv[0] - canvas->xy[0], oldv[1] - canvas->xy[1]));
 }
 
+#endif /* GTK+1&2 */
+
 GtkWidget *wjcanvas_new()
 {
 	return (gtk_widget_new(wjcanvas_get_type(), NULL));
@@ -2811,6 +4637,384 @@ void wjcanvas_get_vport(GtkWidget *widget, int *vport)
 {
 	copy4(vport, WJCANVAS(widget)->xy);
 }
+
+#if GTK_MAJOR_VERSION == 3
+
+// Focusable pixmap widget (on Cairo surfaces, but whatever)
+
+#define WJPIXMAP(obj)		G_TYPE_CHECK_INSTANCE_CAST(obj, wjpixmap_get_type(), wjpixmap)
+#define IS_WJPIXMAP(obj)	G_TYPE_CHECK_INSTANCE_TYPE(obj, wjpixmap_get_type())
+
+typedef struct
+{
+	GtkWidget widget;	// Parent class
+	GdkWindow *pixwindow;
+	cairo_surface_t *pixmap;
+	cairo_surface_t *cursor;
+	GdkRectangle pm, cr;	// pm is allocation relative, unlike in GTK+1&2
+	int width, height;	// Requested pixmap size
+	int xc, yc;
+	int focused_cursor;
+} wjpixmap;
+
+typedef struct
+{
+	GtkWidgetClass parent_class;
+} wjpixmapClass;
+
+G_DEFINE_TYPE(wjpixmap, wjpixmap, GTK_TYPE_WIDGET)
+
+#define WJPIXMAP_FRAME 1 /* Line width, limited only by common sense */
+
+static gboolean wjpixmap_draw(GtkWidget *widget, cairo_t *cr)
+{
+	wjpixmap *pix = WJPIXMAP(widget);
+	GtkStyleContext *ctx = gtk_widget_get_style_context(widget);
+	GtkAllocation alloc;
+
+	cairo_save(cr);
+	gtk_widget_get_allocation(widget, &alloc);
+	/* Outer window */
+	if (gtk_cairo_should_draw_window(cr, gtk_widget_get_window(widget)))
+	{
+		gtk_render_background(ctx, cr, 0, 0, alloc.width, alloc.height);
+// !!! Maybe render pixmap frame here: _before_ focus, as in GTK+1/2?
+		/* Focus frame */
+		if (gtk_widget_has_visible_focus(widget))
+		{
+			/* !!! Is inside-the-border the right place? */
+			GtkBorder border;
+			get_padding_and_border(ctx, NULL, &border, NULL);
+			gtk_render_focus(ctx, cr, border.left, border.top,
+				alloc.width - border.left - border.right,
+				alloc.height - border.top - border.bottom);
+		}
+		/* Pixmap frame */
+		cairo_set_line_width(cr, WJPIXMAP_FRAME);
+		cairo_set_line_cap(cr, CAIRO_LINE_CAP_SQUARE);
+		cairo_set_source_rgb(cr, 0, 0, 0); // Black
+		cairo_rectangle(cr,
+			pix->pm.x - WJPIXMAP_FRAME * 0.5,
+			pix->pm.y - WJPIXMAP_FRAME * 0.5,
+			pix->pm.width + WJPIXMAP_FRAME,
+			pix->pm.height + WJPIXMAP_FRAME);
+		cairo_stroke(cr);
+	}
+	/* Pixmap window */
+	while (gtk_cairo_should_draw_window(cr, pix->pixwindow))
+	{
+		gtk_cairo_transform_to_window(cr, widget, pix->pixwindow);
+		cairo_set_source_surface(cr, pix->pixmap, 0, 0);
+		cairo_rectangle(cr, 0, 0, pix->pm.width, pix->pm.height);
+//		cairo_set_operator(cr, CAIRO_OPERATOR_SOURCE);
+		cairo_fill(cr); // Hope Cairo won't waste much time on clipped-out parts
+		/* Cursor pixmap */
+		if (!pix->cursor) break;
+		if (pix->focused_cursor && !gtk_widget_has_focus(widget)) break;
+		cairo_set_source_surface(cr, pix->cursor, pix->cr.x, pix->cr.y);
+//		cairo_set_operator(cr, CAIRO_OPERATOR_OVER);
+		cairo_rectangle(cr, pix->cr.x, pix->cr.y, pix->cr.width, pix->cr.height);
+		cairo_fill(cr); // Hope Cairo won't waste time if outside of clip
+		break;
+	}
+	cairo_restore(cr);
+
+	return (FALSE);
+}
+
+static void wjpixmap_position(wjpixmap *pix, GtkAllocation *alloc)
+{
+	int x, y, w, h;
+	GtkBorder border;
+
+	get_padding_and_border(gtk_widget_get_style_context(GTK_WIDGET(pix)),
+		NULL, NULL, &border);
+	x = alloc->width - border.left - border.right;
+	pix->pm.width = w = pix->width <= x ? pix->width : x;
+	pix->pm.x = (x - w) / 2 + border.left;
+	y = alloc->height - border.top - border.bottom;
+	pix->pm.height = h = pix->height <= y ? pix->height : y;
+	pix->pm.y = (y - h) / 2 + border.top;
+}
+
+static void wjpixmap_realize(GtkWidget *widget)
+{
+	wjpixmap *pix = WJPIXMAP(widget);
+	GdkWindow *win;
+	GdkWindowAttr attrs;
+	GtkAllocation alloc;
+
+	gtk_widget_set_realized(widget, TRUE);
+	gtk_widget_get_allocation(widget, &alloc);
+
+	win = gtk_widget_get_parent_window(widget);
+	gtk_widget_set_window(widget, win);
+	g_object_ref(win);
+
+	wjpixmap_position(pix, &alloc);
+
+	attrs.x = pix->pm.x + alloc.x;
+	attrs.y = pix->pm.y + alloc.y;
+	attrs.width = pix->pm.width;
+	attrs.height = pix->pm.height;
+	attrs.window_type = GDK_WINDOW_CHILD;
+	attrs.wclass = GDK_INPUT_OUTPUT;
+	attrs.visual = gtk_widget_get_visual(widget);
+	// Add the same events as GtkEventBox does
+	attrs.event_mask = gtk_widget_get_events(widget) | GDK_BUTTON_MOTION_MASK |
+		GDK_BUTTON_PRESS_MASK | GDK_BUTTON_RELEASE_MASK |
+		GDK_ENTER_NOTIFY_MASK | GDK_LEAVE_NOTIFY_MASK;
+	/* !!! GDK_EXPOSURE_MASK seems really not be needed (as advertised),
+	 * despite GtkDrawingArea still having it */
+	pix->pixwindow = win = gdk_window_new(win, &attrs,
+		GDK_WA_X | GDK_WA_Y | GDK_WA_VISUAL);
+	/* !!! Versions without this (below 3.12) are useless */
+	gdk_window_set_event_compression(win, FALSE);
+
+	gtk_widget_register_window(widget, win);
+}
+
+static void wjpixmap_unrealize(GtkWidget *widget)
+{
+	wjpixmap *pix = WJPIXMAP(widget);
+
+	if (pix->pixwindow)
+	{
+		gtk_widget_unregister_window(widget, pix->pixwindow);
+		gdk_window_destroy(pix->pixwindow);
+		pix->pixwindow = NULL;
+	}
+
+	GTK_WIDGET_CLASS(wjpixmap_parent_class)->unrealize(widget);
+}
+
+static void wjpixmap_map(GtkWidget *widget)
+{
+	wjpixmap *pix = WJPIXMAP(widget);
+
+	GTK_WIDGET_CLASS(wjpixmap_parent_class)->map(widget);
+	if (pix->pixwindow) gdk_window_show(pix->pixwindow);
+}
+
+static void wjpixmap_unmap(GtkWidget *widget)
+{
+	wjpixmap *pix = WJPIXMAP(widget);
+
+	if (pix->pixwindow) gdk_window_hide(pix->pixwindow);
+	GTK_WIDGET_CLASS(wjpixmap_parent_class)->unmap(widget);
+}
+
+static void wjpixmap_size_allocate(GtkWidget *widget, GtkAllocation *allocation)
+{
+	wjpixmap *pix = WJPIXMAP(widget);
+
+	gtk_widget_set_allocation(widget, allocation);
+	wjpixmap_position(pix, allocation);
+
+	if (gtk_widget_get_realized(widget)) gdk_window_move_resize(pix->pixwindow,
+		pix->pm.x + allocation->x, pix->pm.y + allocation->y,
+		pix->pm.width, pix->pm.height);
+}
+
+static void wjpixmap_get_size(GtkWidget *widget, gint vert, gint *min, gint *nat)
+{
+	wjpixmap *pix = WJPIXMAP(widget);
+	GtkBorder border;
+
+	get_padding_and_border(gtk_widget_get_style_context(widget), NULL, NULL, &border);
+
+	*min = *nat = (vert ? border.top + border.bottom + pix->height :
+		border.left + border.right + pix->width) + WJPIXMAP_FRAME * 2;
+}
+
+static void wjpixmap_get_preferred_width(GtkWidget *widget, gint *min, gint *nat)
+{
+	wjpixmap_get_size(widget, FALSE, min, nat);
+}
+
+static void wjpixmap_get_preferred_height(GtkWidget *widget, gint *min, gint *nat)
+{
+	wjpixmap_get_size(widget, TRUE, min, nat);
+}
+
+static void wjpixmap_destroy(GtkWidget *widget)
+{
+	wjpixmap *pix = WJPIXMAP(widget);
+
+	if (pix->pixmap)
+	{
+		cairo_surface_fdestroy(pix->pixmap);
+		pix->pixmap = NULL;
+	}
+	if (pix->cursor)
+	{
+		cairo_surface_fdestroy(pix->cursor);
+		pix->cursor = NULL;
+	}
+	GTK_WIDGET_CLASS(wjpixmap_parent_class)->destroy(widget);
+}
+
+static void wjpixmap_class_init(wjpixmapClass *class)
+{
+	GtkWidgetClass *wclass = GTK_WIDGET_CLASS(class);
+
+//	wclass->screen_changed = wjpixmap_screen_changed; // as proxy for changing visual?
+	wclass->destroy = wjpixmap_destroy;
+	wclass->realize = wjpixmap_realize;
+	wclass->unrealize = wjpixmap_unrealize;
+	wclass->map = wjpixmap_map;
+	wclass->unmap = wjpixmap_unmap;
+	wclass->draw = wjpixmap_draw;
+	wclass->size_allocate = wjpixmap_size_allocate;
+	wclass->get_preferred_width = wjpixmap_get_preferred_width;
+	wclass->get_preferred_height = wjpixmap_get_preferred_height;
+	/* Default handlers in GtkWidget redirect these two anyway */
+//	wclass->get_preferred_width_for_height = wjpixmap_get_preferred_width_for_height;
+//	wclass->get_preferred_height_for_width = wjpixmap_get_preferred_height_for_width;
+	/* !!! Do not disturb my circles */
+//	wclass->style_updated = NULL;
+}
+
+static void wjpixmap_init(wjpixmap *pix)
+{
+	gtk_widget_set_has_window(GTK_WIDGET(pix), FALSE);
+	pix->pixwindow = NULL;
+	pix->pixmap = pix->cursor = NULL;
+	add_css_class(GTK_WIDGET(pix), "wjpixmap");
+}
+
+GtkWidget *wjpixmap_new(int width, int height)
+{
+	GtkWidget *widget = gtk_widget_new(wjpixmap_get_type(), NULL);
+	wjpixmap *pix = WJPIXMAP(widget);
+
+	gtk_widget_set_can_focus(widget, TRUE);
+	pix->width = width; pix->height = height;
+	return (widget);
+}
+
+/* Must be called first to init, and afterwards to access pixmap */
+cairo_surface_t *wjpixmap_pixmap(GtkWidget *widget)
+{
+	wjpixmap *pix = WJPIXMAP(widget);
+
+	if (!pix->pixmap)
+	{
+		GdkWindow *win = pix->pixwindow;
+		if (!win) win = gdk_screen_get_root_window(gtk_widget_get_screen(widget));
+		pix->pixmap = gdk_window_create_similar_surface(win,
+			CAIRO_CONTENT_COLOR, pix->width, pix->height);
+	}
+	return (pix->pixmap);
+}
+
+void wjpixmap_draw_rgb(GtkWidget *widget, int x, int y, int w, int h,
+	unsigned char *rgb, int step)
+{
+	wjpixmap *pix = WJPIXMAP(widget);
+	cairo_surface_t *s;
+	cairo_t *cr;
+
+	if (!pix->pixmap) return;
+	s = cairo_upload_rgb(pix->pixmap, NULL, rgb, w, h, step);
+
+	cr = cairo_create(pix->pixmap);
+	cairo_set_operator(cr, CAIRO_OPERATOR_SOURCE);
+	cairo_set_source_surface(cr, s, x, y);
+	cairo_rectangle(cr, x, y, w, h);
+	cairo_fill(cr);
+	cairo_destroy(cr);
+
+	cairo_surface_fdestroy(s);
+	if (pix->pixwindow)
+	{
+		GdkRectangle wr = { x, y, w, h };
+		gdk_window_invalidate_rect(pix->pixwindow, &wr, FALSE);
+	}
+}
+
+void wjpixmap_move_cursor(GtkWidget *widget, int x, int y)
+{
+	wjpixmap *pix = WJPIXMAP(widget);
+	GdkRectangle pm, ocr, tcr1, tcr2, *rcr = NULL;
+	int dx = x - pix->xc, dy = y - pix->yc;
+
+	if (!(dx | dy)) return;
+	ocr = pix->cr;
+	pix->cr.x += dx; pix->cr.y += dy;
+	pix->xc = x; pix->yc = y;
+
+	if (!pix->pixmap || !pix->cursor) return;
+	if (pix->focused_cursor && !gtk_widget_has_focus(widget)) return;
+
+	/* Anything visible? */
+	if (!gtk_widget_get_visible(widget)) return;
+	pm = pix->pm; pm.x = pm.y = 0;
+	if (gdk_rectangle_intersect(&ocr, &pm, &tcr1)) rcr = &tcr1;
+	if (gdk_rectangle_intersect(&pix->cr, &pm, &tcr2))
+	{
+		if (rcr) gdk_rectangle_union(&tcr1, &tcr2, rcr = &ocr);
+		else rcr = &tcr2;
+	}
+	if (!rcr) return; /* Both positions invisible */
+	if (pix->pixwindow) gdk_window_invalidate_rect(pix->pixwindow, rcr, FALSE);
+}
+
+/* Input is two compiled-in XBMs */
+void wjpixmap_set_cursor(GtkWidget *widget, char *image, char *mask,
+	int width, int height, int hot_x, int hot_y, int focused)
+{
+	wjpixmap *pix = WJPIXMAP(widget);
+
+
+	if (pix->cursor)
+	{
+		cairo_surface_fdestroy(pix->cursor);
+		pix->cursor = NULL;
+	}
+	pix->focused_cursor = focused;
+
+	if (image)
+	{
+		GdkWindow *win = pix->pixwindow;
+		cairo_surface_t *s;
+		cairo_t *cr;
+
+		if (!win) win = gdk_screen_get_root_window(gtk_widget_get_screen(widget));
+		pix->cursor = gdk_window_create_similar_surface(win,
+			CAIRO_CONTENT_COLOR_ALPHA, width, height);
+
+		s = xbms_to_surface(image, mask, width, height);
+		cr = cairo_create(pix->cursor);
+		cairo_set_operator(cr, CAIRO_OPERATOR_SOURCE);
+		cairo_set_source_surface(cr, s, 0, 0);
+		cairo_paint(cr);
+		cairo_destroy(cr);
+		cairo_surface_fdestroy(s);
+
+		pix->cr.x = pix->xc - hot_x;
+		pix->cr.y = pix->yc - hot_y;
+		pix->cr.width = width;
+		pix->cr.height = height;
+	}
+
+	/* Optimizing redraw in a rare operation is useless */
+	if (pix->pixmap) gtk_widget_queue_draw(widget);
+}
+
+/* Translate allocation-relative coords to pixmap-relative */
+int wjpixmap_rxy(GtkWidget *widget, int x, int y, int *xr, int *yr)
+{
+	wjpixmap *pix = WJPIXMAP(widget);
+
+	if (!pix->pixmap) return (FALSE);
+	x -= pix->pm.x;
+	y -= pix->pm.y;
+	*xr = x; *yr = y;
+	return ((x >= 0) && (x < pix->pm.width) && (y >= 0) && (y < pix->pm.height));
+}
+
+#else /* if GTK_MAJOR_VERSION <= 2 */
 
 // Focusable pixmap widget
 
@@ -3216,6 +5420,8 @@ int wjpixmap_rxy(GtkWidget *widget, int x, int y, int *xr, int *yr)
 	return ((x >= 0) && (x < pix->pm.width) && (y >= 0) && (y < pix->pm.height));
 }
 
+#endif /* GTK+1&2 */
+
 // Type of pathname
 
 int path_type(char *path)
@@ -3565,6 +5771,33 @@ int do_grab(int mode, GtkWidget *widget, GdkCursor *cursor)
 		return (FALSE);
 	}
 	if (mode != GRAB_PROGRAM) gtk_grab_add(widget);
+#else /* #if GTK_MAJOR_VERSION == 3 */
+	guint32 time;
+	GdkDevice *kbd, *mouse, *dev;
+	GdkWindow *win = gtk_widget_get_window(widget);
+
+	if (!win) return (FALSE); // Lose
+	time = gtk_get_current_event_time();
+	mouse = dev = gtk_get_current_event_device();
+	if (!dev) return (FALSE); // If called out of the blue by mistake
+	kbd = gdk_device_get_associated_device(dev);
+	if (gdk_device_get_source(dev) == GDK_SOURCE_KEYBOARD) // Missed the guess
+		mouse = kbd , kbd = dev;
+
+G_GNUC_BEGIN_IGNORE_DEPRECATIONS /* Running in a wheel is for hamsters */
+	if (gdk_device_grab(kbd, win, GDK_OWNERSHIP_APPLICATION, owner_events,
+		GDK_KEY_PRESS_MASK | GDK_KEY_RELEASE_MASK, NULL, time) != GDK_GRAB_SUCCESS)
+		return (FALSE);
+	if (gdk_device_grab(mouse, win, GDK_OWNERSHIP_APPLICATION, owner_events,
+		GDK_BUTTON_RELEASE_MASK | GDK_BUTTON_PRESS_MASK |
+		GDK_POINTER_MOTION_MASK, cursor, time) != GDK_GRAB_SUCCESS)
+	{
+		gdk_device_ungrab(kbd, time);
+		return (FALSE);
+	}
+	if (mode != GRAB_PROGRAM) gtk_device_grab_add(widget, mouse, TRUE);
+	g_object_set_data(G_OBJECT(widget), GRAB_KEY, mouse);
+G_GNUC_END_IGNORE_DEPRECATIONS
 #endif
 	return (TRUE);
 }
@@ -3581,6 +5814,15 @@ void undo_grab(GtkWidget *widget)
 	gdk_display_keyboard_ungrab(display, time);
 	gdk_display_pointer_ungrab(display, time);
 	gtk_grab_remove(widget);
+#else /* #if GTK_MAJOR_VERSION == 3 */
+	/* !!! Only removes what do_grab() set, here */
+	guint32 time = gtk_get_current_event_time();
+	GdkDevice *mouse = g_object_get_data(G_OBJECT(widget), GRAB_KEY);
+	if (!mouse) return;
+	gdk_device_ungrab(gdk_device_get_associated_device(mouse), time); // kbd
+	gdk_device_ungrab(mouse, time);
+	gtk_device_grab_remove(widget, mouse);
+	g_object_set_data(G_OBJECT(widget), GRAB_KEY, NULL);
 #endif
 }
 
@@ -3661,18 +5903,50 @@ void widget_showhide(GtkWidget *widget, int what)
 
 int parse_color(char *what)
 {
+#if GTK_MAJOR_VERSION == 3
+	GdkRGBA col;
+
+	if (!gdk_rgba_parse(&col, what)) return (-1);
+	return (RGB_2_INT(((int)(col.red * 65535) + 128) / 257,
+		((int)(col.green * 65535) + 128) / 257,
+		((int)(col.blue * 65535) + 128) / 257));
+#else /* if GTK_MAJOR_VERSION <= 2 */
 	GdkColor col;
 
 	if (!gdk_color_parse(what, &col)) return (-1);
 	return (RGB_2_INT(((int)col.red + 128) / 257,
 		((int)col.green + 128) / 257,
 		((int)col.blue + 128) / 257));
+#endif
 }
 
 //	DPI value
 
 double window_dpi(GtkWidget *win)
 {
+#if GTK_MAJOR_VERSION == 3
+	GValue v;
+	GdkScreen *sc = gtk_widget_get_screen(win);
+	double d = gdk_screen_get_resolution(sc);
+	if (d > 0) return (d); // Seems good
+
+	memset(&v, 0, sizeof(v));
+	g_value_init(&v, G_TYPE_INT);
+	if (gdk_screen_get_setting(sc, "gtk-xft-dpi", &v))
+		return (g_value_get_int(&v) / (double)1024.0);
+#ifdef GDK_WINDOWING_X11
+	{
+		/* Get DPI from Xft */
+		char *e, *v = XGetDefault(GDK_SCREEN_XDISPLAY(sc), "Xft", "dpi");
+		if (v)
+		{
+			d = g_strtod(v, &e);
+			if (e != v) return (d); // Seems good
+		}
+	}
+#endif
+	return ((gdk_screen_get_height(sc) * (double)25.4) / gdk_screen_get_height_mm(sc));
+#else /* if GTK_MAJOR_VERSION <= 2 */
 #if GTK2VERSION >= 10
 	double d = gdk_screen_get_resolution(gdk_drawable_get_screen(win->window));
 	if (d > 0) return (d); // Seems good
@@ -3709,6 +5983,7 @@ double window_dpi(GtkWidget *win)
 	return ((gdk_screen_height() * (double)25.4) /
 		gdk_screen_height_mm());
 #endif
+#endif /* GTK+1&2 */
 }
 
 //	Memory size (Mb)

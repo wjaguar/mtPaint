@@ -126,7 +126,10 @@ static void filter_dir(fpick_dd *dt, const char *pattern)
 	}
 	dt->cntx = map - dt->fmap;	
 
-#ifdef HAVE_FILEFILTER
+#if GTK_MAJOR_VERSION == 3
+	g_object_ref_sink(filt);
+	g_object_unref(filt);
+#elif defined HAVE_FILEFILTER
 	gtk_object_sink(GTK_OBJECT(filt));
 #endif
 }

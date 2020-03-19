@@ -34,6 +34,37 @@
 
 /// More of meaningless differences to hide
 
+#if GTK_MAJOR_VERSION == 3
+#define gdk_rgb_init() /* Not needed anymore */
+#define gtk_object_get_data(A,B) g_object_get_data(A,B)
+#define gtk_object_set_data(A,B,C) g_object_set_data(A,B,C)
+#define gtk_object_get_data_by_id(A,B) g_object_get_qdata(A,B)
+#define gtk_object_set_data_by_id(A,B,C) g_object_set_qdata(A,B,C)
+#define GtkObject GObject
+#define gtk_object_weakref(A,B,C) g_object_weak_ref(A,B,C)
+#define GtkDestroyNotify GWeakNotify
+#define GTK_WIDGET_REALIZED(A) gtk_widget_get_realized(A)
+#define GTK_WIDGET_MAPPED(A) gtk_widget_get_mapped(A)
+#define	GTK_WIDGET_SENSITIVE(A) gtk_widget_get_sensitive(A)
+#define	GTK_WIDGET_IS_SENSITIVE(A) gtk_widget_is_sensitive(A)
+#define GTK_WIDGET_VISIBLE(A) gtk_widget_get_visible(A)
+#define gtk_notebook_set_page gtk_notebook_set_current_page
+#define gtk_accel_group_unref g_object_unref
+#define gtk_hpaned_new() gtk_paned_new(GTK_ORIENTATION_HORIZONTAL)
+#define gtk_vpaned_new() gtk_paned_new(GTK_ORIENTATION_VERTICAL)
+#define gtk_hseparator_new() gtk_separator_new(GTK_ORIENTATION_HORIZONTAL)
+#define gtk_vseparator_new() gtk_separator_new(GTK_ORIENTATION_VERTICAL)
+#define hbox_new(A) gtk_box_new(GTK_ORIENTATION_HORIZONTAL, (A))
+#define vbox_new(A) gtk_box_new(GTK_ORIENTATION_VERTICAL, (A))
+#define gtk_menu_item_right_justify(A) gtk_menu_item_set_right_justified((A), TRUE)
+#define gtk_radio_menu_item_group gtk_radio_menu_item_get_group
+#define gtk_widget_ref(A) g_object_ref(A)
+#define gtk_widget_unref(A) g_object_unref(A)
+
+static GQuark tool_key;
+#define TOOL_KEY "mtPaint.tool"
+
+#else
 #define gtk_selection_data_get_data(A) ((A)->data)
 #define gtk_selection_data_get_length(A) ((A)->length)
 #define gtk_selection_data_get_format(A) ((A)->format)
@@ -53,11 +84,10 @@
 #define gtk_paned_get_child2(A) ((A)->child2)
 #define gtk_paned_get_position(A) ((A)->child1_size)
 #define gtk_menu_item_get_submenu(A) ((A)->submenu)
-#define gdk_device_get_name(A) ((A)->name)
-#define gdk_device_get_n_axes(A) ((A)->num_axes)
-#define gdk_device_get_mode(A) ((A)->mode)
 #define hbox_new(A) gtk_hbox_new(FALSE, (A))
 #define vbox_new(A) gtk_vbox_new(FALSE, (A))
+
+#endif
 
 /* Make code not compile if it cannot work */
 typedef char Opcodes_Too_Long[2 * (op_LAST <= WB_OPMASK) - 1];
@@ -384,7 +414,7 @@ typedef struct {
 #if GTK_MAJOR_VERSION >= 2
 
 int texteng_aa = TRUE;
-#if GTK2VERSION >= 6 /* GTK+ 2.6+ */
+#if (GTK_MAJOR_VERSION == 3) || (GTK2VERSION >= 6)
 #define FULLPANGO 1
 int texteng_rot = TRUE;
 int texteng_spc = TRUE;
@@ -417,7 +447,12 @@ int texteng_con = FALSE;
 typedef struct {
 	double sysdpi;
 	int dpi;
+#if GTK_MAJOR_VERSION == 3
+	int lastsize, lastdpi, lastset;
+#endif
 } fontsel_data;
+
+G_GNUC_BEGIN_IGNORE_DEPRECATIONS /* Leave it */
 
 #if GTK_MAJOR_VERSION >= 2
 
@@ -456,6 +491,37 @@ static void rotate_box(PangoRectangle *lr, PangoMatrix *m)
 	lr->height = ceil(y_max / PANGO_SCALE) - lr->y;
 }
 
+#if GTK_MAJOR_VERSION == 3
+
+#define FONT_SIGNAL "style_updated"
+
+static void fontsel_style(GtkWidget *widget, gpointer user_data)
+{
+	GtkStyleContext *ctx;
+	PangoFontDescription *d;
+	void **r = user_data;
+	fontsel_data *fd = r[2];
+	int sz, fontsize;
+
+	if (!fd->dpi || !fd->sysdpi) return; // Leave alone
+	ctx = gtk_widget_get_style_context(widget);
+	gtk_style_context_get(ctx, gtk_style_context_get_state(ctx), "font", &d, NULL);
+	sz = pango_font_description_get_size(d);
+	fontsize = gtk_font_selection_get_size(GTK_FONT_SELECTION(r[0]));
+
+	if ((sz != fd->lastset) || (fd->dpi != fd->lastdpi) || (fontsize != fd->lastsize))
+	{
+		fd->lastdpi = fd->dpi;
+		fd->lastsize = fontsize;
+		sz = (fontsize * fd->dpi) / fd->sysdpi;
+		pango_font_description_set_size(d, fd->lastset = sz);
+		gtk_widget_override_font(widget, d); // To make widget show it
+	}
+	pango_font_description_free(d);
+}
+
+#else
+
 #define FONT_SIGNAL "style_set"
 
 /* In principle, similar approach can be used with GTK+1 too - but it would be
@@ -482,6 +548,7 @@ static void fontsel_style(GtkWidget *widget, GtkStyle *previous_style,
 }
 
 #endif
+#endif /* GTK+2&3 */
 
 static void fontsel_prepare(GtkWidget *widget, gpointer user_data)
 {
@@ -500,6 +567,11 @@ static GtkWidget *fontsel(void **r, void *v)
 	/* !!! Setting initial values fails if no toplevel */
 	gtk_signal_connect(GTK_OBJECT(widget), "realize",
 		GTK_SIGNAL_FUNC(fontsel_prepare), v);
+#if GTK_MAJOR_VERSION == 3
+	/* !!! Kill off animating size changes */
+	css_restyle(entry, ".mtPaint_fontentry { transition-duration: 0; "
+		"transition-delay: 0; }", "mtPaint_fontentry", NULL);
+#endif
 #if GTK_MAJOR_VERSION >= 2
 	gtk_signal_connect(GTK_OBJECT(entry), FONT_SIGNAL, 
 		GTK_SIGNAL_FUNC(fontsel_style), r);
@@ -512,7 +584,12 @@ static GtkWidget *fontsel(void **r, void *v)
 static void do_render_text(texteng_dd *td)
 {
 	GtkWidget *widget = main_window;
+#if GTK_MAJOR_VERSION == 3
+	cairo_surface_t *text_pixmap;
+	cairo_t *cr;
+#else
 	GdkPixmap *text_pixmap;
+#endif
 	unsigned char *buf;
 	int width, height, have_rgb = 0;
 
@@ -574,10 +651,20 @@ static void do_render_text(texteng_dd *td)
 	width = ink.width + PAD_SIZE * 2;
 	height = ink.height + PAD_SIZE * 2;
 
+#if GTK_MAJOR_VERSION == 3
+	text_pixmap = cairo_image_surface_create(CAIRO_FORMAT_RGB24, width, height);
+
+	cr = cairo_create(text_pixmap);
+	cairo_set_source_rgb(cr, 1, 1, 1);
+	cairo_move_to(cr, tx, ty);
+	pango_cairo_show_layout(cr, layout);
+	cairo_destroy(cr);
+#else
 	text_pixmap = gdk_pixmap_new(widget->window, width, height, -1);
 
 	gdk_draw_rectangle(text_pixmap, widget->style->black_gc, TRUE, 0, 0, width, height);
 	gdk_draw_layout(text_pixmap, widget->style->white_gc, tx, ty, layout);
+#endif
 
 	g_object_unref(layout);
 	g_object_unref(context);
@@ -607,7 +694,11 @@ static void do_render_text(texteng_dd *td)
 	if (buf) have_rgb = !!wj_get_rgb_image(gtk_widget_get_window(widget),
 		text_pixmap, buf, 0, 0, width, height);
 	// REMOVE PIXMAP
+#if GTK_MAJOR_VERSION == 3
+	cairo_surface_destroy(text_pixmap);
+#else
 	gdk_pixmap_unref(text_pixmap);
+#endif
 
 	memset(&td->ctx, 0, sizeof(td->ctx));
 	if (!have_rgb) free(buf);
@@ -618,6 +709,8 @@ static void do_render_text(texteng_dd *td)
 		td->ctx.rgb = buf;
 	}
 }
+
+G_GNUC_END_IGNORE_DEPRECATIONS
 
 //	Mouse handling
 
@@ -699,6 +792,18 @@ static gboolean get_evt_mmouse(GtkWidget *widget, GdkEventMotion *event,
 #endif
 	while (TRUE)
 	{
+#if GTK_MAJOR_VERSION == 3
+		if (event->is_hint)
+		{
+			gdk_event_request_motions(event);
+			if (GET_OP((void **)user_data) < op_EVT_XMOUSE0)
+			{
+				gdk_window_get_device_position(event->window,
+					event->device, &mouse.x, &mouse.y, &mouse.state);
+				break;
+			}
+		}
+#else /* #if GTK_MAJOR_VERSION <= 2 */
 		if (!event->is_hint);
 #if GTK_MAJOR_VERSION == 2
 		else if (GET_OP((void **)user_data) >= op_EVT_XMOUSE0)
@@ -713,6 +818,7 @@ static gboolean get_evt_mmouse(GtkWidget *widget, GdkEventMotion *event,
 				&mouse.x, &mouse.y, &mouse.state);
 			break;
 		}
+#endif /* GTK+1&2 */
 		mouse.x = event->x;
 		mouse.y = event->y;
 		mouse.state = event->state;
@@ -728,6 +834,24 @@ static gboolean get_evt_mmouse(GtkWidget *widget, GdkEventMotion *event,
 
 static void enable_events(void **slot, int op)
 {
+#if GTK_MAJOR_VERSION == 3
+	/* Let's be granular, here */
+	GdkEventMask m;
+	switch (op)
+	{
+	case op_EVT_KEY: m = GDK_KEY_PRESS_MASK | GDK_KEY_RELEASE_MASK; break;
+	/* Button release goes where button press went, b/c automatic grab */
+	case op_EVT_MOUSE: case op_EVT_RMOUSE:
+	case op_EVT_XMOUSE: case op_EVT_RXMOUSE:
+		 m = GDK_BUTTON_PRESS_MASK | GDK_BUTTON_RELEASE_MASK; break;
+	case op_EVT_MMOUSE: case op_EVT_MXMOUSE: m = GDK_BUTTON_PRESS_MASK |
+		GDK_BUTTON_RELEASE_MASK | GDK_POINTER_MOTION_MASK; break;
+	case op_EVT_CROSS: m = GDK_ENTER_NOTIFY_MASK | GDK_LEAVE_NOTIFY_MASK; break;
+	case op_EVT_SCROLL: m = GDK_SCROLL_MASK; break;
+	default: return;
+	}
+	gtk_widget_add_events(*slot, m);
+#else /* #if GTK_MAJOR_VERSION <= 2 */
 	if ((op >= op_EVT_MOUSE) && (op <= op_EVT_RXMOUSE))
 	{
 		if (op >= op_EVT_XMOUSE0) gtk_widget_set_extension_events(*slot,
@@ -739,6 +863,7 @@ static void enable_events(void **slot, int op)
 	else if (op != op_EVT_CROSS) return; // Ignore op_EVT_KEY & op_EVT_SCROLL
 	/* No granularity at all, but it was always this way, and it worked */
 	gtk_widget_set_events(*slot, GDK_ALL_EVENTS_MASK);
+#endif /* GTK+1&2 */
 }
 
 // !!! With GCC inlining this, weird size fluctuations can happen. Or not.
@@ -848,6 +973,12 @@ static int drag_event(drag_sel *ds, drag_ctx *dc)
 
 static void set_drag_icon(GdkDragContext *context, GtkWidget *src, int rgb)
 {
+#if GTK_MAJOR_VERSION == 3
+	GdkPixbuf *p = gdk_pixbuf_new(GDK_COLORSPACE_RGB, FALSE, 8, RGB_DND_W, RGB_DND_H);
+	gdk_pixbuf_fill(p, ((unsigned)rgb << 8) + 0xFF);
+	gtk_drag_set_icon_pixbuf(context, p, -2, -2);
+	g_object_unref(p);
+#else /* #if GTK_MAJOR_VERSION <= 2 */
 	GdkGCValues sv;
 	GdkPixmap *swatch;
 
@@ -860,6 +991,7 @@ static void set_drag_icon(GdkDragContext *context, GtkWidget *src, int rgb)
 	gtk_drag_set_icon_pixmap(context, gtk_widget_get_colormap(src),
 		swatch, NULL, -2, -2);
 	gdk_pixmap_unref(swatch);
+#endif /* GTK+1&2 */
 }
 
 /* !!! In GTK+3 icon must be set in "drag_begin", setting it in try_start_drag()
@@ -892,7 +1024,12 @@ static int try_start_drag(GtkWidget *widget, GdkEvent *event, gpointer user_data
 	else if (event->type == GDK_MOTION_NOTIFY)
 	{
 		if (event->motion.is_hint)
+#if GTK_MAJOR_VERSION == 3
+			gdk_window_get_device_position(event->motion.window,
+				event->motion.device, &rx, &ry, &state);
+#else /* if GTK_MAJOR_VERSION <= 2 */
 			gdk_window_get_pointer(event->motion.window, &rx, &ry, &state);
+#endif
 		else
 		{
 			rx = event->motion.x;
@@ -918,8 +1055,14 @@ static int try_start_drag(GtkWidget *widget, GdkEvent *event, gpointer user_data
 				 * this drag, and maybe set icon color */
 				dc->color = -1;
 				if (!drag_event(NULL, dc)) return (TRUE); // no drag
+#if GTK_MAJOR_VERSION == 3
+				gtk_drag_begin_with_coordinates(widget,
+					dc->cd->targets, GDK_ACTION_COPY |
+					GDK_ACTION_MOVE, 1, event, -1, -1);
+#else /* if GTK_MAJOR_VERSION <= 2 */
 				gtk_drag_begin(widget, dc->cd->targets,
 					GDK_ACTION_COPY | GDK_ACTION_MOVE, 1, event);
+#endif
 				return (TRUE);
 			}
 		}
@@ -1086,6 +1229,18 @@ static clipform_dd *clip_format(GtkSelectionData *sel, clipform_data *cd)
 	if ((n > 0) && (gtk_selection_data_get_format(sel) == 32) &&
 		(gtk_selection_data_get_data_type(sel) == GDK_SELECTION_TYPE_ATOM))
 	{
+#if GTK_MAJOR_VERSION == 3
+		guint res, res0 = G_MAXUINT;
+
+		targets = (GdkAtom *)gtk_selection_data_get_data(sel);
+		/* Need to scan for each target, to return the earliest slot in
+		 * the array in case more than one match */
+		for (i = 0; i < n; i++)
+			if (gtk_target_list_find(cd->targets, targets[i], &res) &&
+				(res < res0)) res0 = res;
+		// Return the matching format
+		if (res0 < G_MAXUINT) return (cd->src + res0);
+#else /* if GTK_MAJOR_VERSION <= 2 */
 		GList *dest;
 		GdkAtom target;
 
@@ -1098,6 +1253,7 @@ static clipform_dd *clip_format(GtkSelectionData *sel, clipform_data *cd)
 		}
 		// Return the matching format
 		if (dest) return (cd->src + ((GtkTargetPair *)dest->data)->info);
+#endif
 	}
 	return (NULL);
 }
@@ -1902,6 +2058,35 @@ static void trigger_things(void **wdata)
 	}
 }
 
+#if GTK_MAJOR_VERSION == 3
+
+/* Wait till window is getting drawn to make it user-resizable */
+static gboolean make_resizable(GtkWidget *widget, cairo_t *cr, gpointer user_data)
+{
+	gtk_window_set_resizable(GTK_WINDOW(widget), TRUE);
+	g_signal_handlers_disconnect_by_func(widget, make_resizable, user_data);
+	return (FALSE);
+}
+
+/* Try to avoid scrolling - request natural size of contents */
+static void do_wantmax(GtkWidget *widget, gint vert, gint *min, gint *nat,
+	gint for_width, gpointer user_data)
+{
+	GtkWidget *inside = gtk_bin_get_child(GTK_BIN(widget));
+	gint cmin = 0, cnat = 0;
+
+	if (!inside) return; // Nothing to do
+	if (((int)user_data & 1) && !vert) return; // Leave width be
+	if (((int)user_data & 2) && vert) return; // Leave height be
+	if (for_width >= 0)
+		gtk_widget_get_preferred_height_for_width(inside, for_width, &cmin, &cnat);
+	else (vert ? gtk_widget_get_preferred_height :
+		gtk_widget_get_preferred_width)(inside, &cmin, &cnat);
+	if (cnat > *nat) *nat = cnat;
+}
+
+#else /* #if GTK_MAJOR_VERSION <= 2 */
+
 /* Try to avoid scrolling - request full size of contents */
 static void scroll_max_size_req(GtkWidget *widget, GtkRequisition *requisition,
 	gpointer user_data)
@@ -1923,6 +2108,8 @@ static void scroll_max_size_req(GtkWidget *widget, GtkRequisition *requisition,
 	}
 }
 
+#endif
+
 // !!! And with inlining this, problem also
 GtkWidget *scrollw(int vh)
 {
@@ -1940,6 +2127,152 @@ static void toggle_vbook(GtkToggleButton *button, gpointer user_data)
 	gtk_notebook_set_page(**(void ***)user_data,
 		!!gtk_toggle_button_get_active(button));
 }
+
+#if GTK_MAJOR_VERSION == 3
+
+//	RGBIMAGE widget
+
+typedef struct {
+	cairo_surface_t *s;
+	unsigned char *rgb;
+	int w, h, bkg;
+} rgbimage_data;
+
+static gboolean redraw_rgb(GtkWidget *widget, cairo_t *cr, gpointer user_data)
+{
+	rgbimage_data *rd = user_data;
+	GdkRectangle r;
+	int x2, y2, rxy[4] = { 0, 0, rd->w, rd->h };
+
+
+	if (!gdk_cairo_get_clip_rectangle(cr, &r)) return (TRUE); // Nothing to do
+
+	cairo_save(cr);
+	cairo_set_operator(cr, CAIRO_OPERATOR_SOURCE);
+
+	if (!clip(rxy, r.x, r.y, x2 = r.x + r.width, y2 = r.y + r.height, rxy) ||
+		!rd->rgb) rxy[2] = r.x , rxy[3] = y2;
+	else
+	{
+		/* RGB image buffer */
+		if (!rd->s) rd->s = cairo_upload_rgb(NULL, gtk_widget_get_window(widget),
+			rd->rgb, rd->w, rd->h, rd->w * 3);
+		cairo_set_source_surface(cr, rd->s, 0, 0);
+		cairo_rectangle(cr, 0, 0, rd->w, rd->h); // Let Cairo clip it
+		cairo_fill(cr);
+	}
+
+	/* Opaque background outside image proper */
+	cairo_set_rgb(cr, rd->bkg);
+	if (rxy[2] < x2)
+	{
+		cairo_rectangle(cr, rxy[2], r.y, x2 - rxy[2], rxy[3] - rxy[1]);
+		cairo_fill(cr);
+	}
+	if (rxy[3] < y2)
+	{
+		cairo_rectangle(cr, r.x, rxy[3], r.width, y2 - rxy[3]);
+		cairo_fill(cr);
+	}
+
+	cairo_restore(cr);
+
+	return (TRUE);
+}
+
+static void reset_rgb(GtkWidget *widget, gpointer user_data)
+{
+	rgbimage_data *rd = user_data;
+	if (rd->s) cairo_surface_fdestroy(rd->s);
+	rd->s = NULL;
+}
+
+GtkWidget *rgbimage(void **r, int *wh)
+{
+	GtkWidget *widget;
+	rgbimage_data *rd = r[2];
+
+	widget = gtk_drawing_area_new();
+	rd->rgb = r[0];
+	rd->w = wh[0];
+	rd->h = wh[1];
+	gtk_widget_set_size_request(widget, wh[0], wh[1]);
+	g_signal_connect(G_OBJECT(widget), "unrealize", G_CALLBACK(reset_rgb), rd);
+	g_signal_connect(G_OBJECT(widget), "draw", G_CALLBACK(redraw_rgb), rd);
+
+	return (widget);
+}
+
+//	RGBIMAGEP widget
+
+static gboolean redraw_rgbp(GtkWidget *widget, cairo_t *cr, gpointer user_data)
+{
+	rgbimage_data *rd = user_data;
+	GtkAllocation alloc;
+	int x, y;
+
+	if (!rd->s) return (TRUE);
+	gtk_widget_get_allocation(widget, &alloc);
+	x = (alloc.width - rd->w) / 2;
+	y = (alloc.height - rd->h) / 2;
+
+	cairo_save(cr);
+	cairo_set_operator(cr, CAIRO_OPERATOR_SOURCE);
+	cairo_set_source_surface(cr, rd->s, x, y);
+	cairo_rectangle(cr, x, y, rd->w, rd->h);
+	cairo_fill(cr);
+	cairo_restore(cr);
+
+	return (TRUE);
+}
+
+static void reset_rgbp(GtkWidget *widget, gpointer user_data)
+{
+	rgbimage_data *rd = user_data;
+	cairo_surface_t *s;
+	cairo_t *cr;
+
+	if (!rd->s)
+	{
+		GdkWindow *win = gtk_widget_get_window(widget);
+		if (!win) win = gdk_screen_get_root_window(gtk_widget_get_screen(widget));
+		rd->s = gdk_window_create_similar_surface(win, CAIRO_CONTENT_COLOR,
+			rd->w, rd->h);
+	}
+
+	s = cairo_upload_rgb(rd->s, NULL, rd->rgb, rd->w, rd->h, rd->w * 3);
+	cr = cairo_create(rd->s);
+	cairo_set_operator(cr, CAIRO_OPERATOR_SOURCE);
+	cairo_set_source_surface(cr, s, 0, 0);
+	cairo_paint(cr);
+	cairo_destroy(cr);
+	cairo_surface_fdestroy(s);
+
+	gtk_widget_queue_draw(widget);
+}
+
+// !!! And with inlining this, problem also
+GtkWidget *rgbimagep(void **r, int w, int h)
+{
+	rgbimage_data *rd = r[2];
+	GtkWidget *widget;
+
+	/* With GtkImage unable to properly hold surfaces till GTK+ 3.20, have
+	 * to use a window-less container as substitute */
+	widget = gtk_box_new(GTK_ORIENTATION_HORIZONTAL, 0);
+	gtk_widget_set_size_request(widget, w, h);
+
+	rd->rgb = r[0];
+	rd->w = w;
+	rd->h = h;
+	g_signal_connect(G_OBJECT(widget), "realize", G_CALLBACK(reset_rgbp), rd);
+	g_signal_connect(G_OBJECT(widget), "unrealize", G_CALLBACK(reset_rgb), rd);
+	g_signal_connect(G_OBJECT(widget), "draw", G_CALLBACK(redraw_rgbp), rd);
+
+	return (widget);
+}
+
+#else /* if GTK_MAJOR_VERSION <= 2 */
 
 //	RGBIMAGE widget
 
@@ -2038,7 +2371,35 @@ GtkWidget *rgbimagep(void **r, int w, int h)
 	return (widget);
 }
 
+#endif /* GTK+1&2 */
+
 //	CANVASIMG widget
+
+#if GTK_MAJOR_VERSION == 3
+
+static void expose_canvasimg(GtkWidget *widget, cairo_region_t *clip_r,
+	gpointer user_data)
+{
+	rgbimage_data *rd = user_data;
+	cairo_rectangle_int_t r;
+	int x2, y2, rxy[4] = { 0, 0, rd->w, rd->h };
+
+
+	cairo_region_get_extents(clip_r, &r);
+	if (!clip(rxy, r.x, r.y, x2 = r.x + r.width, y2 = r.y + r.height, rxy) ||
+		!rd->rgb) rxy[2] = r.x , rxy[3] = y2;
+	/* RGB image buffer */
+	else wjcanvas_draw_rgb(widget, rxy[0], rxy[1], rxy[2] - rxy[0], rxy[3] - rxy[1],
+		rd->rgb + (rxy[1] * rd->w + rxy[0]) * 3, rd->w * 3, 0, FALSE);
+
+	/* Opaque background outside image proper */
+	if (rxy[2] < x2) wjcanvas_draw_rgb(widget, rxy[2], r.y,
+		x2 - rxy[2], rxy[3] - rxy[1], NULL, 0, rd->bkg, FALSE);
+	if (rxy[3] < y2) wjcanvas_draw_rgb(widget, r.x, rxy[3],
+		r.width, y2 - rxy[3], NULL, 0, rd->bkg, FALSE);
+}
+
+#else /* if GTK_MAJOR_VERSION <= 2 */
 
 static gboolean expose_canvasimg(GtkWidget *widget, GdkEventExpose *event,
 	gpointer user_data)
@@ -2049,6 +2410,8 @@ static gboolean expose_canvasimg(GtkWidget *widget, GdkEventExpose *event,
 	expose_ext(widget, event, user_data, vport[0], vport[1]);
 	return (TRUE);
 }
+
+#endif /* GTK+1&2 */
 
 GtkWidget *canvasimg(void **r, int w, int h, int bkg)
 {
@@ -2071,6 +2434,50 @@ GtkWidget *canvasimg(void **r, int w, int h, int bkg)
 }
 
 //	CANVAS widget
+
+#if GTK_MAJOR_VERSION == 3
+
+static void expose_canvas_(GtkWidget *widget, cairo_region_t *clip_r,
+	gpointer user_data)
+{
+	void **slot = user_data;
+	void **base = slot[0], **desc = slot[1];
+	cairo_rectangle_int_t re, rex;
+	rgbcontext ctx;
+	int m, s, sz, cost = (int)GET_DESCV(PREV_SLOT(slot), 2);
+	int i, n, wh, r1 = 0;
+
+	/* Analyze what we got */
+	cairo_region_get_extents(clip_r, &rex);
+	wh = rex.width * rex.height;
+	n = cairo_region_num_rectangles(clip_r);
+	for (i = m = sz = 0; i < n; i++)
+	{
+		cairo_region_get_rectangle(clip_r, i, &re);
+		sz += (s = re.width * re.height);
+		if (m < s) m = s;
+	}
+	/* Only bother with regions if worth it */
+	if (wh - sz <= cost * (n - 1)) r1 = n = 1 , m = wh , re = rex;
+
+	ctx.rgb = malloc(m * 3);
+	for (i = 0; i < n; i++)
+	{
+		if (!r1) cairo_region_get_rectangle(clip_r, i, &re);
+		ctx.xy[2] = (ctx.xy[0] = re.x) + re.width;
+		ctx.xy[3] = (ctx.xy[1] = re.y) + re.height;
+
+		if (((evtxr_fn)desc[1])(GET_DDATA(base), base,
+			(int)desc[0] & WB_OPMASK, slot, &ctx))
+// !!! Allow drawing area to be reduced, or ignored altogether
+			wjcanvas_draw_rgb(widget, ctx.xy[0], ctx.xy[1],
+				ctx.xy[2] - ctx.xy[0], ctx.xy[3] - ctx.xy[1],
+				ctx.rgb, (ctx.xy[2] - ctx.xy[0]) * 3, 0, FALSE);
+	}
+	free(ctx.rgb);
+}
+
+#else /* if GTK_MAJOR_VERSION <= 2 */
 
 static gboolean expose_canvas_(GtkWidget *widget, GdkEventExpose *event,
 	gpointer user_data)
@@ -2121,6 +2528,8 @@ static gboolean expose_canvas_(GtkWidget *widget, GdkEventExpose *event,
 #endif
 	return (FALSE);
 }
+
+#endif /* GTK+1&2 */
 
 //	FCIMAGEP widget
 
@@ -2188,6 +2597,44 @@ static void fcimage_rxy(void **slot, int *xy)
 
 // OPT* widgets
 
+#if GTK_MAJOR_VERSION == 3
+
+/* !!! Limited to 256 choices max, by using id[0] for index */
+static void opt_reset(void **slot, char *ddata, int idx)
+{
+	void **pp = slot[1];
+	char **names, id[2] = { 0, 0 };
+	int i, j, k, cnt, opf = GET_OPF(slot), op = opf & WB_OPMASK;
+
+	if (op == op_OPTD) cnt = -1 , names = *(char ***)(ddata + (int)pp[2]);
+	else cnt = (int)pp[3] , names = pp[2];
+	if (!cnt) cnt = -1;
+
+	g_signal_handlers_disconnect_by_func(slot[0], get_evt_1, NEXT_SLOT(slot));
+	gtk_combo_box_text_remove_all(GTK_COMBO_BOX_TEXT(slot[0]));
+	for (i = j = k = 0; (i != cnt) && names[i]; i++)
+	{
+		if (!names[i][0]) continue;
+		id[0] = i;
+		gtk_combo_box_text_append(GTK_COMBO_BOX_TEXT(slot[0]), id, _(names[i]));
+		if (i == idx) j = k;
+		k++;
+  	}
+	gtk_combo_box_set_active(GTK_COMBO_BOX(slot[0]), j);
+	if (WB_GETREF(opf) > 1) g_signal_connect(slot[0], "changed",
+		G_CALLBACK(get_evt_1), NEXT_SLOT(slot));
+}	
+
+static int wj_option_menu_get_history(GtkWidget *cbox)
+{
+	const char *id = gtk_combo_box_get_active_id(GTK_COMBO_BOX(cbox));
+	return (id ? id[0] : 0);
+}
+
+#define wj_option_menu_set_history(W,N) gtk_combo_box_set_active(W,N)
+
+#else /* if GTK_MAJOR_VERSION <= 2 */
+
 #if GTK_MAJOR_VERSION == 2
 
 /* Cause the size to be properly reevaluated */
@@ -2239,6 +2686,8 @@ static int wj_option_menu_get_history(GtkWidget *optmenu)
 
 #define wj_option_menu_set_history(W,N) gtk_option_menu_set_history(W,N)
 
+#endif /* GTK+1&2 */
+
 //	RPACK* and COMBO widgets
 
 static GtkWidget *mkpack(int mode, int d, int ref, char *ddata, void **r)
@@ -2256,6 +2705,21 @@ static GtkWidget *mkpack(int mode, int d, int ref, char *ddata, void **r)
 		mode ? GTK_SIGNAL_FUNC(get_evt_1_t) : GTK_SIGNAL_FUNC(get_evt_1)));
 }
 
+#if GTK_MAJOR_VERSION == 3
+
+static gboolean col_expose(GtkWidget *widget, cairo_t *cr, unsigned char *col)
+{
+	cairo_save(cr);
+	cairo_set_operator(cr, CAIRO_OPERATOR_SOURCE);
+	cairo_set_rgb(cr, MEM_2_INT(col, 0));
+	cairo_paint(cr);
+	cairo_restore(cr);
+
+	return (TRUE);
+}
+
+#else /* if GTK_MAJOR_VERSION <= 2 */
+
 // !!! ref to RGB[3]
 static gboolean col_expose(GtkWidget *widget, GdkEventExpose *event,
 	unsigned char *col)
@@ -2270,6 +2734,8 @@ static gboolean col_expose(GtkWidget *widget, GdkEventExpose *event,
 
 	return (TRUE);
 }
+
+#endif /* GTK+1&2 */
 
 //	COLORLIST widget
 
@@ -2569,6 +3035,40 @@ static void gradbar_slot(GtkWidget *btn, gpointer user_data)
 	get_evt_1(NULL, (gpointer)dt->r);
 }
 
+#if GTK_MAJOR_VERSION == 3
+
+static gboolean gradbar_draw(GtkWidget *widget, cairo_t *cr, gpointer user_data)
+{
+	unsigned char *rp, *idx = user_data;
+	gradbar_data *dt = (void *)(idx - offsetof(gradbar_data, idxs) - *idx);
+	int n = *idx + dt->ofs;
+
+	cairo_save(cr);
+	cairo_rectangle(cr, 0, 0, SLOT_SIZE, SLOT_SIZE);
+	if (n < *dt->len) // Filled slot
+	{
+		rp = dt->rgb ? dt->rgb + dt->map[n] * 3 : dt->map + n * 3;
+		cairo_set_rgb(cr, MEM_2_INT(rp, 0));
+
+	}
+	else // Empty slot - show that
+	{
+		cairo_set_rgb(cr, RGB_2_INT(178, 178, 178));
+		cairo_fill(cr);
+		cairo_set_rgb(cr, RGB_2_INT(128, 128, 128));
+		cairo_move_to(cr, 0, 0);
+		cairo_line_to(cr, 0, SLOT_SIZE);
+		cairo_line_to(cr, SLOT_SIZE, SLOT_SIZE);
+		cairo_close_path(cr);
+	}
+	cairo_fill(cr);
+	cairo_restore(cr);
+
+	return (TRUE);
+}
+
+#else /* if GTK_MAJOR_VERSION <= 2 */
+
 static gboolean gradbar_draw(GtkWidget *widget, GdkEventExpose *event,
 	gpointer user_data)
 {
@@ -2595,6 +3095,8 @@ static gboolean gradbar_draw(GtkWidget *widget, GdkEventExpose *event,
 	return (TRUE);
 }
 
+#endif /* GTK+1&2 */
+
 // !!! With inlining this, problem also
 GtkWidget *gradbar(void **r, char *ddata)
 {
@@ -2603,6 +3105,7 @@ GtkWidget *gradbar(void **r, char *ddata)
 	void **pp = r[1];
 	int i;
 
+G_GNUC_BEGIN_IGNORE_DEPRECATIONS /* Leave it */
 	hbox = gtk_hbox_new(TRUE, 0);
 
 	dt->r = NEXT_SLOT(r);
@@ -2614,6 +3117,7 @@ GtkWidget *gradbar(void **r, char *ddata)
 	dt->lim = (int)pp[6];
 
 	dt->lr[0] = btn = xpack(hbox, gtk_button_new());
+	add_css_class(btn, "mtPaint_gradbar_button");
 	gtk_container_add(GTK_CONTAINER(btn), gtk_arrow_new(GTK_ARROW_LEFT,
 #if GTK_MAJOR_VERSION == 1
         // !!! Arrow w/o shadow is invisible in plain GTK+1
@@ -2630,16 +3134,26 @@ GtkWidget *gradbar(void **r, char *ddata)
 		dt->idxs[i] = i;
 		btn = xpack(hbox, gtk_radio_button_new_from_widget(
 			GTK_RADIO_BUTTON_0(btn)));
+		add_css_class(btn, "mtPaint_gradbar_button");
 		gtk_toggle_button_set_mode(GTK_TOGGLE_BUTTON(btn), FALSE);
 		gtk_signal_connect(GTK_OBJECT(btn), "toggled",
 			GTK_SIGNAL_FUNC(gradbar_slot), dt->idxs + i);
 		sw = gtk_drawing_area_new();
 		gtk_container_add(GTK_CONTAINER(btn), sw);
+#if GTK_MAJOR_VERSION == 3
+		gtk_widget_set_valign(sw, GTK_ALIGN_CENTER);
+		gtk_widget_set_halign(sw, GTK_ALIGN_CENTER);
+		gtk_widget_set_size_request(sw, SLOT_SIZE, SLOT_SIZE);
+		g_signal_connect(G_OBJECT(sw), "draw",
+			G_CALLBACK(gradbar_draw), dt->idxs + i);
+#else /* if GTK_MAJOR_VERSION <= 2 */
 		gtk_widget_set_usize(sw, SLOT_SIZE, SLOT_SIZE);
 		gtk_signal_connect(GTK_OBJECT(sw), "expose_event",
 			GTK_SIGNAL_FUNC(gradbar_draw), dt->idxs + i);
+#endif /* GTK+1&2 */
 	}
 	dt->lr[1] = btn = xpack(hbox, gtk_button_new());
+	add_css_class(btn, "mtPaint_gradbar_button");
 	gtk_container_add(GTK_CONTAINER(btn), gtk_arrow_new(GTK_ARROW_RIGHT,
 #if GTK_MAJOR_VERSION == 1
         // !!! Arrow w/o shadow is invisible in plain GTK+1
@@ -2649,12 +3163,57 @@ GtkWidget *gradbar(void **r, char *ddata)
 #endif
 	gtk_signal_connect(GTK_OBJECT(btn), "clicked",
 		GTK_SIGNAL_FUNC(gradbar_scroll), dt->idxs + 1);
+G_GNUC_END_IGNORE_DEPRECATIONS
 
 	gtk_widget_show_all(hbox);
 	return (hbox);
 }
 
 //	COMBOENTRY widget
+
+#if GTK_MAJOR_VERSION == 3
+
+static void comboentry_reset(GtkWidget *cbox, char **v, char **src)
+{
+	GtkWidget *entry = gtk_bin_get_child(GTK_BIN(cbox));
+
+	gtk_entry_set_text(GTK_ENTRY(entry), *(char **)v);
+	// Replace transient buffer
+	*(const char **)v = gtk_entry_get_text(GTK_ENTRY(entry));
+
+	gtk_combo_box_text_remove_all(GTK_COMBO_BOX_TEXT(cbox));
+	while (*src) gtk_combo_box_text_append_text(GTK_COMBO_BOX_TEXT(cbox), *src++);
+}
+
+static void comboentry_chg(GtkComboBox *cbox, gpointer user_data)
+{
+	/* Only react to selecting from list */
+	if (gtk_combo_box_get_active(cbox) >= 0) get_evt_1(G_OBJECT(cbox), user_data);
+}
+
+// !!! With inlining this, problem also
+GtkWidget *comboentry(char *ddata, void **r)
+{
+	void **pp = r[1];
+	GtkWidget *cbox = gtk_combo_box_text_new_with_entry();
+	GtkWidget *entry = gtk_bin_get_child(GTK_BIN(cbox));
+
+	comboentry_reset(cbox, r[0], *(char ***)(ddata + (int)pp[2]));
+
+	g_signal_connect(G_OBJECT(cbox), "changed",
+		G_CALLBACK(comboentry_chg), NEXT_SLOT(r));
+	g_signal_connect(G_OBJECT(entry), "activate",
+		G_CALLBACK(get_evt_1), NEXT_SLOT(r));
+
+	return (cbox);
+}
+
+#define comboentry_get_text(A) \
+	gtk_entry_get_text(GTK_ENTRY(gtk_bin_get_child(GTK_BIN(A))))
+#define comboentry_set_text(A,B) \
+	gtk_entry_set_text(GTK_ENTRY(gtk_bin_get_child(GTK_BIN(A))), B)
+
+#else /* if GTK_MAJOR_VERSION <= 2 */
 
 static void comboentry_reset(GtkCombo *combo, char **v, char **src)
 {
@@ -2694,7 +3253,54 @@ GtkWidget *comboentry(char *ddata, void **r)
 #define comboentry_get_text(A) gtk_entry_get_text(GTK_ENTRY(GTK_COMBO(A)->entry))
 #define comboentry_set_text(A,B) gtk_entry_set_text(GTK_ENTRY(GTK_COMBO(A)->entry), B)
 
+#endif /* GTK+1&2 */
+
 //	PCTCOMBO widget
+
+#if GTK_MAJOR_VERSION == 3
+
+// !!! Even with inlining this, some space gets wasted
+GtkWidget *pctcombo(void **r)
+{
+	GtkWidget *cbox, *entry, *button;
+	char buf[32];
+	int i, n = 0, v = *(int *)r[0], *ns = GET_DESCV(r, 2);
+
+	/* Uses 0-terminated array of ints */
+	while (ns[n] > 0) n++;
+
+	cbox = gtk_combo_box_text_new_with_entry();
+	/* Find the button */
+	button = combobox_button(cbox);
+	gtk_widget_set_can_focus(button, FALSE);
+	/* Make it small enough */
+	css_restyle(button, ".mtPaint_pctbutton { padding: 0; }",
+		"mtPaint_pctbutton", NULL);
+	gtk_widget_set_size_request(button, 18, -1);
+
+	entry = gtk_bin_get_child(GTK_BIN(cbox));
+	gtk_widget_set_can_focus(entry, FALSE);
+	gtk_editable_set_editable(GTK_EDITABLE(entry), FALSE);
+	gtk_entry_set_width_chars(GTK_ENTRY(entry), 6);
+	gtk_entry_set_max_width_chars(GTK_ENTRY(entry), 6);
+
+	for (i = 0; i < n; i++)
+	{
+		sprintf(buf, "%d%%", ns[i]);
+		gtk_combo_box_text_append_text(GTK_COMBO_BOX_TEXT(cbox), buf);
+	}
+	sprintf(buf, "%d%%", v);
+	gtk_entry_set_text(GTK_ENTRY(entry), buf);
+
+	g_signal_connect(G_OBJECT(entry), "changed",
+		G_CALLBACK(get_evt_1), NEXT_SLOT(r));
+
+	return (cbox);
+}
+
+#define pctcombo_entry(A) gtk_bin_get_child(GTK_BIN(A))
+
+#else /* if GTK_MAJOR_VERSION <= 2 */
 
 #if (GTK_MAJOR_VERSION == 2) && (GTK2VERSION < 12) /* GTK+ 2.10 or earlier */
 
@@ -2759,6 +3365,8 @@ GtkWidget *pctcombo(void **r)
 
 #define pctcombo_entry(A) (GTK_COMBO(A)->entry)
 
+#endif /* GTK+1&2 */
+
 //	TEXT widget
 
 static GtkWidget *textarea(char *init)
@@ -2777,8 +3385,14 @@ static GtkWidget *textarea(char *init)
 
 	text = gtk_text_view_new_with_buffer(texbuf);
 
+#if GTK_MAJOR_VERSION == 3
+	scroll = gtk_scrolled_window_new(
+		gtk_scrollable_get_hadjustment(GTK_SCROLLABLE(text)),
+		gtk_scrollable_get_vadjustment(GTK_SCROLLABLE(text)));
+#else
 	scroll = gtk_scrolled_window_new(GTK_TEXT_VIEW(text)->hadjustment,
 		GTK_TEXT_VIEW(text)->vadjustment);
+#endif
 #endif
 	gtk_scrolled_window_set_policy(GTK_SCROLLED_WINDOW(scroll),
 		GTK_POLICY_AUTOMATIC, GTK_POLICY_AUTOMATIC);
@@ -4122,6 +4736,13 @@ static void listc_optimal_width(GtkTreeView *tree, listc_data *ld)
 {
 	GtkTreeModel *tm = gtk_tree_view_get_model(tree);
 	int i, j;
+#if GTK_MAJOR_VERSION == 3
+	/* !!! GTK+2 accounts for vertical separators, and resizes columns to fit
+	 * header buttons; GTK+3 does neither */
+	int hvis = gtk_tree_view_get_headers_visible(tree);
+	gint vsep;
+	gtk_widget_style_get(GTK_WIDGET(tree), "vertical-separator", &vsep, NULL);
+#endif
 
 	for (j = 0; j < ld->c.ncol; j++)
 	{
@@ -4139,6 +4760,19 @@ static void listc_optimal_width(GtkTreeView *tree, listc_data *ld)
 				&width, NULL); // It returns max of all
 			if (!gtk_tree_model_iter_next(tm, &it)) break;
 		}
+#if GTK_MAJOR_VERSION == 3
+		if (hvis)
+		{
+			GtkWidget *button = gtk_tree_view_column_get_button(col);
+			if (button)
+			{
+				gint bw;
+				gtk_widget_get_preferred_width(button, &bw, NULL);
+				if (width < bw) width = bw;
+			}
+		}
+		width += vsep;
+#endif
 		gtk_tree_view_column_set_fixed_width(col, width);
 	}
 }
@@ -4212,8 +4846,10 @@ static void listc_reset(GtkTreeView *tree, listc_data *ld)
 		listc_sort(tree, ld, FALSE);
 	}
 
+G_GNUC_BEGIN_IGNORE_DEPRECATIONS /* Deprecate the bugs first */
 	/* !!! Sometimes it shows the wrong part and redraw doesn't help */
 	gtk_adjustment_value_changed(gtk_tree_view_get_vadjustment(tree));
+G_GNUC_END_IGNORE_DEPRECATIONS
 
 	ld->lock = FALSE;
 }
@@ -4566,10 +5202,12 @@ GtkWidget *tlspinpack(void **r, void **vp, GtkWidget *table, int wh)
 		 * reflect that */
 		np[0] = gtk_spin_button_get_value_as_int(GTK_SPIN_BUTTON(widget));
 		spin_connect(widget, GTK_SIGNAL_FUNC(spinpack_evt), tp);
+G_GNUC_BEGIN_IGNORE_DEPRECATIONS /* GtkGrid is no better for this */
 // !!! Spacing = 2
 		gtk_table_attach(GTK_TABLE(table), widget,
 			column + x, column + x + 1, row + y, row + y + 1,
 			GTK_EXPAND | GTK_FILL, 0, 0, 2);
+G_GNUC_END_IGNORE_DEPRECATIONS
 		*tp++ = vp;
 	}
 	return (widget);
@@ -4597,10 +5235,12 @@ void tltext(char *v, void **pp, GtkWidget *table, int pad)
 		tmp[i] = '\0';
 		label = gtk_label_new(tmp);
 		gtk_label_set_justify(GTK_LABEL(label), GTK_JUSTIFY_LEFT);
+G_GNUC_BEGIN_IGNORE_DEPRECATIONS /* Pointless churn is pointless */
 		gtk_misc_set_alignment(GTK_MISC(label), 0.0, 0.5);
 		gtk_widget_show(label);
 		gtk_table_attach(GTK_TABLE(table), label, x, x + 1, row, row + 1,
 			GTK_FILL, 0, pad, pad);
+G_GNUC_END_IGNORE_DEPRECATIONS
 		x++;
 		if (!c) break;
 		if (c == '\n') x = column , row++;
@@ -4619,9 +5259,15 @@ static void toolbar_lclick(GtkWidget *widget, gpointer user_data)
 	void **base = slot[0], **desc = slot[1];
 
 	/* Ignore radio buttons getting depressed */
+#if GTK_MAJOR_VERSION == 3
+	if (GTK_IS_RADIO_TOOL_BUTTON(widget) && !gtk_toggle_tool_button_get_active(
+		GTK_TOGGLE_TOOL_BUTTON(widget))) return;
+	slot = g_object_get_qdata(G_OBJECT(widget), tool_key); // if initialized
+#else /* #if GTK_MAJOR_VERSION <= 2 */
 	if (GTK_IS_RADIO_BUTTON(widget) && !GTK_TOGGLE_BUTTON(widget)->active)
 		return;
 	slot = gtk_object_get_user_data(GTK_OBJECT(widget)); // if initialized
+#endif
 	if (slot) ((evt_fn)desc[1])(GET_DDATA(base), base,
 		(int)desc[0] & WB_OPMASK, slot);
 }
@@ -4635,13 +5281,27 @@ static gboolean toolbar_rclick(GtkWidget *widget, GdkEventButton *event,
 	/* Handle only right clicks */
 	if ((event->type != GDK_BUTTON_PRESS) || (event->button != 3))
 		return (FALSE);
+#if GTK_MAJOR_VERSION == 3
+	slot = g_object_get_qdata(G_OBJECT(widget), tool_key); // if initialized
+#else /* #if GTK_MAJOR_VERSION <= 2 */
 	slot = gtk_object_get_user_data(GTK_OBJECT(widget)); // if initialized
+#endif
 	if (slot) ((evt_fn)desc[1])(GET_DDATA(base), base,
 		(int)desc[0] & WB_OPMASK, slot);
 	return (TRUE);
 }
 
 //	SMARTTBAR widget
+
+#if GTK_MAJOR_VERSION == 3
+
+/* This one handler, for keeping overflow menu untouchable */
+static gboolean leave_be(GtkToolItem *tool_item, gpointer user_data)
+{
+	return (TRUE);
+}
+
+#else /* #if GTK_MAJOR_VERSION <= 2 */
 
 /* The following is main toolbars auto-sizing code. If toolbar is too long for
  * the window, some of its items get hidden, but remain accessible through an
@@ -5249,6 +5909,8 @@ static void twobar_size_alloc(GtkWidget *widget, GtkAllocation *alloc,
 	}
 }
 
+#endif /* GTK+1&2 */
+
 //	MENUBAR widget
 
 /* !!! This passes the item slot, not event slot, as event source */
@@ -5259,13 +5921,19 @@ static void menu_evt(GtkWidget *widget, gpointer user_data)
 	void **base = slot[0], **desc = slot[1];
 
 	/* Ignore radio buttons getting depressed */
+#if GTK_MAJOR_VERSION == 3
+	if (GTK_IS_RADIO_MENU_ITEM(widget) && !gtk_check_menu_item_get_active(
+		GTK_CHECK_MENU_ITEM(widget))) return;
+	slot = g_object_get_qdata(G_OBJECT(widget), tool_key); // if initialized
+#else /* #if GTK_MAJOR_VERSION <= 2 */
 	if (GTK_IS_RADIO_MENU_ITEM(widget) && !GTK_CHECK_MENU_ITEM(widget)->active)
 		return;
 	slot = gtk_object_get_user_data(GTK_OBJECT(widget));
+#endif
 	((evt_fn)desc[1])(GET_DDATA(base), base, (int)desc[0] & WB_OPMASK, slot);
 }
 
-#if GTK2VERSION >= 4 /* Not needed before GTK+ 2.4 */
+#if (GTK_MAJOR_VERSION == 3) || (GTK2VERSION >= 4) /* Not needed before GTK+ 2.4 */
 
 /* Ignore shortcut key only when item itself is insensitive or hidden */
 static gboolean menu_allow_key(GtkWidget *widget, guint signal_id, gpointer user_data)
@@ -5319,10 +5987,14 @@ static int check_smart_menu_keys(void *sdata, GdkEventKey *event)
 		if (--l <= 0) return (FALSE); // No such key in overflow
 
 	/* Just popup - if we're here, overflow menu is offscreen anyway */
+G_GNUC_BEGIN_IGNORE_DEPRECATIONS /* Running in a wheel is for hamsters */
 	gtk_menu_popup(GTK_MENU(gtk_menu_item_get_submenu(GTK_MENU_ITEM(slot->fallback))),
 		NULL, NULL, NULL, NULL, 0, 0);
+G_GNUC_END_IGNORE_DEPRECATIONS
 	return (TRUE);
 }
+
+#if GTK_MAJOR_VERSION <= 2 /* !!! FOR NOW */
 
 /* Invalidate width cache after width-affecting change */
 static void check_width_cache(smartmenu_data *sd, int width)
@@ -5531,10 +6203,16 @@ static void smart_menu_size_alloc(GtkWidget *widget, GtkAllocation *alloc,
 	gtk_widget_size_allocate(child, &child_alloc);
 }
 
+#endif
+
 /* Fill smart menu structure */
 // !!! With inlining this, problem also
 void *smartmenu_done(void **tbar, void **r)
 {
+#if GTK_MAJOR_VERSION == 3
+	GtkWidget *tl = gtk_label_new("");
+	char c, *ts, *src, *dest;
+#endif
 	smartmenu_data *sd = tbar[2];
 	GtkWidget *parent, *item;
 	void **rr;
@@ -5559,8 +6237,25 @@ void *smartmenu_done(void **tbar, void **r)
 		l = strspn(s = rr[1], "/");
 		if (s[l]) s = _(s); // Translate
 		s += l;
+#if GTK_MAJOR_VERSION == 3
+		/* Due to crippled API, cannot set & display a mnemonic without it
+		 * attaching in the regular way; need to strip them from items */
+		gtk_label_set_text_with_mnemonic(GTK_LABEL(tl), s);
+		sd->r_menu[i].key = gtk_label_get_mnemonic_keyval(GTK_LABEL(tl));
+		ts = strdup(s);
+		src = dest = ts;
+		while (TRUE)
+		{
+			c = *src++;
+			if (c != '_') *dest++ = c;
+			if (!c) break;
+		}
+		gtk_label_set_text(GTK_LABEL(gtk_bin_get_child(GTK_BIN(item))), ts);
+		free(ts);
+#else /* #if GTK_MAJOR_VERSION <= 2 */
 		sd->r_menu[i].key = gtk_label_parse_uline(
 			GTK_LABEL(GTK_BIN(item)->child), s);
+#endif
 	}
 	for (i = 0; i <= n / 2; i++) // Swap ends
 	{
@@ -5570,6 +6265,10 @@ void *smartmenu_done(void **tbar, void **r)
 	}
 	gtk_widget_hide(sd->r_menu[0].slot[0]);
 
+#if GTK_MAJOR_VERSION == 3
+	g_object_ref_sink(tl);
+	g_object_unref(tl);
+#endif
 	return (sd);
 }
 
@@ -5675,6 +6374,29 @@ GtkWidget *do_prepare(GtkWidget *widget, int pk, pkmods *mods)
 			widget = gtk_widget_get_parent(widget);
 	/* Border this */
 	if (mods->cw) gtk_container_set_border_width(GTK_CONTAINER(widget), mods->cw);
+#if GTK_MAJOR_VERSION == 3
+	/* Set fixed width/height for this */
+/* !!! The call below does MINIMUM size; later, separate out the cases where UPPER
+ * limit is desired, make a wrapper for that, and use maxw/maxh for them */
+	if ((mods->minw > 0) || (mods->minh > 0))
+		gtk_widget_set_size_request(widget,
+			mods->minw > 0 ? mods->minw : -1,
+			mods->minh > 0 ? mods->minh : -1);
+	/* And/or min ones; this, GTK+3 can do naturally */
+	if ((mods->minw < 0) || (mods->minh < 0))
+		gtk_widget_set_size_request(widget,
+			mods->minw < 0 ? -mods->minw : -1,
+			mods->minh < 0 ? -mods->minh : -1);
+	/* Make this scrolled window request max size */
+	if (mods->wantmax)
+	{
+		GtkWidget *wrap = wjsizebin_new(G_CALLBACK(do_wantmax), NULL,
+			(gpointer)(mods->wantmax - 1));
+		gtk_widget_show(wrap);
+		gtk_container_add(GTK_CONTAINER(wrap), widget);
+		widget = wrap;
+	}
+#else /* #if GTK_MAJOR_VERSION <= 2 */
 	/* Set fixed width/height for this */
 	if ((mods->minw > 0) || (mods->minh > 0))
 		gtk_widget_set_usize(widget,
@@ -5689,6 +6411,7 @@ GtkWidget *do_prepare(GtkWidget *widget, int pk, pkmods *mods)
 	/* Make this scrolled window request max size */
 	if (mods->wantmax) gtk_signal_connect(GTK_OBJECT(widget), "size_request",
 		GTK_SIGNAL_FUNC(scroll_max_size_req), (gpointer)(mods->wantmax - 1));
+#endif
 
 	return (widget);
 }
@@ -5713,6 +6436,7 @@ enum {
 	ct_TBAR,
 	ct_NBOOK,
 	ct_HVSPLIT,
+	ct_SGROUP,
 };
 
 /* !!! Limited to rows & columns 0-255 per wh composition l16:col8:row8 */
@@ -5726,9 +6450,11 @@ static void table_it(ctslot *ct, GtkWidget *it, int wh, int pad, int pack)
 	if ((column <= 1) && (column + l > 1) && (r1 <= row)) r1 = row + 1;
 	ct->type = (r1 << 16) + (r0 << 8) + (ct->type & 255);
 
+G_GNUC_BEGIN_IGNORE_DEPRECATIONS /* Pointless churn is pointless */
 	gtk_table_attach(GTK_TABLE(ct->widget), it, column, column + l, row, row + 1,
 		pack == pk_TABLEx ? GTK_EXPAND | GTK_FILL : GTK_FILL, 0,
 		pack == pk_TABLEp ? pad : 0, pad);
+G_GNUC_END_IGNORE_DEPRECATIONS
 }
 
 /* Pack widget into container according to settings */
@@ -5740,6 +6466,17 @@ int do_pack(GtkWidget *widget, ctslot *ct, void **pp, int n, int tpad)
 	int what = ct->type & 255;
 	int l = WB_GETLEN((int)pp[0]);
 
+#if GTK_MAJOR_VERSION == 3
+	/* Apply size group */
+	if (what == ct_SGROUP)
+	{
+		gtk_size_group_add_widget((GtkSizeGroup *)box, widget);
+		/* Real container is above it */
+		ct++;
+		box = ct->widget;
+		what = ct->type & 255;
+	}
+#endif
 
 	/* Remember what & when goes into HVSPLIT */
 	if (what == ct_HVSPLIT)
@@ -5748,6 +6485,18 @@ int do_pack(GtkWidget *widget, ctslot *ct, void **pp, int n, int tpad)
 		box = hd->box;
 		if (hd->cnt < HVSPLIT_MAX) hd->inbox[hd->cnt++] = widget;
 	}
+
+#if GTK_MAJOR_VERSION == 3
+	/* Protect canvas widgets from external painting-over, with CSS nodes
+	 * or without */
+	if ((n & pkf_CANVAS) && GTK_IS_SCROLLED_WINDOW(box))
+		css_restyle(box, (gtk3version >= 20 ?
+			".mtPaint_cscroll overshoot,.mtPaint_cscroll undershoot"
+			" { background:none; }" :
+			".mtPaint_cscroll .overshoot,.mtPaint_cscroll .undershoot"
+			" { background:none; }"),
+			"mtPaint_cscroll", NULL);
+#endif
 
 	n &= pk_MASK; // Strip flags
 
@@ -5782,7 +6531,9 @@ int do_pack(GtkWidget *widget, ctslot *ct, void **pp, int n, int tpad)
 	case pk_SCROLLVP: case pk_SCROLLVPv: case pk_SCROLLVPm: case pk_SCROLLVPn:
 		sw = GTK_SCROLLED_WINDOW(box);
 
+G_GNUC_BEGIN_IGNORE_DEPRECATIONS /* Pointless churn is pointless */
 		gtk_scrolled_window_add_with_viewport(sw, widget);
+G_GNUC_END_IGNORE_DEPRECATIONS
 #ifdef U_LISTS_GTK1
 		adj = gtk_scrolled_window_get_vadjustment(sw);
 		if ((n == pk_SCROLLVPv) || (n == pk_SCROLLVPm))
@@ -5922,7 +6673,9 @@ static cmdef cmddefs[] = {
 	{ op_LISTCX,	sizeof(listc_data) },
 	{ op_DOCK,	sizeof(dock_data) },
 	{ op_HVSPLIT,	sizeof(hvsplit_data) },
+#if GTK_MAJOR_VERSION <= 2
 	{ op_SMARTTBAR,	sizeof(smarttbar_data), op_uMENUBAR },
+#endif
 	{ op_SMARTMENU,	sizeof(smartmenu_data), op_uMENUBAR },
 	{ op_DRAGDROP,	sizeof(drag_ctx) },
 	/* In this, data slot points to dependent widget's wdata */
@@ -6364,6 +7117,9 @@ void **run_create_(void **ifcode, void *ddata, int ddsize, char **script)
 		}
 		/* Done with a container */
 		case op_WDONE:
+#if GTK_MAJOR_VERSION == 3
+			if (CT_WHAT(wp) == ct_SGROUP) CT_POP(wp);
+#endif
 			CT_DROP(wp);
 			continue;
 		/* Create the main window */
@@ -6372,12 +7128,19 @@ void **run_create_(void **ifcode, void *ddata, int ddsize, char **script)
 			int wh = (int)pp[3];
 
 			gdk_rgb_init();
+
 			init_tablet();	// Set up the tablet
 
 			widget = window = gtk_window_new(GTK_WINDOW_TOPLEVEL);
 // !!! Better to use WIDTH() and HEIGHT() as elsewhere
 			// Set minimum width/height
+#if GTK_MAJOR_VERSION == 3
+			gtk_widget_set_size_request(window, wh >> 16, wh & 0xFFFF);
+			/* Global initialization */
+			tool_key = g_quark_from_static_string(TOOL_KEY);
+#else
 			gtk_widget_set_usize(window, wh >> 16, wh & 0xFFFF);
+#endif
 			// Set name _without_ translating
 			gtk_window_set_title(GTK_WINDOW(window), v);
 
@@ -6429,7 +7192,9 @@ void **run_create_(void **ifcode, void *ddata, int ddsize, char **script)
 // !!! Border = 6
 			gtk_container_set_border_width(GTK_CONTAINER(window), 6);
 			/* Both boxes go onto stack, with vbox on top */
+G_GNUC_BEGIN_IGNORE_DEPRECATIONS /* Pointless churn is pointless */
 			CT_PUSH(wp, gtk_dialog_get_action_area(GTK_DIALOG(window)), ct_BOX);
+G_GNUC_END_IGNORE_DEPRECATIONS
 			CT_PUSH(wp, gtk_dialog_get_content_area(GTK_DIALOG(window)), ct_BOX);
 			break;
 		/* Create a fileselector window (with horizontal box inside) */
@@ -6470,7 +7235,9 @@ void **run_create_(void **ifcode, void *ddata, int ddsize, char **script)
 		case op_TOPVBOXV:
 			part = TRUE; // not toplevel
 			// Fill space vertically but not horizontally
+G_GNUC_BEGIN_IGNORE_DEPRECATIONS /* Pointless churn is pointless */
 			widget = window = gtk_alignment_new(0.0, 0.5, 0.0, 1.0);
+G_GNUC_END_IGNORE_DEPRECATIONS
 			// Keep max vertical size
 			widget_set_keepsize(window, TRUE);
 			sw = add_vbox(window);
@@ -6551,6 +7318,7 @@ void **run_create_(void **ifcode, void *ddata, int ddsize, char **script)
 		}
 		/* Add a table */
 		case op_TABLE:
+G_GNUC_BEGIN_IGNORE_DEPRECATIONS /* Pointless churn is pointless */
 			widget = gtk_table_new((int)v & 0xFFFF, (int)v >> 16, FALSE);
 			if (lp > 1)
 			{
@@ -6558,6 +7326,7 @@ void **run_create_(void **ifcode, void *ddata, int ddsize, char **script)
 				gtk_table_set_row_spacings(GTK_TABLE(widget), s);
 				gtk_table_set_col_spacings(GTK_TABLE(widget), s);
 			}
+G_GNUC_END_IGNORE_DEPRECATIONS
 // !!! Padding = 0
 			cw = GET_BORDER(TABLE);
 			ct = ct_TABLE;
@@ -6566,8 +7335,14 @@ void **run_create_(void **ifcode, void *ddata, int ddsize, char **script)
 		case op_EQBOX:
 		/* Add a box */
 		case op_VBOX: case op_HBOX:
+#if GTK_MAJOR_VERSION == 3
+			widget = gtk_box_new((op == op_VBOX ? GTK_ORIENTATION_VERTICAL :
+				GTK_ORIENTATION_HORIZONTAL), (int)v & 255);
+			gtk_box_set_homogeneous(GTK_BOX(widget), op == op_EQBOX);
+#else
 			widget = (op == op_VBOX ? gtk_vbox_new :
 				gtk_hbox_new)(op == op_EQBOX, (int)v & 255);
+#endif
 			if (lp)
 			{
 				cw = ((int)v >> 8) & 255;
@@ -6661,8 +7436,13 @@ void **run_create_(void **ifcode, void *ddata, int ddsize, char **script)
 			label = pack(widget, gtk_label_new(""));
 			gtk_widget_show(label);
 			/* To prevent statusbar wobbling */
+#if GTK_MAJOR_VERSION == 3 /* !!! May need keepsize or maxsize */
+			gtk_widget_get_preferred_size(widget, &req, NULL);
+			gtk_widget_set_size_request(widget, -1, req.height);
+#else /* if GTK_MAJOR_VERSION <= 2 */
 			gtk_widget_size_request(widget, &req);
 			gtk_widget_set_usize(widget, -1, req.height);
+#endif
 
 			ct = ct_BOX;
 			pk = pk_SHOW;
@@ -6673,8 +7453,10 @@ void **run_create_(void **ifcode, void *ddata, int ddsize, char **script)
 		{
 			int paw = (int)v;
 			widget = gtk_label_new("");
+G_GNUC_BEGIN_IGNORE_DEPRECATIONS /* Pointless churn is pointless */
 			gtk_misc_set_alignment(GTK_MISC(widget),
 				((paw >> 16) & 255) / 2.0, 0.0);
+G_GNUC_BEGIN_IGNORE_DEPRECATIONS
 			if (paw & 0xFFFF) mods.minw = paw & 0xFFFF; // usize
 			// Label-specific packing
 			if (pk == pk_PACKEND) pk = pk_PACKEND1;
@@ -6735,11 +7517,22 @@ void **run_create_(void **ifcode, void *ddata, int ddsize, char **script)
 		/* Add a helptext label */
 		case op_HLABEL: case op_HLABELm:
 			widget = gtk_label_new(v);
+#if GTK_MAJOR_VERSION == 3
+			gtk_widget_set_can_focus(widget, TRUE);
+#else
 			GTK_WIDGET_SET_FLAGS(widget, GTK_CAN_FOCUS);
+#endif
 #if GTK_MAJOR_VERSION >= 2
 			gtk_label_set_selectable(GTK_LABEL(widget), TRUE);
 #endif
-#if GTK_MAJOR_VERSION == 2
+#if GTK_MAJOR_VERSION == 3
+			/* "font-size" stopped being broken only in GTK+ 3.22, and
+			 * nagging about "Pango syntax" started - WJ */
+			if (op == op_HLABELm) css_restyle(widget, (gtk3version >= 22 ?
+				".mtPaint_hlabel { font-family: Monospace; font-size:9pt; }" :
+				".mtPaint_hlabel { font: Monospace 9; }" ),
+				"mtPaint_hlabel", NULL);
+#elif GTK_MAJOR_VERSION == 2
 			if (op == op_HLABELm)
 			{
 				PangoFontDescription *pfd =
@@ -6751,9 +7544,11 @@ void **run_create_(void **ifcode, void *ddata, int ddsize, char **script)
 #endif
 			gtk_label_set_justify(GTK_LABEL(widget), GTK_JUSTIFY_LEFT);
 			gtk_label_set_line_wrap(GTK_LABEL(widget), TRUE);
+G_GNUC_BEGIN_IGNORE_DEPRECATIONS /* Pointless churn is pointless */
 			gtk_misc_set_alignment(GTK_MISC(widget), 0, 0);
 // !!! Padding = 5/5
 			gtk_misc_set_padding(GTK_MISC(widget), 5, 5);
+G_GNUC_END_IGNORE_DEPRECATIONS
 			break;
 		/* Add to table a batch of labels generated from text string */
 		case op_TLTEXT:
@@ -6763,17 +7558,28 @@ void **run_create_(void **ifcode, void *ddata, int ddsize, char **script)
 		/* Add a progressbar */
 		case op_PROGRESS:
 			widget = gtk_progress_bar_new();
+#if GTK_MAJOR_VERSION == 3
+			gtk_progress_bar_set_text(GTK_PROGRESS_BAR(widget), _(v));
+#else /* if GTK_MAJOR_VERSION <= 2 */
 			gtk_progress_set_format_string(GTK_PROGRESS(widget), _(v));
 			gtk_progress_set_show_text(GTK_PROGRESS(widget), TRUE);
+#endif
 // !!! Padding = 0
 			break;
 		/* Add a color patch renderer */
 		case op_COLORPATCH:
 			widget = gtk_drawing_area_new();
+#if GTK_MAJOR_VERSION == 3
+			gtk_widget_set_size_request(widget,
+				(int)pp[2] >> 16, (int)pp[2] & 0xFFFF);
+			g_signal_connect(G_OBJECT(widget), "draw",
+				G_CALLBACK(col_expose), v);
+#else /* if GTK_MAJOR_VERSION <= 2 */
 			gtk_drawing_area_size(GTK_DRAWING_AREA(widget),
 				(int)pp[2] >> 16, (int)pp[2] & 0xFFFF);
 			gtk_signal_connect(GTK_OBJECT(widget), "expose_event",
 				GTK_SIGNAL_FUNC(col_expose), v);
+#endif
 // !!! Padding = 0
 			break;
 		/* Add an RGB renderer */
@@ -6835,14 +7641,18 @@ void **run_create_(void **ifcode, void *ddata, int ddsize, char **script)
 		{
 			int n = *(int *)v;
 			widget = add_a_spin(n, n, n);
+#if GTK_MAJOR_VERSION == 3
+			gtk_widget_set_can_focus(widget, FALSE);
+#else
 			GTK_WIDGET_UNSET_FLAGS(widget, GTK_CAN_FOCUS);
+#endif
 			tpad = GET_BORDER(SPIN);
 			break;
 		}
 		/* Add a spin, fill from field/var */
 		case op_SPIN: case op_SPINc:
 			widget = add_a_spin(*(int *)v, (int)pp[2], (int)pp[3]);
-#if GTK2VERSION >= 4 /* GTK+ 2.4+ */
+#if (GTK_MAJOR_VERSION == 3) || (GTK2VERSION >= 4) /* GTK+ 2.4+ */
 			if (op == op_SPINc) gtk_entry_set_alignment(
 				GTK_ENTRY(&(GTK_SPIN_BUTTON(widget)->entry)), 0.5);
 #endif
@@ -6921,9 +7731,13 @@ void **run_create_(void **ifcode, void *ddata, int ddsize, char **script)
 			break;
 		/* Add an option menu for field/var */
 		case op_OPT: case op_OPTD:
+#if GTK_MAJOR_VERSION == 3
+			widget = r[0] = gtk_combo_box_text_new(); // Fix up slot
+#else /* if GTK_MAJOR_VERSION <= 2 */
 			widget = r[0] = gtk_option_menu_new(); // Fix up slot
 			 /* !!! Show now - or size won't be set properly */
 			gtk_widget_show(widget);
+#endif
 #if GTK_MAJOR_VERSION == 2
 			gtk_signal_connect(GTK_OBJECT(widget), "realize",
 				GTK_SIGNAL_FUNC(opt_size_fix), NULL);
@@ -6947,7 +7761,12 @@ void **run_create_(void **ifcode, void *ddata, int ddsize, char **script)
 			break;
 		/* Add a path entry or box to table */
 		case op_PENTRY:
+#if GTK_MAJOR_VERSION == 3
+			widget = gtk_entry_new();
+			gtk_entry_set_max_length(GTK_ENTRY(widget), (int)pp[2]);
+#else
 			widget = gtk_entry_new_with_max_length((int)pp[2]);
+#endif
 			set_path(widget, v, PATH_VALUE);
 			tpad = GET_BORDER(ENTRY);
 			break;
@@ -7133,6 +7952,11 @@ void **run_create_(void **ifcode, void *ddata, int ddsize, char **script)
 			sw = bar = widget;
 			gtk_widget_show(bar);
 
+#if GTK_MAJOR_VERSION == 3
+			/* Just add a box, to hold extra things at end */
+			widget = hbox_new(0);
+			pack(widget, bar);
+#else /* #if GTK_MAJOR_VERSION <= 2 */
 			widget = wj_size_box();
 
 			/* Make datastruct */
@@ -7152,6 +7976,7 @@ void **run_create_(void **ifcode, void *ddata, int ddsize, char **script)
 			vport_noshadow_fix(vport);
 			sd->vport = vport;
 			gtk_container_add(GTK_CONTAINER(vport), bar);
+#endif /* GTK+1&2 */
 // !!! Padding = 0
 			break;
 		}
@@ -7163,6 +7988,11 @@ void **run_create_(void **ifcode, void *ddata, int ddsize, char **script)
 			// !!! Box replaces toolbar on stack
 			CT_POP(wp);
 			CT_PUSH(wp, box, ct_BOX);
+#if GTK_MAJOR_VERSION == 3
+			/* Button is builtin */
+			widget = NULL;
+			pk = pk_NONE;
+#else /* #if GTK_MAJOR_VERSION <= 2 */
 			{
 				smarttbar_data *sd = tbar[2];
 				sd->r2 = r; // remember where the slots end
@@ -7170,15 +8000,20 @@ void **run_create_(void **ifcode, void *ddata, int ddsize, char **script)
 				widget = smarttbar_button(sd, v);
 				pk = pk_SHOW;
 			}
+#endif /* GTK+1&2 */
 			break;
 		}
 		/* Add a container-toggle beside toolbar */
 		case op_TBBOXTOG:
 			widget = pack(CT_N(wp, 1), gtk_toggle_button_new());
+#if GTK_MAJOR_VERSION == 3
+			gtk_widget_set_tooltip_text(widget, _(wid = pp[3]));
+#else
 			/* Parasite tooltip on toolbar */
 			gtk_tooltips_set_tip(GTK_TOOLBAR(CT_TOP(wp))->tooltips,
 				widget, _(wid = pp[3]), "Private");
-#if GTK2VERSION >= 4 /* GTK+ 2.4+ */
+#endif
+#if (GTK_MAJOR_VERSION == 3) || (GTK2VERSION >= 4) /* GTK+ 2.4+ */
 			gtk_button_set_focus_on_click(GTK_BUTTON(widget), FALSE);
 #endif
 			gtk_signal_connect(GTK_OBJECT(widget), "clicked",
@@ -7190,6 +8025,10 @@ void **run_create_(void **ifcode, void *ddata, int ddsize, char **script)
 		case op_TBBUTTON: case op_TBTOGGLE: case op_TBRBUTTON:
 		{
 			GtkWidget *rb = NULL;
+#if GTK_MAJOR_VERSION == 3
+			GtkToolItem *it = NULL;
+			GtkWidget *m;
+#endif
 
 			if (keygroup) keymap_add(keymap, r, pp[3], keygroup);
 
@@ -7205,6 +8044,46 @@ void **run_create_(void **ifcode, void *ddata, int ddsize, char **script)
 				v = *(int *)v == (int)pp[2] ? &set : NULL;
 			}
 
+#if GTK_MAJOR_VERSION == 3
+			if (op == op_TBRBUTTON)
+				it = gtk_radio_tool_button_new_from_widget(
+					GTK_RADIO_TOOL_BUTTON(rb));
+			else if (op == op_TBTOGGLE)
+				it = gtk_toggle_tool_button_new();
+			else if (op == op_TBBUTTON)
+				it = gtk_tool_button_new(NULL, NULL);
+			if (it)
+			{
+				gtk_tool_item_set_tooltip_text(it, _(wid = pp[3]));
+				gtk_tool_button_set_icon_widget(GTK_TOOL_BUTTON(it),
+					xpm_image(pp[4]));
+				g_signal_connect(G_OBJECT(it),
+					op == op_TBBUTTON ? "clicked" : "toggled",
+					G_CALLBACK(toolbar_lclick), NEXT_SLOT(tbar));
+				gtk_toolbar_insert(GTK_TOOLBAR(CT_TOP(wp)), it, -1);
+				widget = GTK_WIDGET(it);
+				pk = pk_SHOW;
+				/* Set overflow menu to usable state */
+				if (GET_OP(tbar) == op_SMARTTBAR)
+				{
+					m = gtk_tool_item_retrieve_proxy_menu_item(it);
+					gtk_container_remove(GTK_CONTAINER(m),
+						gtk_bin_get_child(GTK_BIN(m)));
+					gtk_container_add(GTK_CONTAINER(m),
+						xpm_image(pp[4]));
+					gtk_widget_set_tooltip_text(m, _(pp[3]));
+					/* Prevent item's re-creation */
+					g_signal_connect(G_OBJECT(it),
+						"create_menu_proxy",
+						G_CALLBACK(leave_be), NULL);
+				}
+				if (v) gtk_toggle_tool_button_set_active(
+					GTK_TOGGLE_TOOL_BUTTON(widget), *(int *)v);
+			}
+			else if (v) gtk_toggle_button_set_active(
+				GTK_TOGGLE_BUTTON(widget), *(int *)v);
+			g_object_set_qdata(G_OBJECT(widget), tool_key, r);
+#else /* #if GTK_MAJOR_VERSION <= 2 */
 			if (op != op_TBBOXTOG) widget = gtk_toolbar_append_element(
 				GTK_TOOLBAR(CT_TOP(wp)),
 				(op == op_TBBUTTON ? GTK_TOOLBAR_CHILD_BUTTON :
@@ -7215,6 +8094,7 @@ void **run_create_(void **ifcode, void *ddata, int ddsize, char **script)
 			if (v) gtk_toggle_button_set_active(
 				GTK_TOGGLE_BUTTON(widget), *(int *)v);
 			gtk_object_set_user_data(GTK_OBJECT(widget), r);
+#endif /* GTK+1&2 */
 			if (lp > 4) gtk_signal_connect(GTK_OBJECT(widget),
 				"button_press_event",
 				GTK_SIGNAL_FUNC(toolbar_rclick), SLOT_N(tbar, 2));
@@ -7223,17 +8103,30 @@ void **run_create_(void **ifcode, void *ddata, int ddsize, char **script)
 		/* Add a toolbar separator */
 		case op_TBSPACE:
 		{
+#if GTK_MAJOR_VERSION == 3
+			GtkToolItem *it = gtk_separator_tool_item_new();
+			gtk_widget_show(GTK_WIDGET(it));
+			gtk_toolbar_insert(GTK_TOOLBAR(CT_TOP(wp)), it, -1);
+#else /* #if GTK_MAJOR_VERSION <= 2 */
 			gtk_toolbar_append_space(GTK_TOOLBAR(CT_TOP(wp)));
+#endif
 			break;
 		}
 		/* Add a two/one row container for 2 toolbars */
 		case op_TWOBOX:
+#if GTK_MAJOR_VERSION == 3
+			widget = gtk_flow_box_new();
+			gtk_flow_box_set_selection_mode(GTK_FLOW_BOX(widget),
+				GTK_SELECTION_NONE);
+			ct = ct_CONT;
+#else /* #if GTK_MAJOR_VERSION <= 2 */
 			widget = wj_size_box();
 			gtk_signal_connect(GTK_OBJECT(widget), "size_request",
 				GTK_SIGNAL_FUNC(twobar_size_req), NULL);
 			gtk_signal_connect(GTK_OBJECT(widget), "size_allocate",
 				GTK_SIGNAL_FUNC(twobar_size_alloc), NULL);
 			ct = ct_BOX;
+#endif
 // !!! Padding = 0
 			break;
 		/* Add a menubar */
@@ -7262,6 +8155,7 @@ void **run_create_(void **ifcode, void *ddata, int ddsize, char **script)
 			sd->mbar = bar;
 			sd->r = r;
 
+#if GTK_MAJOR_VERSION <= 2
 			widget = wj_size_box();
 
 			gtk_signal_connect(GTK_OBJECT(widget), "size_request",
@@ -7270,6 +8164,7 @@ void **run_create_(void **ifcode, void *ddata, int ddsize, char **script)
 				GTK_SIGNAL_FUNC(smart_menu_size_alloc), sd);
 
 			pack(widget, bar);
+#endif
 			break;
 		}
 		/* Prepare smart menubar when done */
@@ -7284,7 +8179,9 @@ void **run_create_(void **ifcode, void *ddata, int ddsize, char **script)
 		{
 			GtkWidget *label, *menu;
 			char *s;
+#if GTK_MAJOR_VERSION <= 2
 			guint keyval;
+#endif
 			int l;
 
 			gid = v; /* For keymap */
@@ -7298,6 +8195,11 @@ void **run_create_(void **ifcode, void *ddata, int ddsize, char **script)
 			s += l;
 
 			label = gtk_bin_get_child(GTK_BIN(widget));
+#if GTK_MAJOR_VERSION == 3
+			gtk_label_set_text_with_mnemonic(GTK_LABEL(label), s);
+			/* !!! In case any non-toplevel submenu has an underline,
+			 * in GTK+3 it'll have to be cut out from string beforehand */
+#else /* #if GTK_MAJOR_VERSION <= 2 */
 			keyval = gtk_label_parse_uline(GTK_LABEL(label), s);
 			/* Toplevel submenus can have Alt+letter shortcuts */
 			if ((l < 2) && (keyval != GDK_VoidSymbol))
@@ -7307,6 +8209,7 @@ void **run_create_(void **ifcode, void *ddata, int ddsize, char **script)
 #else
 				gtk_label_set_text_with_mnemonic(GTK_LABEL(label), s);
 #endif
+#endif /* GTK+1&2 */
 
 			sw = menu = gtk_menu_new();
 			ct = ct_CONT;
@@ -7353,17 +8256,27 @@ void **run_create_(void **ifcode, void *ddata, int ddsize, char **script)
 				if ((op != op_MENURITEM) || (f = f == (int)pp[2]))
 					gtk_check_menu_item_set_active(
 						GTK_CHECK_MENU_ITEM(widget), f);
+#if GTK_MAJOR_VERSION <= 2
 				gtk_check_menu_item_set_show_toggle(
 					GTK_CHECK_MENU_ITEM(widget), TRUE);
+#endif
 			}
 
 			l = strspn(s = pp[3], "/");
 			if (s[l]) s = _(s); // Translate
 			s += l;
 
+#if GTK_MAJOR_VERSION == 3
+			/* !!! In case any regular menuitem has an underline,
+			 * in GTK+3 it'll have to be cut out from string beforehand */
+			gtk_label_set_text(GTK_LABEL(gtk_bin_get_child(GTK_BIN(widget))), s);
+
+			g_object_set_qdata(G_OBJECT(widget), tool_key, r);
+#else /* #if GTK_MAJOR_VERSION <= 2 */
 			gtk_label_parse_uline(GTK_LABEL(GTK_BIN(widget)->child), s);
 
 			gtk_object_set_user_data(GTK_OBJECT(widget), r);
+#endif
 			gtk_signal_connect(GTK_OBJECT(widget), "activate",
 				GTK_SIGNAL_FUNC(menu_evt), NEXT_SLOT(tbar));
 
@@ -7371,7 +8284,7 @@ void **run_create_(void **ifcode, void *ddata, int ddsize, char **script)
 		/* !!! Otherwise GTK+ won't add spacing to an empty accel field */
 			gtk_widget_set_accel_path(widget, FAKE_ACCEL, ag);
 #endif
-#if GTK2VERSION >= 4
+#if (GTK_MAJOR_VERSION == 3) || (GTK2VERSION >= 4)
 		/* !!! GTK+ 2.4+ ignores invisible menu items' keys by default */
 			gtk_signal_connect(GTK_OBJECT(widget), "can_activate_accel",
 				GTK_SIGNAL_FUNC(menu_allow_key), NULL);
@@ -7426,8 +8339,14 @@ void **run_create_(void **ifcode, void *ddata, int ddsize, char **script)
 		case op_HEIGHTBAR:
 		{
 			widget = gtk_label_new(""); // Gives useful lower limit
+#if GTK_MAJOR_VERSION == 3
+			GtkSizeGroup *sg = gtk_size_group_new(GTK_SIZE_GROUP_VERTICAL);
+			gtk_size_group_set_ignore_hidden(sg, FALSE);
+			CT_PUSH(wp, sg, ct_SGROUP);
+#else /* #if GTK_MAJOR_VERSION <= 2 */
 			gtk_signal_connect(GTK_OBJECT(widget), "size_request",
 				GTK_SIGNAL_FUNC(heightbar_size_req), NULL);
+#endif
 			break;
 		}
 #if 0
@@ -7519,11 +8438,21 @@ void **run_create_(void **ifcode, void *ddata, int ddsize, char **script)
 			continue;
 		/* Make toplevel window shrinkable */
 		case op_MKSHRINK:
+#if GTK_MAJOR_VERSION == 3
+			/* Just do smarter initial sizing, here it is enough */
+			gtk_window_set_resizable(GTK_WINDOW(window), FALSE);
+			g_signal_connect(window, "draw", G_CALLBACK(make_resizable), NULL);
+#else /* #if GTK_MAJOR_VERSION <= 2 */
 			gtk_window_set_policy(GTK_WINDOW(window), TRUE, TRUE, FALSE);
+#endif
 			continue;
 		/* Make toplevel window non-resizable */
 		case op_NORESIZE:
+#if GTK_MAJOR_VERSION == 3
+			gtk_window_set_resizable(GTK_WINDOW(window), FALSE);
+#else
 			gtk_window_set_policy(GTK_WINDOW(window), FALSE, FALSE, TRUE);
+#endif
 			continue;
 		/* Make scrolled window request max size */
 		case op_WANTMAX:
@@ -7959,10 +8888,18 @@ static void *do_query(char *data, void **wdata, int mode)
 			break;
 		case op_FSPIN:
 			*(int *)v = rint((mode & 1 ?
+#if GTK_MAJOR_VERSION == 3
+				gtk_spin_button_get_value(GTK_SPIN_BUTTON(*wdata)) :
+#else
 				GTK_SPIN_BUTTON(*wdata)->adjustment->value :
+#endif
 				read_float_spin(*wdata)) * 100);
 			break;
 		case op_TBTOGGLE:
+#if GTK_MAJOR_VERSION == 3 /* In GTK+1&2, same handler as for GtkToggleButton */
+			*(int *)v = gtk_toggle_tool_button_get_active(*wdata);
+			break;
+#endif
 		case op_CHECK: case op_CHECKb: case op_TOGGLE: case op_TBBOXTOG:
 			*(int *)v = gtk_toggle_button_get_active(*wdata);
 			if (op == op_CHECKb) inifile_set_gboolean(pp[2], *(int *)v);
@@ -7973,6 +8910,23 @@ static void *do_query(char *data, void **wdata, int mode)
 			void **slot = wdata;
 
 			/* If reading radio group through an inactive slot */
+#if GTK_MAJOR_VERSION == 3
+			if (!gtk_toggle_tool_button_get_active(*wdata))
+			{
+				/* Let outer loop find active item */
+				if (mode <= 1) break;
+				/* Otherwise, find active item here */
+				group = gtk_radio_tool_button_get_group(*wdata);
+				/* !!! The ugly thing returns a group of _regular_
+				 * radiobuttons which sit inside toolbuttons */
+				while (group && !gtk_toggle_button_get_active(
+					GTK_TOGGLE_BUTTON(group->data)))
+					group = group->next;
+				if (!group) break; // impossible happened
+				slot = g_object_get_qdata(G_OBJECT(
+					gtk_widget_get_parent(group->data)), tool_key);
+			}
+#else /* #if GTK_MAJOR_VERSION <= 2 */
 			if (!gtk_toggle_button_get_active(*wdata))
 			{
 				/* Let outer loop find active item */
@@ -7985,6 +8939,7 @@ static void *do_query(char *data, void **wdata, int mode)
 				slot = gtk_object_get_user_data(
 					GTK_OBJECT(group->data));
 			}
+#endif
 			*(int *)v = TOOL_ID(slot);
 			break;
 		}
@@ -8008,8 +8963,13 @@ static void *do_query(char *data, void **wdata, int mode)
 					GTK_CHECK_MENU_ITEM(group->data)))
 					group = group->next;
 				if (!group) break; // impossible happened
+#if GTK_MAJOR_VERSION == 3
+				slot = g_object_get_qdata(G_OBJECT(group->data),
+					tool_key);
+#else
 				slot = gtk_object_get_user_data(
 					GTK_OBJECT(group->data));
+#endif
 			}
 			*(int *)v = TOOL_ID(slot);
 			break;
@@ -8218,6 +9178,10 @@ void cmd_reset(void **slot, void *ddata)
 			break;
 		}
 		case op_TBTOGGLE: 
+#if GTK_MAJOR_VERSION == 3 /* In GTK+1&2, same handler as for GtkToggleButton */
+			gtk_toggle_tool_button_set_active(*wdata, *(int *)v);
+			break;
+#endif
 		case op_CHECK: case op_CHECKb: case op_TOGGLE:
 		case op_TBBOXTOG:
 			gtk_toggle_button_set_active(*wdata, *(int *)v);
@@ -8271,8 +9235,26 @@ void cmd_reset(void **slot, void *ddata)
 			GtkAdjustment *xa, *ya;
 			int *xp = v;
 			get_scroll_adjustments(*wdata, &xa, &ya);
+#if GTK_MAJOR_VERSION == 3
+			{
+				/* This is to change both before triggering any */
+				guint id = g_signal_lookup("value_changed",
+					G_TYPE_FROM_INSTANCE(xa));
+				g_signal_handlers_block_matched(G_OBJECT(xa),
+					G_SIGNAL_MATCH_ID, id, 0, NULL, NULL, NULL);
+				g_signal_handlers_block_matched(G_OBJECT(ya),
+					G_SIGNAL_MATCH_ID, id, 0, NULL, NULL, NULL);
+				gtk_adjustment_set_value(xa, xp[0]);
+				gtk_adjustment_set_value(ya, xp[1]);
+				g_signal_handlers_unblock_matched(G_OBJECT(xa),
+					G_SIGNAL_MATCH_ID, id, 0, NULL, NULL, NULL);
+				g_signal_handlers_unblock_matched(G_OBJECT(ya),
+					G_SIGNAL_MATCH_ID, id, 0, NULL, NULL, NULL);
+			}
+#else /* #if GTK_MAJOR_VERSION <= 2 */
 			xa->value = xp[0];
 			ya->value = xp[1];
+#endif
 			gtk_adjustment_value_changed(xa);
 			gtk_adjustment_value_changed(ya);
 			break;
@@ -8308,6 +9290,7 @@ void cmd_reset(void **slot, void *ddata)
 			rd->h = xp[1];
 			rd->bkg = xp[2];
 			if (nw) wjcanvas_size(*wdata, xp[0], xp[1]);
+			wjcanvas_uncache(*wdata, NULL);
 			gtk_widget_queue_draw(*wdata);
 			break;
 		}
@@ -8340,7 +9323,11 @@ void cmd_reset(void **slot, void *ddata)
 			break;
 		case op_TBRBUTTON:
 			if (*(int *)v == TOOL_ID(wdata))
+#if GTK_MAJOR_VERSION == 3
+				gtk_toggle_tool_button_set_active(*wdata, TRUE);
+#else
 				gtk_toggle_button_set_active(*wdata, TRUE);
+#endif
 			break;
 		case op_MENURITEM:
 			if (*(int *)v != TOOL_ID(wdata)) break;
@@ -8905,7 +9892,11 @@ void cmd_showhide(void **slot, int state)
 		if (state) // show - apply stored size, position, raise, unfocus
 		{
 			gtk_window_set_transient_for(GTK_WINDOW(w), vdata->tparent);
+#if GTK_MAJOR_VERSION == 3
+			if (vdata->ininame) gtk_window_move(GTK_WINDOW(w),
+#else
 			if (vdata->ininame) gtk_widget_set_uposition(w,
+#endif
 				vdata->xywh[0], vdata->xywh[1]);
 			else vdata->ininame = ""; // first time
 			gtk_window_set_default_size(GTK_WINDOW(w),
@@ -8942,7 +9933,11 @@ void cmd_showhide(void **slot, int state)
 			 * focus from fileselector back to pref window - WJ */
 			if (!(vdata->xywh[4] = is_maximized(w)))
 			{
+#if GTK_MAJOR_VERSION == 3
+				gtk_window_get_size(GTK_WINDOW(w),
+#else
 				gdk_window_get_size(w->window,
+#endif
 					vdata->xywh + 2, vdata->xywh + 3);
 				gdk_window_get_root_origin(gtk_widget_get_window(w),
 					vdata->xywh + 0, vdata->xywh + 1);
@@ -8989,10 +9984,17 @@ void cmd_set(void **slot, int v)
 		if (!v ^ !!gtk_paned_get_child1(GTK_PANED(pane))) return; // nothing to do
 
 		window = gtk_widget_get_toplevel(slot[0]);
+#if GTK_MAJOR_VERSION == 3
+		if (gtk_widget_get_visible(window))
+			gtk_window_get_size(GTK_WINDOW(window), &w2, NULL);
+		/* Window size isn't yet valid */
+		else g_object_get(G_OBJECT(window), "default_width", &w2, NULL);
+#else
 		if (GTK_WIDGET_VISIBLE(window))
 			gdk_window_get_size(window->window, &w2, NULL);
 		/* Window size isn't yet valid */
 		else gtk_object_get(GTK_OBJECT(window), "default_width", &w2, NULL);
+#endif
 
 		if (v)
 		{
@@ -9107,7 +10109,11 @@ void cmd_set(void **slot, int v)
 		cmd_event(slot, op_EVT_CLICK); // for any value
 		break;
 	case op_TBBUTTON:
+#if GTK_MAJOR_VERSION == 3
+		g_signal_emit_by_name(slot[0], "clicked"); // for any value
+#else
 		gtk_button_clicked(slot[0]); // for any value
+#endif
 		break;
 	case op_uMENURITEM:
 		// Cannot unset itself, and no use to set twice
@@ -9138,6 +10144,10 @@ void cmd_set(void **slot, int v)
 		gtk_spin_button_set_value(slot[0], v / 100.0);
 		break;
 	case op_TBTOGGLE: case op_TBRBUTTON:
+#if GTK_MAJOR_VERSION == 3 /* In GTK+1&2, same handler as for GtkToggleButton */
+		gtk_toggle_tool_button_set_active(slot[0], v);
+		break;
+#endif
 	case op_CHECK: case op_CHECKb: case op_TOGGLE:
 	case op_TBBOXTOG:
 		gtk_toggle_button_set_active(slot[0], v);
@@ -9279,8 +10289,15 @@ void cmd_peekv(void **slot, void *res, int size, int idx)
 		if (idx == CANVAS_SIZE)
 		{
 			int *v = res;
+#if GTK_MAJOR_VERSION == 3
+			GtkAllocation alloc;
+			gtk_widget_get_allocation(w, &alloc);
+			if (size >= sizeof(int)) v[0] = alloc.width;
+			if (size >= sizeof(int) * 2) v[1] = alloc.height;
+#else
 			if (size >= sizeof(int)) v[0] = w->allocation.width;
 			if (size >= sizeof(int) * 2) v[1] = w->allocation.height;
+#endif
 		}
 		else if (idx == CANVAS_VPORT)
 		{
@@ -9502,7 +10519,11 @@ void cmd_setv(void **slot, void *res, int idx)
 		colorlist_reset_color(slot, (int)res);
 		break;
 	case op_PROGRESS:
+#if GTK_MAJOR_VERSION == 3
+		gtk_progress_bar_set_fraction(slot[0], (int)res / 100.0);
+#else
 		gtk_progress_set_percentage(slot[0], (int)res / 100.0);
+#endif
 		break;
 	case op_CSCROLL:
 	{
@@ -9511,10 +10532,40 @@ void cmd_setv(void **slot, void *res, int idx)
 		GtkAdjustment *xa, *ya;
 		int *v = res;
 		get_scroll_adjustments(slot[0], &xa, &ya);
+#if GTK_MAJOR_VERSION == 3
+		{
+			guint idv = g_signal_lookup("value_changed",
+				G_TYPE_FROM_INSTANCE(xa));
+			guint idc = g_signal_lookup("changed",
+				G_TYPE_FROM_INSTANCE(xa));
+			g_signal_handlers_block_matched(G_OBJECT(xa),
+				G_SIGNAL_MATCH_ID, idv, 0, NULL, NULL, NULL);
+			g_signal_handlers_block_matched(G_OBJECT(ya),
+				G_SIGNAL_MATCH_ID, idv, 0, NULL, NULL, NULL);
+			g_signal_handlers_block_matched(G_OBJECT(xa),
+				G_SIGNAL_MATCH_ID, idc, 0, NULL, NULL, NULL);
+			g_signal_handlers_block_matched(G_OBJECT(ya),
+				G_SIGNAL_MATCH_ID, idc, 0, NULL, NULL, NULL);
+			/* Set limit first and value after */
+			gtk_adjustment_set_upper(xa, v[2]);
+			gtk_adjustment_set_upper(ya, v[3]);
+			gtk_adjustment_set_value(xa, v[0]);
+			gtk_adjustment_set_value(ya, v[1]);
+			g_signal_handlers_unblock_matched(G_OBJECT(xa),
+				G_SIGNAL_MATCH_ID, idv, 0, NULL, NULL, NULL);
+			g_signal_handlers_unblock_matched(G_OBJECT(ya),
+				G_SIGNAL_MATCH_ID, idv, 0, NULL, NULL, NULL);
+			g_signal_handlers_unblock_matched(G_OBJECT(xa),
+				G_SIGNAL_MATCH_ID, idc, 0, NULL, NULL, NULL);
+			g_signal_handlers_unblock_matched(G_OBJECT(ya),
+				G_SIGNAL_MATCH_ID, idc, 0, NULL, NULL, NULL);
+		}
+#else
 		xa->value = v[0];
 		ya->value = v[1];
 		xa->upper = v[2];
 		ya->upper = v[3];
+#endif
 		break;
 	}
 	case op_CANVASIMG: case op_CANVASIMGB:
@@ -9541,6 +10592,7 @@ void cmd_setv(void **slot, void *res, int idx)
 		{
 			if (clip(rxy, v[0], v[1], v[2], v[3], vport))
 			{
+				wjcanvas_uncache(w, rxy);
 				gtk_widget_queue_draw_area(w,
 					rxy[0] - vport[0], rxy[1] - vport[1],
 					rxy[2] - rxy[0], rxy[3] - rxy[1]);
@@ -9552,6 +10604,15 @@ void cmd_setv(void **slot, void *res, int idx)
 			/* Paint */
 			if (ctx->rgb)
 			{
+#if GTK_MAJOR_VERSION == 3
+				wjcanvas_draw_rgb(w, ctx->xy[0], ctx->xy[1],
+					ctx->xy[2] - ctx->xy[0],
+					ctx->xy[3] - ctx->xy[1],
+					ctx->rgb, (ctx->xy[2] - ctx->xy[0]) * 3,
+					0, TRUE);
+// !!! Remains to be seen if the below is needed - might be, in some cases
+//				gdk_window_process_updates(gtk_widget_get_window(w), FALSE);
+#else /* if GTK_MAJOR_VERSION <= 2 */
 				gdk_draw_rgb_image(w->window, w->style->black_gc,
 					ctx->xy[0] - vport[0],
 					ctx->xy[1] - vport[1],
@@ -9559,6 +10620,7 @@ void cmd_setv(void **slot, void *res, int idx)
 					ctx->xy[3] - ctx->xy[1],
 					GDK_RGB_DITHER_NONE, ctx->rgb,
 					(ctx->xy[2] - ctx->xy[0]) * 3);
+#endif
 				free(ctx->rgb);
 			}
 			/* Prepare */
@@ -9653,6 +10715,18 @@ void cmd_setv(void **slot, void *res, int idx)
 		fd->dpi = (int)res;
 		if (!fd->sysdpi) fd->sysdpi = window_dpi(main_window); // Init
 		/* To cause full preview reset */
+#if GTK_MAJOR_VERSION == 3
+		{
+			GtkWidget *e = gtk_font_selection_get_size_entry(fs);
+			char *s = strdup(gtk_entry_get_text(GTK_ENTRY(e)));
+
+			gtk_entry_set_text(GTK_ENTRY(e), "0");
+			gtk_widget_activate(e);
+			gtk_entry_set_text(GTK_ENTRY(e), s);
+			gtk_widget_activate(e);
+			free(s);
+		}
+#else /* #if GTK_MAJOR_VERSION <= 2 */
 		{
 			int size = fs->size;
 
@@ -9660,6 +10734,7 @@ void cmd_setv(void **slot, void *res, int idx)
 			gtk_widget_activate(fs->size_entry);
 			fs->size = size;
 		}
+#endif
 		break;
 	}
 #endif
@@ -9670,6 +10745,13 @@ void cmd_repaint(void **slot)
 {
 	int op = op;
 	if (IS_UNREAL(slot)) return;
+#if GTK_MAJOR_VERSION == 3
+	op = GET_OP(slot);
+	/* Tell cached widgets to drop cache */
+	if (op == op_RGBIMAGE) reset_rgb(slot[0], slot[2]);
+	else if ((op == op_CANVASIMG) || (op == op_CANVASIMGB) || (op == op_CANVAS))
+		wjcanvas_uncache(slot[0], NULL);
+#endif
 #ifdef U_LISTS_GTK1
 	op = GET_OP(slot);
 	if ((op == op_COLORLIST) || (op == op_COLORLISTN))

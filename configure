@@ -4,7 +4,7 @@
 
 echo
 
-MT_V="3.49.24"
+MT_V="3.49.25"
 MT_DATE="2020-03-18"
 
 MT_VERSION="mtPaint $MT_V"
@@ -84,6 +84,7 @@ do
 	"gtk2"* )	GTK=2
 			# Override minor version of installed GTK+2
 			GTK2VERSION="`echo "$A" | sed -e 's/gtk2\.\?\([0-9]*\).*/\1/'`";;
+	"gtk3" )	GTK=3;;
 	"intl" )	MT_LANG=YES;;
 	"man" )		MT_MAN=YES;;
 	"pod" )		MT_POD=YES;;
@@ -166,6 +167,7 @@ win .............. Configure for Windows MinGW / MSYS
 gtk1 ............. Configure for GTK+1
 gtk2 ............. Configure for GTK+2
 gtk2.VER ......... Configure for GTK+2, minor version VER
+gtk3 ............. Configure for GTK+3
 gtkfilesel ....... Use GtkFileSelection file picker
 gtkcolsel ........ Use GtkColorSelection colour picker
 oldlists ......... Use GtkList and GtkCList lists
@@ -309,25 +311,6 @@ else
 	MT_LOCDIR="${MT_LOCDIR:-$MT_DATAROOT/locale}"
 	MT_PO="$MT_LOCDIR"
 fi
-
-### Set feature flags
-
-[ "$USE_THREADS" = "YES" ] && DEFS="$DEFS -DU_THREADS"
-if [ "$MT_FPICK" = mtpaint ]
-then
-	DEFS="$DEFS -DU_FPICK_MTPAINT"
-else # "$MT_FPICK" = gtkfilesel
-	DEFS="$DEFS -DU_FPICK_GTKFILESEL"
-fi
-if [ "$MT_CPICK" = mtpaint ]
-then
-	DEFS="$DEFS -DU_CPICK_MTPAINT"
-else #	"$MT_CPICK" = gtkcolsel
-	DEFS="$DEFS -DU_CPICK_GTK"
-fi
-[ "$MT_ANIM" = ImageMagick ] && DEFS="$DEFS -DU_ANIM_IMAGICK"
-# mtPaint version
-DEFS="$DEFS -DMT_VERSION='\"$MT_VERSION\"'"
 
 ### Setup compiler (only GCC is really supported at this time)
 
@@ -480,6 +463,7 @@ if [ "$OPTS" = RELEASE ]
 then
 	# Target i386 when compiling for any x86 CPU;
 	# this produces smallest *AND* fastest binary
+# !!! Questionable, now; need retesting, and proper cross-configuring too
 	case $ARCH in
 		i?86) CFLAGS="-O2 ${MARCH:--march=i386}";;
 		*) CFLAGS="-O2 $MARCH";;
@@ -647,20 +631,30 @@ rm -f _conf.c _conf.tmp
 
 FOUND_GTK=
 [ "$OS" != "${OS#MinGW/}" ] && GTK=2
-[ "$GTK" != 1 ] && PKGCONFIG gtk+-2.0 --cflags > /dev/null 2>&1 && FOUND_GTK=2 GTK=2
-[ "$GTK" != 2 ] && PKGCONFIG gtk+ --cflags > /dev/null 2>&1 && FOUND_GTK=1 GTK=1
+[ "${GTK:-2}" = 2 ] && PKGCONFIG gtk+-2.0 --cflags > /dev/null 2>&1 && FOUND_GTK=2 GTK=2
+[ "${GTK:-1}" = 1 ] && PKGCONFIG gtk+ --cflags > /dev/null 2>&1 && FOUND_GTK=1 GTK=1
+[ "${GTK:-3}" = 3 ] && PKGCONFIG gtk+-3.0 --cflags > /dev/null 2>&1 && FOUND_GTK=3 GTK=3
 GTK=${GTK:-1}
 
 if [ "$USE_THREADS" = NO ] ; then
 	THREADS=
-elif [ "$GTK" = 2 ] ; then
+elif [ "$GTK" -ge 2 ] ; then
 	THREADS="gthread-2.0"
 else # "$GTK" = 1
 	THREADS="gthread"
 fi
 
 # !!! It is assumed that the nondefault install prefix is the one GTK+ lives in
-if [ "$FOUND_GTK" = 2 ]
+if [ "$FOUND_GTK" = 3 ] && PKGCONFIG --atleast-version=3.12 gtk+-3.0
+then
+	GTKPREFIX=`PKGCONFIG gtk+-3.0 --variable=prefix`
+	INCLUDES="$INCLUDES `PKGCONFIG gtk+-3.0 $THREADS --cflags`"
+	LIBS="$LIBS `PKGCONFIG gtk+-3.0 $THREADS --libs`"
+elif [ "$FOUND_GTK" = 3 ]
+then
+	echo "GTK+3 versions prior to 3.12 are not and can not be supported"
+	exit 1
+elif [ "$FOUND_GTK" = 2 ]
 then
 	GTKPREFIX=`PKGCONFIG gtk+-2.0 --variable=prefix`
 	INCLUDES="$INCLUDES `PKGCONFIG gtk+-2.0 $THREADS --cflags`"
@@ -701,17 +695,47 @@ else
 	echo "Failed to find required GTK+$GTK libraries" 1>&2
 	exit 1
 fi
+
 # Need to add this to use GTK+1 with GCC 5
 [ "$GTK" = 1 ] && HAVE_GCC_VER 5.0 && CFLAGS="$CFLAGS -std=gnu89"
 # Also need to add "-lX11" on GTK+2/X systems
 [ "$GTK" = 2 ] && [ "$LIBS" != "${LIBS#*gdk-x11}" ] && LIBS="$LIBS -lX11"
+# Need the same on GTK+3/X systems even more
+[ "$GTK" = 3 ] && [ "$INCLUDES" != "${INCLUDES#*gio-unix}" ] && LIBS="$LIBS -lX11"
 # GTK+2 version to use
 DEFS="$DEFS${GTK2VERSION:+ -DGTK2VERSION=$GTK2VERSION}"
-# List widgets to use
-[ "$GTK" = 1 ] && MT_LISTS=1
-[ ${GTK2VERSION:-18} -lt 18 ] && MT_LISTS=1
-[ "$FOUND_GTK" != 2 ] || PKGCONFIG --atleast-version=2.18 gtk+-2.0 || MT_LISTS=1
+# Widgets to use
+if [ "$GTK" = 3 ]
+then
+	MT_LISTS=2		# GtkList & GtkCList are with us no more
+	MT_FPICK=mtpaint	# Neither is GtkFileSelection
+elif [ "$GTK" = 2 ]
+then # GTK+3 compatible things need some compatibility
+	[ ${GTK2VERSION:-18} -lt 18 ] && MT_LISTS=1
+	[ "$FOUND_GTK" != 2 ] || PKGCONFIG --atleast-version=2.18 gtk+-2.0 || MT_LISTS=1
+else # GTK+1
+	MT_LISTS=1
+fi
+
+### Set feature flags
+
+[ "$USE_THREADS" = "YES" ] && DEFS="$DEFS -DU_THREADS"
+if [ "$MT_FPICK" = mtpaint ]
+then
+	DEFS="$DEFS -DU_FPICK_MTPAINT"
+else # "$MT_FPICK" = gtkfilesel
+	DEFS="$DEFS -DU_FPICK_GTKFILESEL"
+fi
+if [ "$MT_CPICK" = mtpaint ]
+then
+	DEFS="$DEFS -DU_CPICK_MTPAINT"
+else #	"$MT_CPICK" = gtkcolsel
+	DEFS="$DEFS -DU_CPICK_GTK"
+fi
 [ "$MT_LISTS" = 1 ] && DEFS="$DEFS -DU_LISTS_GTK1"
+[ "$MT_ANIM" = ImageMagick ] && DEFS="$DEFS -DU_ANIM_IMAGICK"
+# mtPaint version
+DEFS="$DEFS -DMT_VERSION='\"$MT_VERSION\"'"
 
 ### 
 

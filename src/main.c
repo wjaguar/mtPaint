@@ -377,8 +377,13 @@ int main( int argc, char *argv[] )
 
 	putenv( "G_BROKEN_FILENAMES=1" );	// Needed to read non ASCII filenames in GTK+2
 
+#if GTK_MAJOR_VERSION == 3
+	/* No floating random stuff over canvas */
+	putenv("GTK_OVERLAY_SCROLLING=0");
+#else
 	/* Disable bug-ridden eyecandy module that breaks sizing */
 	putenv("LIBOVERLAY_SCROLLBAR=0");
+#endif
 
 #if GTK2VERSION >= 4
 	/* Tablet handling in GTK+ 2.18+ is broken beyond repair if this mode
@@ -409,7 +414,9 @@ int main( int argc, char *argv[] )
 		gtk_init(&argc, &argv);
 		gtk_init_bugfixes();
 	}
-#if GTK_MAJOR_VERSION == 2
+#if GTK_MAJOR_VERSION == 3
+	if (!cmd_mode) init_css(inifile_get(DEFAULT_CSS_INI, ""));
+#elif GTK_MAJOR_VERSION == 2
 	if (!cmd_mode)
 	{
 		char *theme = inifile_get(DEFAULT_THEME_INI, "");

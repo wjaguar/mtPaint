@@ -289,7 +289,10 @@ static void *pref_code[] = {
 		FS_SELECT_FILE, DEFAULT_PAL_INI),
 	PATHs(_("Default Patterns"), _("Select Default Patterns File"),
 		FS_SELECT_FILE, DEFAULT_PAT_INI),
-#if GTK_MAJOR_VERSION == 2
+#if GTK_MAJOR_VERSION == 3
+	PATHs(_("Default CSS"), _("Select Default CSS File"),
+		FS_SELECT_FILE, DEFAULT_CSS_INI),
+#elif GTK_MAJOR_VERSION == 2
 	PATHs(_("Default Theme"), _("Select Default Theme File"),
 		FS_SELECT_FILE, DEFAULT_THEME_INI),
 #endif
