@@ -7,6 +7,11 @@ all: $(MAN_PAGE)
 $(MAN_PAGE): mtpaint.pod
 	pod2man "--release=$(MT_VERSION)" "--date=$(MT_DATE)" "--center=Mark Tyler's Painting Program" mtpaint.pod > $(MAN_PAGE)
 
+html: vcode.html
+
+%.html: %.t2t
+	txt2tags -t html $*.t2t
+
 install:
 	mkdir -p $(DESTDIR)$(MT_MAN_DEST)/man1 $(DESTDIR)$(MT_DATAROOT)/applications $(DESTDIR)$(MT_DATAROOT)/pixmaps
 	cp $(MAN_PAGE) $(DESTDIR)$(MT_MAN_DEST)/man1

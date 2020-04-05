@@ -6437,6 +6437,7 @@ enum {
 	ct_NBOOK,
 	ct_HVSPLIT,
 	ct_SGROUP,
+	ct_SMARTMENU,
 };
 
 /* !!! Limited to rows & columns 0-255 per wh composition l16:col8:row8 */
@@ -6503,6 +6504,7 @@ int do_pack(GtkWidget *widget, ctslot *ct, void **pp, int n, int tpad)
 	/* Adapt packing mode to container type */
 	if (n <= pk_DEF) switch (what)
 	{
+	case ct_SMARTMENU:
 	case ct_CONT: n = pk_CONT; break;
 	case ct_BIN: n = pk_BIN; break;
 	case ct_SCROLL: n = pk_SCROLLVP; break;
@@ -7120,6 +7122,9 @@ void **run_create_(void **ifcode, void *ddata, int ddsize, char **script)
 #if GTK_MAJOR_VERSION == 3
 			if (CT_WHAT(wp) == ct_SGROUP) CT_POP(wp);
 #endif
+			/* Prepare smart menubar when done */
+			if (CT_WHAT(wp) == ct_SMARTMENU)
+				vdata->smmenu = smartmenu_done(tbar, r);
 			CT_DROP(wp);
 			continue;
 		/* Create the main window */
@@ -8146,7 +8151,8 @@ G_GNUC_END_IGNORE_DEPRECATIONS
 // !!! Padding = 0
 			if (op != op_SMARTMENU) break;
 
-			// !!! Menubar is what sits on stack till SMDONE
+			ct = ct_SMARTMENU;
+			// !!! Menubar is what sits on stack
 			sw = bar = widget;
 			gtk_widget_show(bar);
 
@@ -8167,13 +8173,6 @@ G_GNUC_END_IGNORE_DEPRECATIONS
 #endif
 			break;
 		}
-		/* Prepare smart menubar when done */
-		case op_SMDONE:
-			vdata->smmenu = smartmenu_done(tbar, r);
-			/* Done with this container */
-			CT_DROP(wp);
-// !!! Should be fallthrough to WDONE, but such arrangement will be ugly
-			continue;
 		/* Add a dropdown submenu */
 		case op_SUBMENU: case op_ESUBMENU: case op_SSUBMENU:
 		{
@@ -10590,13 +10589,11 @@ void cmd_setv(void **slot, void *res, int idx)
 		wjcanvas_get_vport(w, vport);
 		if (idx == CANVAS_REPAINT)
 		{
+			wjcanvas_uncache(w, v);
 			if (clip(rxy, v[0], v[1], v[2], v[3], vport))
-			{
-				wjcanvas_uncache(w, rxy);
 				gtk_widget_queue_draw_area(w,
 					rxy[0] - vport[0], rxy[1] - vport[1],
 					rxy[2] - rxy[0], rxy[3] - rxy[1]);
-			}
 		}
 		else if (idx == CANVAS_PAINT)
 		{

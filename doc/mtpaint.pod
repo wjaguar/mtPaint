@@ -10,7 +10,7 @@ S<mtpaint [option] [imagefile ... ]>
 
 =head1 DESCRIPTION
 
-mtPaint is a GTK+1/2 based painting program designed for creating icons and pixel based artwork. It can edit indexed palette or 24 bit RGB images and offers painting and palette manipulation tools. Its main file format is PNG, although it can also handle JPEG, GIF, TIFF, BMP, XPM, and XBM files. Due to its simplicity and lack of dependencies it runs well on GNU/Linux, Windows and older PC hardware.  There is full documentation of mtPaint's features contained in a handbook.  If you don't already have this, you can download it from the mtPaint website.
+mtPaint is a GTK+1/2/3 based painting program designed for creating icons and pixel based artwork. It can edit indexed palette or 24 bit RGB images and offers painting and palette manipulation tools. Its main file format is PNG, although it can also handle JPEG, GIF, TIFF, JPEG2000, WEBP, BMP, PCX, TGA, LBM, PBM, PGM, PPM, PAM, LSS16, XPM, and XBM files. Due to its simplicity and lack of dependencies it runs well on GNU/Linux, Windows and older PC hardware.  There is full documentation of mtPaint's features contained in a handbook.  If you don't already have this, you can download it from the mtPaint website.
 
 =head1 OPTIONS
 
@@ -18,20 +18,39 @@ mtPaint can accept one of the following options:
 
   --help	Output usage information
   --version	Output version information
+  --flist       Read a list of files from a file
+  --sort        Sort files passed as arguments
+  --cmd         Start mtPaint in commandline scripting mode without GUI
   -s		Grab a screenshot
   -v		Start mtPaint in viewer mode
+  --            End of options
 
 
 =head1 HOMEPAGE
 
 http://mtpaint.sourceforge.net/
 
-=head1 ORIGINAL AUTHOR
+=head1 AUTHOR
 
-Mark Tyler
+Original author:
+
+=over
+
+=item * Mark Tyler
+
+=back
+
+Current maintainer:
+
+=over
+
+=item * Dmitry Groshev S<C<< <wjaguar AT users.sourceforge.net> >>>
+
+=back
 
 The development of mtPaint has been helped by various people from the free software community.  See "Credits" in the README or the mtPaint help system for details.
 
-
+You can follow or contribute to mtPaint's development at
+L<< https://github.com/wjaguar/mtPaint >>.
 
 =cut

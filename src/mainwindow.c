@@ -5625,7 +5625,7 @@ static void *main_menu_code[] = {
 	MENUITEM(_("//Keyboard Shortcuts ..."), ACTMOD(DLG_KEYS, 0)),
 	MENUITEM(_("//Rebind Shortcut Keycodes"), ACTMOD(ACT_REBIND_KEYS, 0)),
 	WDONE,
-	SMDONE, // smartmenu
+	WDONE, // smartmenu
 	ENDSCRIPT,
 	RET
 };

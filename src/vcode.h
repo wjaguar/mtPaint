@@ -133,7 +133,6 @@ enum {
 
 	op_MENUBAR,
 	op_SMARTMENU,
-	op_SMDONE,
 	op_SUBMENU,
 	op_ESUBMENU,
 	op_SSUBMENU,
@@ -959,7 +958,6 @@ enum {
 #define TWOBOX WBh_(TWOBOX, 0)
 #define MENUBAR(HC) WBr2h_(MENUBAR, 0 + 2), EVENT(CHANGE, HC)
 #define SMARTMENU(HC) WBr2h_(SMARTMENU, 0 + 2), EVENT(CHANGE, HC)
-#define SMDONE WBh(SMDONE, 0)
 #define SUBMENU(NM) WBrh_(SUBMENU, 1), (NM)
 #define ESUBMENU(NM) WBrh_(ESUBMENU, 1), (NM)
 #define SSUBMENU(NM) WBrh_(SSUBMENU, 1), (NM)
