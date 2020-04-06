@@ -1,0 +1,2036 @@
+V-code Technical Reference
+
+
+
+-------------------------------------------------
+
+== Introduction ==
+
+V-code got its name from a void pointer. As bytecode is comprised of 'char', so
+V-code is of 'void *'. Therefore, "V".
+
+V-code engine runs mtPaint's GUI - and its commandline and scripts - but it is
+less a widget toolkit per se, than a technique of abstraction. The idea was to
+decouple the semantics of controls from the particulars of implementation - and
+to get rid of the mind-numbing boilerplate that invariably accompanies anything
+having to do with a GUI. And when I compare what it takes to create a new dialog
+now with V-code, to what it had taken without - I much prefer the new way.
+
+V-code is declarative. I describe an interface component, and leave it to the
+engine to make it - or to pretend convincingly enough, so that the rest of the
+program does not notice a difference. Whatever specialcasing is needed, is done
+within the engine, never to poke its ugly snout outside.
+
+While the declarative part is quite extensive, the runtime API is simplistic. It
+does not need complexity; when creation is firmly separated into its own phase,
+only a few tweaks remain to be done at runtime.
+
+Another reason for the simplicity is that I made things interchangeable. There
+are no special accessor functions for any type of widget, and callback signatures
+never differ without a very compelling reason. This way, one event handler can
+serve a number of different widgets with minimal effort.
+
+This absence of widget functions/methods is an intentional feature and the core
+difference of V-code from usual GUI toolkits. All actions are done through a
+compact set of call points, and while internally tasks get routed to specific
+effector modules, calling code takes no part in the decisions what to use, how,
+and when. Interdependences of some operations arising in some cases are thus
+easily tracked and handled, entirely within the engine. Equally easy are
+conditional replacements of a component with a differently implemented, or a
+simulated one.
+
+V-code is not told what to do; it receives commands as to what it should make
+happen. It is the principle of the thing.
+
+The function handlers are minimalistic. No sanity checks; if something is done
+wrong, code signals that by crashing. But no strictness either; if a function is
+called on an unhandled widget type, it simply does nothing. Default values are
+sometimes substituted, but only where doing it once in the handler made more
+sense than repeating the same at several call sites.
+
+Neither declarative nor runtime part is providing complete coverage; only the
+widgets and operations needed by mtPaint. When for a new feature I need something
+that is not yet there, I extend the V-code engine.
+
+
+== Overview ==
+
+The pegasus-eye view of how V-code is used, is this.
+- You prepare a V-code description of, say, a dialog window.
+- You fill a struct with initial values for it.
+- You hand off both to **run_create_()**.
+- It executes the description: allocates memory, copies the struct in there,
+  creates widgets, setups callbacks, does initializations, and shows the finished
+  result to the user.
+- User does some things to controls in the dialog, changing some values, then
+  presses "OK".
+- The callback sees that it was "OK", calls **run_query()** to read back values
+  from all the controls.
+- The new values in the copy of struct and/or in global variables are used to do
+  something.
+- The callback calls **run_destroy()** to finish off the window, and returns.
+- Done.
+
+
+There are ways and means to do more complicated things, but this simple scenario
+is done this simply; in exactly 3 function calls.
+
+This is how it can work.
+
+Every V-code command describing a control - say, a spinbutton or a text entry -
+has a memory reference; either to a global variable, or to a field in a struct.
+When the control is created, it is initialized from that memory; when it is read,
+the result goes to that memory. When **run_create()** makes that control, it
+saves the address of that V-code command, and the widget it created, into its
+"tape" (a flat array of "slots"). When you call **run_query()**, it iterates over
+slots in the "tape" and looks at commands; it reads back values from every control
+it finds, each into the place that its command refers to. When you call
+**run_destroy()**, after the widgets get destroyed it again iterates over slots
+and looks at commands, to do cleanup actions if needed; after that, the attached
+struct and "tape" are freed.
+
+When you need to add a callback, you put an //EVENT()// command, with a type ID
+and a function reference, after a control; this command also gets a slot in the
+"tape". The function gets called when the control sitting before it in the "tape"
+wants to raise an event of that type. With the //TRIGGER// command, you can raise
+the preceding //EVENT()// just after **run_create()** finishes creating things;
+doing it to a list control's //SELECT// event is the natural way to make other
+controls reflect initial selection in the list. Some commands that create
+controls, have //EVENT()// built in, some even two of them; for them, function
+references go as parameters to the commands. A //TRIGGER// command after a
+two-event control triggers its second builtin //EVENT()//.
+
+When you need to, say, hide a control, you pass address of its slot to
+**cmd_showhide()**. To get that address, you put a //REF()// command right before
+the command that creates the control. //REF()//, again, has a memory reference
+(to a field of type **void**** ; for a variable, you use //REFv()//); into that
+memory, **run_create()** will put the current position in the "tape".
+
+For a container widget, you create it with a command such as //VBOX//, and
+everything you create after it will go into it, till you close it with //WEND//.
+One-place containers, such as //FRAME()//, close by themselves after accepting a
+widget (or you can close them by //WEND// leaving them empty). One command can
+also create more than one container; //DOCK()// has two panes, each filled
+separately and finished by its own //WEND//.
+
+Most container widgets do not get slots of their own, but are fill-and-forget. If
+you need to interact with them, say hide a box with all its contents, you need a
+version with a slot; those are tagged with "r", like //VBOXr// vs //VBOX//.
+
+When you want to include some commands only if a condition holds (say, with an
+RGB image you offer to select red, green, or blue channel, and with indexed ones
+you don't), you can use simple conditionals //IF()// and //UNLESS()//, affecting
+one command, or extended ones //IFx()// and //UNLESSx()// that affect everything
+till the matching //ENDIF()//. They get a memory reference (to an **int**), and
+check it for being zero or nonzero.
+
+When you need to allocate some memory (say, a buffer for a histogram image to be
+displayed), you use the //TALLOC()// command; it takes two fields - from one it
+takes the size, into the other it puts the resulting pointer. Such memory is
+allocated as part of the same memory block that holds the struct and the "tape",
+so if there isn't enough memory for it, then nothing at all gets allocated and
+**run_create()** itself fails (returning NULL).
+
+If you put a pointer to some separately allocated object into the struct, you can
+even tell **run_destroy()** to free it along with everything else; for that, you
+use the //CLEANUP()// command.
+
+A complete command sequence is one that creates a self-contained interface
+element (usually a toplevel window, but not necessarily). There are two things
+required from it. It has to define something in where all the controls will go;
+a //WINDOW()//, //TOPVBOX// etc. And it has to terminate the sequence, telling
+**run_create()** what to do with it; use //WDIALOG()// command to run it as a
+dialog, //WSHOW// to show it to the user, or //WEND// to hand it off to the
+program to be shown later.
+
+
+== V-code as written ==
+
+Declarative V-code is an array of pointers to void:
+
+**void *whatever_code[] = { ... };**
+
+The array is initialized by a sequence of command macros, with their parameters.
+In case the commands are referring to **ddata** fields, the struct type to use
+must be set before that, as the //WBbase// macro:
+
+**#define WBbase whatever_dd**
+
+So nearly all V-code chunks in mtPaint look like this:
+```
+#define WBbase whatever_dd
+void *whatever_code[] = { ... };
+#undef WBbase
+```
+
+In a simplest case, one V-code chunk creates something from beginning to end, but
+there are also other possibilities.
+
+The most complex part of mtPaint, the main window, is defined part by part in
+several chunks in several source files, which the main chunk, fittingly named
+**main_code[]**, calls one by one using the //CALL()// command; some then call
+yet other chunks in their turn.
+
+The least complex parts, the lowly filter windows, use a reverse approach; a
+small filter-specific code chunk which is a V-code subroutine, indirectly called
+(with //CALLp()// command) by **filterwindow_code[]** chunk between it building
+the generic top part and the equally generic bottom part of the window.
+
+
+== In-memory structure ==
+
+The memory block allocated by **run_create_()** is structured this way:
+
+| ddata | User-provided backing struct |
+| vdata | Internal window-info struct  |
+| wdata | "Tape" of "slots" referring to widgets, events, etc. |
+| dtail | Extra memory allocated to widgets and to/by other V-code commands |
+
+All this is allocated as one single block, which not only greatly simplifies
+memory management, but also, with all references to anything of note sitting in a
+flat array of "slots", makes all kinds of reflection trivial. This is by virtue
+of V-code being processed in two passes; first, **predict_size()** counts how
+many "slots" and how much extra memory the V-code sequence wants, then memory for
+all that is allocated and partitioned up, the user-provided struct copied in, and
+only then the commands actually get executed one after another; creating and
+setting up widgets, taking up chunks of dtail area, and filling "slots".
+
+A canonical reference to a block is the address of its **wdata**; i.e. it points
+into middle of the block. The reason for that is purely historical; nothing
+prevents setting up **ddata** and **vdata** after **dtail** area instead, but
+given that a block should never be deallocated in any other way than by calling
+**run_destroy()**, the arrangement is not relevant to anything.
+
+A "slot" in **wdata** consists of 3 pointers:
+| 0 | Widget/something else |
+| 1 | V-code command that set up the slot |
+| 2 | Dtail chunk |
+
+Slot where "something else" is its **dtail** chunk (i.e. 0th cell equals 2nd) is
+considered "unreal"; such slots are set up by pseudo-widgets used to simulate
+real ones when running scripts, thus the name. With the V-code command obviously
+being the same in either case (real and simulated), this is the only way to tell
+the two apart.
+
+The first slot of **wdata** is a fake one, used for linking all this together:
+| 0 | **ddata** |
+| 1 | **vdata** |
+| 2 | Dtail chunk |
+The **vdata** structure masquerades as a V-code command //WDONE//; as no regular
+//WDONE// gets a slot of its own, the slot is thus unique. The **wdata_slot()**
+function just steps through the "tape" before a slot till it finds this marker,
+and returns its address.
+
+The second slot must belong to a toplevel widget. No other thing should be put
+into the "tape" before it.
+
+And the last slot in **wdata**, marking its end, is all NULLs; all functions
+iterating over slots, depend on it being there. //WEND//, //WSHOW// and
+//WDIALOG()// put it into the "tape", before doing all other finishing touches.
+
+Macro **GET_DDATA()** gets from **wdata** to **ddata** (just reads the 0th cell
+of the first slot). The macro GET_VDATA(), internal to vcode.c, gets from
+**wdata** to **vdata** (by reading the 1st cell).
+
+
+== Structure of V-codes ==
+
+As said above, V-code is an array of pointers to void. The array contains a
+sequence of commands - each consisting of one or more pointer values: an
+instruction header, and a specified number of parameters.
+
+The parameters can be either constants, or memory references. The latter may be
+either addresses of globals (string constants, variables, cells in global arrays,
+functions), or offsets in **ddata** struct, of the type designated by the
+//WBbase// macro. Encoding the field references is done with the //WBfield()//
+macro:
+
+**..., WBfield(field), ...**
+
+Other things are encoded as per usual; variables with the "&" operator, strings,
+arrays and functions as is, constants with a "(void *)" cast:
+
+**&(variable), "string", array, array + 2, function, (void *)1**
+
+The responsibility of a high-level command macro is to pack its parameters in the
+way and order that the underlying instruction code expects them. Like this:
+
+**OKBTN(_("OK"), conf_done)**
+
+translates to this:
+
+**WBr2h_x(OKBTN, 1 + 2), (_("OK")), EVENT(OK, conf_done)**
+
+Here you see a command macro expanding into an instruction header macro, a string
+constant (wrapped in a no-op translation marker), and a nested command macro
+which in its turn expands to another header and a function constant:
+
+**WBrh(EVT_OK, 1), (conf_done)**
+
+Instruction headers are in fact 31-bit integer values, to be able to comfortably
+reside in a pointer on a 32-bit system, and to avoid the signed/unsigned hassle.
+As of mtPaint 3.50, the bits are allocated this way:
+
+|| Bits | Function             | Values   |
+|  0-11 | Instruction code     | op_*     |
+| 12-15 | Packing mode         | pk_*     |
+| 16-17 | Number of slots      | WB_REF*  |
+|    18 | Indirection flag     | WB_NFLAG |
+|    19 | Field flag           | WB_FFLAG |
+|    20 | Script flag          | WB_SFLAG |
+| 21-23 | Reserved             | 0        |
+| 24-30 | Number of parameters | 0-127    |
+
+
+The number of parameters is how many pointers after the header are part of the
+command in question; i.e. how many to skip to get to the next header. In the
+example above it is 1 + 2: 1 for the string, and 2 more for the nested
+//EVENT()// command (which in its own header has 1, for the function).
+
+The first pointer after the header (given the number of parameters is nonzero) is
+intended to be interpreted as pointer to data; this is in no way a hard
+requirement, and many instructions use it for constants instead, but the prologue
+code in V-code functions pre-interprets this field in accordance to field flag and
+indirection flag, so if an instruction refers to in-memory data, it is easiest to
+place the most used (or only) location in there.
+
+- Initially, the first pointer is read as, well, a pointer (and by default, left
+unmodified);
+- With the field flag on, it is reinterpreted as an integer offset from the start
+of **ddata**, and the current **ddata** base address gets added to it;
+- With the indirection flag on, it is interpreted as a pointer to a pointer, and
+that pointer is read in.
+
+
+The script flag, if set, selects nondefault scripting-related behaviour for some
+few commands (specifics depend on command). Not even looked at for all the rest
+of them.
+
+The number of slots (from 0 to 3) tells //run_create_()// how many slots in the
+"tape" this command needs. The first slot refers to the command itself, the
+second and third are set up for its builtin //EVENT()// subcommands (each one a
+pair of pointers at end of the parameters area). A command not taking any slots,
+is executed and forgotten; this fits the widgets that do not need any interaction
+(such as most containers) and modifier commands. The example command above takes
+two slots; it is what the "r2" in its header macro means. The //EVENT// command
+on its own takes one, thus the plain "r" in its.
+
+The packing mode denotes how the widget the command creates should be packed into
+its container, in case the container supports this mode of packing. The small
+assortment of choices is this:
+
+| pk_NONE    | not intended to be packed (modifier, event, etc.) |
+| pk_PACK    | from beginning of container, not expanding |
+| pk_XPACK   | from beginning, expanding |
+| pk_EPACK   | from end, expanding |
+| pk_PACKEND | from end, not expanding |
+| pk_TABLE1x | into first free cell in first/second column of a table, not expanding |
+| pk_TABLE   | into specified row and column(s) of a table, not expanding |
+| pk_TABLEx  | into specified row and column(s) of a table, expanding |
+
+- //pk_PACK// and //pk_XPACK// are allowed for any kind of container, other modes
+require a matching container type.
+- //pk_TABLE// and //pk_TABLEx// take an extra pointer value, from the very end
+of command's parameters, and interpret it as 3 byte values denoting X, Y, and
+length, as packed by the //WBxyl()// macro. Like in this command macro for a
+horizontal box that can take several table columns:
+**#define TLHBOXl(X,Y,L) WBh_t(HBOX, 1), WBxyl(X, Y, L)**
+
+
+Returning to the example, //OKBTN()// command does //pk_XPACK//, as denoted by
+the "_x" in its header macro; the //EVENT()// command does //pk_NONE//, as
+denoted by the lack of "_" in its.
+
+And finally, the instruction code tells //run_create_()// what to do with it all
+(and later, is used to recognize the objects to which the slots in the "tape"
+refer). In the example, it is //op_OKBTN// for the command itself, and
+//op_EVT_OK// for its builtin //EVENT()// command.
+
+On the preprocessor side of things, instruction codes are assembled in stages.
+First, a set of macros is used as shorthand representations for every combination
+of flags and slots that ever arises in some command. For example, //WB_R2F//
+denotes two slots asked for, and the field flag set:
+
+**#define WB_R2F (WB_REF2 + WB_FFLAG)**
+
+Then goes the basic macro encoding the instruction header: //WBp_()//, taking
+instruction code, length, packing mode, and a flags and slots combination.
+However, for brevity, actual command macros use one of the many pre-encoded
+//WB*h*()// macros that need take only instruction name and length. Like the one
+from the example:
+
+**#define WBr2h_x(NM,L) WBp_(op_##NM, L, XPACK, R2)**
+
+In these macros, the part between "WB" and "h" denotes the slots and flags, and
+the part after "h", packing mode.
+
+Additionally, there is a set of helper macros that some commands use to pack two
+byte values into a single pointer: //WBwh()//, //WBnh()//, and //WBbs()//; the
+difference is purely semantic, they do the same thing. And another set for three
+values: //WBpbs()// and //WBppa()//, again doing the same.
+
+
+== V-code commands ==
+
+All high-level command macros are listed below. The list is not final, for new
+commands can be derived from opcodes and lower-level macros any time when existing
+combinations of parameters do not cover a new use case.
+
+In the descriptions below, unless noted differently, the string parameters are
+constants or global **char** arrays, the numeric parameters are constants.
+
+Packing mode for the commands producing widgets (controls and containers),
+unless noted differently, is the default one, //pk_PACK//.
+
+Naming guidelines (not 100% followed) for the macros:
+- "**u**" prefixed to "unreal" (script-only, simulated) version of a widget:
+  //uSPIN()//
+- "**a**" affixed to a version that takes an array instead of several constant
+  parameters: //TSPINa()//
+- "**c**" affixed to a version that is centered: //MLABELc()//
+- "**e**" affixed to a version that has a builtin event: //RPACKe()//
+- "**p**" affixed to a version that takes string parameter by reference instead
+  of a string constant: //WINDOWp()//
+- "**r**" affixed to a version that has a slot in the "tape": //VBOXr//
+- "**s**" affixed to a version that is scriptable: //MENUITEMs()//
+- "**v**" affixed to a version that refers to a variable/array instead of a field:
+  //CSCROLLv()//
+- "**x**" affixed to a version that has extra parameters: //TLABELx()//
+- "**T**" or "**T1**" prefixed to a version packed in first/second table column:
+  //TLABEL()//, //TSPIN()//, //T1SPIN()//
+- "**TL**" prefixed to a version packed into table at (//x, y//): //TLLABEL()//
+- "**TL...l**" circumfixed to a version packed into table at (//x, y//)
+  taking //length// cells: //TLLABELl()//
+- "**X**" prefixed to a version that is packed expanding: //XTABLE()//
+- "**F**" prefixed to a version that has a frame around: //FTABLE()//
+
+
+=== Finalizers ===
+
+All these commands finish element creation and cause **run_create()** to return.
+They differ in what else they do between those two points.
+
+: //WDONE// :
+  do nothing extra
+: //WSHOW// :
+  show the toplevel
+: //WDIALOG(field)// :
+  show, then process input till the **void**** field changes to non-NULL
+
+
+=== Toplevels ===
+
+All toplevels are one-place containers, unless noted differently. All have a slot
+in the "tape" (and extra slots for builtin events, if have any).
+
+: //MAINWINDOW(title, icon, width, height)// :
+  program's main window, with specified title, XPM icon, default width and height
+: //WINDOW(title)// :
+  a regular non-modal window with specified title
+: //WINDOWp(field)// :
+  as above, with title passed in a **char*** field
+: //WINDOWm(title)// :
+  a regular modal window with title
+: //WINDOWpm(field)// :
+  as above, with title in a **char*** field
+: //DIALOGpm(field)// :
+  a modal dialog, with title in a **char*** field; is a double container: the top
+  (the first accessible) is dialog's "content area" (a vertical box), the
+  bottom/second is its "action area" (the one with buttons, a horizontal box)
+: //FPICKpm(title_field, mode_field, filename_field, OK_handler, CANCEL_handler)// :
+  a file selector window, with **char*** title, **int** mode, and **char[]**
+  filename (in system encoding) in fields, and handlers for //OK// and //CANCEL//
+  events; is a box container (horizontal) for extra controls
+: //POPUP(title)// :
+  a popup window with specified title (which, while not shown, is still useful for
+  identifying the window in window manager's lists)
+: //TOPVBOX// :
+  a pseudo-toplevel, for elements created to sit in //MOUNT// containers or purely
+  for scripting; is a box container (vertical)
+: //TOPVBOXV// :
+  same thing but with different sizing: fills space vertically, but horizontally
+  is only centered, not stretched
+: //IDENT(id)// :
+  set a non-default identifying string for the toplevel; is needed when one
+  toplevel has separate V-code descriptions for different parts: the case in point
+  is file selector, where the //FPICKpm()// command builds its fixed part through
+  a nested **run_create()** using an //IDENT()//
+
+
+=== Containers ===
+
+Table containers have a border area by default; its size can be set by
+//BORDER(TABLE)// (see "Sizing and placement" category below). Other containers
+do not, unless specifically noted.
+
+: //WEND// :
+  close the current container
+: //TABLE(columns, rows)// :
+  a table of given dimensions (those currently are initial, not a hard limit)
+: //TABLE2(rows)// :
+  a two-column table
+: //TABLEs(columns, rows, spacing)// :
+  a table with specified spacing (same for rows and columns)
+: //TABLEr(columns, rows)// :
+  a table that gets a slot in the "tape"
+: //XTABLE(columns, rows)// :
+  a table that is packed expanding (//pk_XPACK//)
+: //ETABLE(columns, rows)// :
+  a table that is packed from the end (//pk_PACKEND//)
+: //VBOX// :
+  a vertical box
+: //VBOXr// :
+  a vertical box with slot in the "tape"
+: //VBOXbp(spacing, border, padding)// :
+  a vertical box with specified spacing, border, and padding
+: //VBOXP// :
+  a vertical box with padding of default size (5 pixels)
+: //VBOXB// :
+  a vertical box with border of default size (5 pixels)
+: //VBOXS// :
+  a vertical box with spacing of default size (5 pixels)
+: //VBOXPS// :
+  a vertical box with padding and spacing of default size (5 pixels each)
+: //VBOXBS// :
+  a vertical box with border and spacing of default size (5 pixels each)
+: //VBOXPBS// :
+  a vertical box with padding, border and spacing of default size (5 pixels each)
+: //XVBOX// :
+  a vertical box that is packed expanding
+: //XVBOXbp(spacing, border, padding)// :
+  same, with specified spacing, border, and padding
+: //XVBOXP// :
+  a vertical box, packed expanding, with default padding
+: //XVBOXB// :
+  a vertical box, packed expanding, with default border
+: //XVBOXBS// :
+  a vertical box, packed expanding, with default border and spacing
+: //EVBOX// :
+  a vertical box, packed from the end
+: //HBOX// :
+  a horizontal box
+: //HBOXbp(spacing, border, padding)// :
+  a horizontal box with specified spacing, border, and padding
+: //HBOXP// :
+  a horizontal box, with default padding
+: //HBOXPr// :
+  same, with slot in the "tape"
+: //HBOXB// :
+  a horizontal box, with default border
+: //XHBOX// :
+  a horizontal box, packed expanding
+: //XHBOXbp(spacing, border, padding)// :
+  same, with specified spacing, border, and padding
+: //XHBOXP// :
+  a horizontal box, packed expanding, with default padding
+: //XHBOXS// :
+  a horizontal box, packed expanding, with default spacing
+: //XHBOXBS// :
+  a horizontal box, packed expanding, with default border and spacing
+: //TLHBOXl(x, y, length)// :
+  a horizontal box, packed into //length// columns in a table, starting at
+  column //x//, row //y//
+: //TLHBOXpl(x, y, length)// :
+  same, with default padding
+: //EQBOX// :
+  a horizontal box with equal space allocated to contents
+: //EQBOXbp(spacing, border, padding)// :
+  same, with specified spacing, border, and padding
+: //EQBOXP// :
+  a horizontal box with equal space, with default padding
+: //EQBOXB// :
+  a horizontal box with equal space, with default border
+: //EQBOXS// :
+  a horizontal box with equal space, with default spacing
+: //EEQBOX// :
+  a horizontal box with equal space, packed from the end
+
+
+==== Frames ====
+
+Frames have an empty border area around them by default, its size can be set by
+//BORDER(FRAME)//. A container sitting inside a frame can also have a border of
+its own, even if both are created by one command.
+
+: //FRAME(name)// :
+  a frame with specified name
+: //XFRAME(name)// :
+  same, packed expanding
+: //XFRAMEp(field)// :
+  a frame, packed expanding, with name passed in a **char*** field
+: //EFRAME// :
+  a frame without name, with an "etched out" look
+: //FTABLE(name, columns, rows)// :
+  a table of given dimensions sitting in a named frame
+: //FVBOX(name)// :
+  a vertical box sitting in a named frame
+: //FVBOXB(name)// :
+  a vertical box in a named frame, with default border
+: //FVBOXBS(name)// :
+  a vertical box in a named frame, with default border and spacing
+: //FXVBOX(name)// :
+  a vertical box in a named frame, packed expanding
+: //FXVBOXB(name)// :
+  same, with default border
+: //EFVBOX// :
+  a vertical box with twice the default border (10 pixels), sitting in an
+  "etched out" nameless frame
+: //FHBOXB(name)// :
+  a horizontal box in a named frame, with default border
+
+
+==== Scrolling ====
+
+Scrolling containers have a default border area: //BORDER(SCROLL)//.
+
+: //SCROLL(horiz_mode, vert_mode)// :
+  a scrolling container, with display modes for its horizontal and vertical
+  scrollbar: 0 - do not show, 1 - show when needed, 2 - show always
+: //XSCROLL(horiz_mode, vert_mode)// :
+  same, packed expanding
+: //FSCROLL(horiz_mode, vert_mode)// :
+  a scrolling container in an unnamed frame, packed expanding
+: //CSCROLLv(array)// :
+  a scrolling container acting as a control: with its own slot, and with
+  horizontal and vertical positions read into/reset from **int[2]** array
+  (zeroed out by **run_create()**); horizontal and vertical scrollbars are shown
+  when needed
+
+
+==== Notebook ====
+
+Regular notebook widgets have a default border area: //BORDER(NBOOK)//.
+
+: //NBOOK// :
+  a notebook with tabs on top, packed expanding; is a container for //PAGE//'s
+: //NBOOKr// :
+  same, with a slot in the "tape"
+: //NBOOKl// :
+  a notebook with tabs on the left, packed expanding
+: //PAGE(name)// :
+  a page for a notebook, with a name; is a box container (vertical)
+: //PAGEvp(var)// :
+  same, with name passed in a **char*** variable
+: //PAGEi(icon, spacing)// :
+  a page for a notebook, with an icon instead of name, and specified spacing
+: //PAGEir(icon, spacing)// :
+  same, with a slot in the "tape"
+: //PLAINBOOK// :
+  a "notebook" without any visible trappings, just to show either of two boxes in
+  same place; has a slot in the "tape", through which to command it to switch
+  pages; is a double container - page 0 is the top, all pages vertical boxes
+: //PLAINBOOKn(num_pages)// :
+  same but with specified number of pages (3 or more); a multiple container, page
+  0 is the top
+: //BOOKBTN(name, field)// :
+  a toggle button with a name, for switching pages of a //PLAINBOOK// whose slot
+  is in the **void**** field: show page 1 if toggled, page 0 if not
+
+
+==== Special ====
+
+: //DOCK(ini_var_name)// :
+  a splitter adding a dock pane on the right, that can be hidden/shown; the
+  specified inifile variable (integer) holds the pane's width when it is shown;
+  has a slot in the "tape"; is a double container, with left (main) pane the top,
+  and dock pane the bottom, both panes are vertical boxes
+: //HVSPLIT// :
+  a splitter that can be switched between single-pane, horizontal, and vertical;
+  packed expanding, has a slot; is a container for two widgets, the first for
+  single/left/top pane, the second for hidden/right/bottom one; still needs
+  //WEND// after them
+: //VSPLIT// :
+  a regular vertical splitter, packed expanding, has a slot; a container for two
+  widgets, first is for the top pane, the second for the bottom, needs //WEND//
+  after them
+: //TWOBOX// :
+  a container for two widgets, holding them in one row if enough horizontal space,
+  or in two rows if not
+: //MOUNT(field, create_func, CHANGE_handler)// :
+  a container holding and "leasing" an element created by a specified **mnt_fn**
+  function (returns **wdata**), with **int** field set to TRUE while holding it,
+  and a handler for //CHANGE// event, triggered when leasing/unleasing; has a
+  slot for itself and another for the event
+: //PMOUNT(field, create_func, CHANGE_handler, ini_var_name, def_height)// :
+  same, but with the element held in a resizable vertical pane with specified
+  default height, with specified inifile variable (integer) storing modified
+  height
+: //REMOUNTv(var)// :
+  a container that, when created, "leases" the element from the //MOUNT// whose
+  slot is in the **void**** variable, and when destroyed, returns it back; is
+  packed expanding, has a slot
+: //HEIGHTBAR// :
+  a modifier that requests the max height of all the widgets following it in the
+  same container, whether visible or not; used to prevent jitter when those
+  widgets get shown/hidden later
+
+
+==== Statusbar ====
+
+: //STATUSBAR// :
+  a statusbar, packed from the end, has a slot, is a box container (horizontal)
+: //STLABEL(width, align)// :
+  a statusbar label, with specified width and alignment: 0 - left, 1 - center,
+  2 - right; has a slot
+: //STLABELe(width, align)// :
+  same, packed from the end
+
+
+=== Separators ===
+
+: //HSEP// :
+  a horizontal separator
+: //HSEPl(width)// :
+  same, with specified minimum width
+: //HSEPt// :
+  a thin (minimum height) horizontal separator
+
+
+=== Labels ===
+
+All labels, when packed into boxes and tables, have padding by default; its size
+can be set by //BORDER(LABEL)//. Labels are left aligned by default.
+
+Labels identify adjacent controls to scripts, unless prevented from it or have no
+control to attach to.
+
+: //MLABEL(text)// :
+  a regular label with text
+: //MLABELr(text)// :
+  same, with a slot of its own
+: //MLABELc(text)// :
+  a centered label with text
+: //MLABELcp(field)// :
+  same, with text passed in a **char*** field
+: //MLABELxr(text, x_padding, y_padding, x_align)// :
+  a label with text, with specified extra horizontal and vertical padding, and
+  horizontal alignment at //x_align/10//: 0 - left, 5 - center, 10 - right; has
+  a slot
+: //MLABELpx(field, x_padding, y_padding, x_align)// :
+  same, but with text passed in a **char*** field, and without a slot of its own
+: //WLABELp(field)// :
+  a centered label with text passed in a **char*** field, packed expanding,
+  ignored by scripts
+: //XLABELcr(text)// :
+  a centered label with text, packed expanding, has a slot
+: //TLABEL(text)// :
+  a label with text, packed into the first free cell of the first column of a
+  table
+: //TLABELr(text)// :
+  same, with a slot of its own
+: //TLABELx(text, x_padding, y_padding, x_align)// :
+  same, with specified padding and alignment, and without a slot
+: //TLLABELl(text, x, y, length)// :
+  a label with text, packed into //length// columns in a table, starting at
+  column //x//, row //y//
+: //TLLABEL(text, x, y)// :
+  same, packed into one column
+: //TLLABELx(text, x, y, x_padding, y_padding, x_align)// :
+  same, with specified padding and alignment
+: //TLLABELxr(text, x, y, x_padding, y_padding, x_align)// :
+  same, with a slot of its own
+: //TLLABELp(field, x, y)// :
+  a label with text passed in a **char*** field, packed into a table at
+  column //x//, row //y//
+: //TLLABELpx(field, x, y, x_padding, y_padding, x_align)// :
+  same, with specified padding and alignment
+: //TXLABEL(text, x, y)// :
+  a label with text, packed expanding into a table at column //x//, row //y//,
+  aligned at 0.3 of its width
+: //HLABELp(field)// :
+  a helptext label with text passed in a **char*** field
+: //HLABELmp(field)// :
+  same with monospace font
+: //TLTEXT(text, x, y)// :
+  text, separated into columns by tabs and into rows by newlines, is placed into
+  a table starting at column //x//, row //y//
+: //TLTEXTf(field, x, y)// :
+  same, with text stored in a **char** array field
+: //TLTEXTp(field, x, y)// :
+  same, but with text passed in a **char*** field
+
+
+=== Image display ===
+
+All widgets in this group have slots in the "tape".
+
+: //COLORPATCHv(rgb_array, width, height)// :
+  areа of specified size, filled with RGB color passed in an **unsigned char[3]**
+  array (or a string constant), packed expanding
+: //RGBIMAGE(image_field, w_h_array_field)// :
+  area of size passed in **int[2]** array field, displaying an image pointed to
+  by **unsigned char*** field
+: //TLRGBIMAGE(image_field, w_h_array_field, x, y)// :
+  same, packed into a table at column //x//, row //y//
+: //RGBIMAGEP(array_field, width, height)// :
+  area of specified size, displaying an image stored in **unsigned char[]**
+  array field
+: //CANVASIMGv(array, width, height)// :
+  framed canvas widget (one able to properly receive clicks, releases, and
+  movement, and efficiently handle scrolling) of specified size, displaying an
+  image stored in **unsigned char[]** array
+: //CCANVASIMGv(array, width, height)// :
+  same, packed from the end, expanding (//pk_EPACK//)
+: //CANVASIMGB(image_field, w_h_bkg_array_field)// :
+  framed canvas widget of minimum size passed in first 2 cells of **int[3]** array
+  field, displaying an image pointed to by **unsigned char*** field, and filling
+  the extra space, if any, with RGB color packed in an **int** in the cell 2 of
+  the **int[3]** array
+: //FCIMAGEP(image_field, x_y_array_field, w_h_array_field)// :
+  focusable widget displaying an image pointed to by **unsigned char*** field,
+  of size passed in **int[2]** array field, contoured by a frame, with a
+  ring-shaped location marker on it at coordinates given in another **int[2]**
+  array field
+: //TLFCIMAGEP(image_field, x_y_array_field, w_h_array_field, x, y)// :
+  same, packed into a table at column //x//, row //y//
+: //TLFCIMAGEPn(image_field, w_h_array_field, x, y)// :
+  same, but without a location marker
+: //CANVAS(init_width, init_height, cost, EXT_handler)// :
+  framed canvas widget of specified initial size, that triggers //EXT// event to
+  redraw an area (handled by an **evtxr_fn**); the //cost// value is defined as
+  how many pixels likely could be redrawn in the time needed to call the event
+  once more (i.e. its init+teardown cost), and is used for deciding whether to
+  redraw multiple subregions one by one, or their encompassing region once; has
+  a slot for itself and an extra one for the event
+
+
+The //EXT// handler of //CANVAS()// receives in its //xdata// parameter a pointer
+to **rgbcontext** (see mygtk.h). Its task is to render into the buffer there an
+RGB image of the denoted area of canvas, and return TRUE.
+
+
+=== Spinbuttons and spinsliders ===
+
+All spinbuttons and spinsliders, when packed into boxes and tables, have padding
+by default; its size can be set by //BORDER(SPIN)// and //BORDER(SPINSLIDE)//.
+They all have slots in the "tape", unless specifically noted.
+
+: //NOSPINv(var)// :
+  displays an **int** variable in a non-modifiable spinbutton, has no slot
+: //TLNOSPIN(field, x, y)// :
+  displays an **int** field value in a non-modifiable spinbutton, packed into a
+  table at column //x//, row //y//, has no slot
+: //TLNOSPINr(field, x, y)// :
+  same but has a slot
+: //TLSPIN(field, min, max, x, y)// :
+  a spinbutton with **int** field, range //min// to //max//, packed into a table
+  at column //x//, row //y//
+: //TLXSPIN(field, min, max, x, y)// :
+  same, packed there expanding
+: //TLXSPINv(var, min, max, x, y)// :
+  same, with **int** variable
+: //T1SPIN(field, min, max)// :
+  a spinbutton with **int** field, packed into the first free cell of the second
+  column of a table
+: //TSPIN(text, field, min, max)// :
+  same combined with label that goes into the first column
+: //TSPINv(text, var, min, max)// :
+  same, with **int** variable
+: //TSPINa(text, array_field)// :
+  same, but with value, min and max in **int[3]** array field
+: //SPIN(field, min, max)// :
+  a spinbutton with **int** field, range //min// to //max//
+: //SPINv(var, min, max)// :
+  same, with **int** variable
+: //SPINc(field, min, max)// :
+  a spinbutton with **int** field, centering the value
+: //XSPIN(field, min, max)// :
+  a spinbutton with **int** field, packed expanding
+: //FSPIN(field, min, max)// :
+  a fixedpoint spinbutton with **int** field holding value * 100, range //min//
+  to //max// (both * 100)
+: //FSPINv(field, min, max)// :
+  same, with **int** variable
+: //TFSPIN(text, field, min, max)// :
+  a fixedpoint spinbutton with **int** field, packed into the second column of
+  a table, combined with label that goes into the first column
+: //FSPIN(field, min, max, x, y)// :
+  a fixedpoint spinbutton with **int** field, packed into a table at column //x//,
+  row //y//
+: //SPINa(array_field)// :
+  a spinbutton with value, min and max in **int[3]** array field
+: //XSPINa(array_field)// :
+  same, packed expanding
+: //uSPIN(field, min, max)// :
+  a script-only simulated spinbutton with **int** field, range //min// to //max//
+: //uSPINv(var, min, max)// :
+  same, with **int** variable
+: //uFSPINv(var, min, max)// :
+  same, but fixedpoint
+: //uSPINa(array_field)// :
+  a script-only simulated spinbutton with value, min and max in **int[3]** array
+  field
+: //uSCALE(field, min, max)// :
+  a script-only simulated spinbutton with **int** field, with extended syntax:
+  interprets values like "x1.5" as "original value multiplied by 1.5"
+: //TLSPINPACKv(array, count, CHANGE_handler, width, x, y)// :
+  a grid of //count// spinbuttons arranged in //width// columns, packed into a
+  table starting at column //x//, row //y//, with values, min and max for each in
+  **int[][3]** array which is automatically updated when any of values changes,
+  with a handler for //CHANGE// event that is triggered after (handled by an
+  **evtx_fn**); has a slot for itself and another for the event
+: //T1SPINSLIDE(field, min, max)// :
+  a spinslider with **int** field, range //min// to //max//, packed into the first
+  free cell of the second column of a table, with preset size (255 x 20 pixels)
+: //TSPINSLIDE(text, field, min, max)// :
+  same combined with label that goes into the first column
+: //TSPINSLIDEa(text, array_field)// :
+  same, but with value, min and max in **int[3]** array field
+: //TLSPINSLIDE(field, min, max, x, y)// :
+  a spinslider with **int** field, packed into a table at column //x//, row //y//
+: //TLSPINSLIDEvs(var, min, max, x, y)// :
+  same, with **int** variable and preset width (150 pixels)
+: //TLSPINSLIDExl(field, min, max, x, y, length)// :
+  a spinslider with **int** field, packed expanding into //length// columns in a
+  table, starting at column //x//, row //y//
+: //TLSPINSLIDEx(field, min, max, x, y)// :
+  same, packed into one column
+: //SPINSLIDEa(array_field)// :
+  a spinslider with value, min and max in **int[3]** array field
+: //XSPINSLIDEa(array_field)// :
+  same, packed expanding
+
+
+The //CHANGE// handler of //TLSPINPACKv()// receives in its //xdata// parameter
+an **int** index of the spinbutton that changed, cast into **void***.
+
+
+=== Checkbuttons ===
+
+All checkbuttons have a default border area: //BORDER(CHECK)//. They all have
+slots in the "tape".
+
+: //CHECK(name, field)// :
+  a named checkbutton with **int** field
+: //CHECKv(name, var)// :
+  same, with **int** variable
+: //CHECKb(name, field, ini_var_name)// :
+  a named checkbutton with **int** field, with specified inifile variable
+  (integer) storing its value
+: //XCHECK(name, field)// :
+  a named checkbutton with **int** field, packed expanding
+: //TLCHECKl(name, field, x, y, length)// :
+  same, packed into //length// columns in a table, starting at column //x//,
+  row //y//
+: //TLCHECK(name, field, x, y)// :
+  same, packed into one column
+: //TLCHECKvl(name, var, x, y, length)// :
+  a named checkbutton with **int** variable, packed into //length// columns in a
+  table, starting at column //x//, row //y//
+: //TLCHECKv(name, var, x, y)// :
+  same, packed into one column
+: //uCHECK(name, field)// :
+  a script-only simulated named checkbutton with **int** field
+: //uCHECKv(name, var)// :
+  same, with **int** variable
+
+
+=== Radiobutton packs ===
+
+All radiobutton packs have a default border area: //BORDER(RPACK)//. They all have
+slots in the "tape", those with a builtin event have an extra slot for the event.
+
+: //RPACK(names_array, count, height, field)// :
+  a box of radiobuttons with **int** field that stores the index of the active
+  one, with names in **char*[]** array, //count// of them in total (0 if array of
+  names is NULL-terminated), arranged in columns of no more than //height// (0 if
+  all in a single column), packed expanding
+: //RPACKv(names_array, count, height, var)// :
+  same, with **int** variable
+: //FRPACK(frame_name, names_array, count, height, field)// :
+  a box of radiobuttons with **int** field, sitting in a named frame
+: //FRPACKv(frame_name, names_array, count, height, var)// :
+  same, with **int** variable
+: //RPACKe(names_array, count, height, field, SELECT_handler)// :
+  a box of radiobuttons with **int** field and a handler for //SELECT// event,
+  packed expanding
+: //FRPACKe(frame_name, names_array, count, height, field, SELECT_handler)// :
+  same, sitting in a named frame
+: //RPACKD(names_field, height, field)// :
+  a box of radiobuttons with **int** field, with **char**** field pointing to a
+  NULL-terminated **char*[]** array of names, packed expanding
+: //RPACKDv(names_field, height, var)// :
+  same, with **int** variable
+: //RPACKDve(names_field, height, var, SELECT_handler)// :
+  same, with a handler for //SELECT// event
+
+
+In case a radiobutton's name is an empty string, the corresponding index is just
+skipped.
+
+
+=== Option menus and comboboxes ===
+
+All option menus and comboboxes have a default border area: //BORDER(OPT)//. They
+all have slots in the "tape", those with a builtin event have an extra slot for
+the event.
+
+: //OPT(names_array, count, field)// :
+  an option menu with **int** field, with list of choices' names in **char*[]**
+  array, //count// of them in total (0 if array of choices is NULL-terminated)
+: //OPTv(names_array, count, var)// :
+  same, with **int** variable
+: //TOPTv(text, names_array, count, var)// :
+  same, packed into the second column of a table, combined with label that goes
+  into the first column
+: //TLOPT(names_array, count, field, x, y)// :
+  an option menu with **int** field, packed into a table at column //x//,
+  row //y//
+: //TLOPTv(names_array, count, var, x, y)// :
+  same, with **int** variable
+: //OPTe(names_array, count, field, SELECT_handler)// :
+  an option menu with **int** field and a handler for //SELECT// event
+: //OPTve(names_array, count, var, SELECT_handler)// :
+  same, with **int** variable
+: //XOPTe(names_array, count, field, SELECT_handler)// :
+  an option menu with **int** field and a handler for //SELECT// event, packed
+  expanding
+: //TLOPTle(names_array, count, field, SELECT_handler, x, y, length)// :
+  same, packed into //length// columns in a table, starting at column //x//,
+  row //y//
+: //TLOPTvle(names_array, count, var, SELECT_handler, x, y, length)// :
+  same, with **int** variable
+: //TLOPTve(names_array, count, var, SELECT_handler, x, y)// :
+  same, packed into one column
+: //OPTD(names_field, field)// :
+  an option menu with **int** field, with **char**** field pointing to a
+  NULL-terminated **char*[]** array of choices' names
+: //XOPTD(names_field, field)// :
+  same, packed expanding
+: //TOPTDv(text, names_field, field)// :
+  same with **int** variable, packed into the second column of a table, combined
+  with label that goes into the first column
+: //OPTDe(names_field, field, SELECT_handler)// :
+  an option menu with **int** field, **char**** field pointing to choices' names,
+  and a handler for //SELECT// event
+: //XOPTDe(names_field, field, SELECT_handler)// :
+  same, packed expanding
+: //TOPTDe(text, names_field, field, SELECT_handler)// :
+  same, packed into the second column of a table, combined with label that goes
+  into the first column
+: //COMBO(names_array, count, field)// :
+  a combobox with **int** field, with list of choices' names in **char*[]**
+  array, //count// of them in total (0 if array of choices is NULL-terminated)
+: //PCTCOMBOv(var, array, CHANGE_handler)// :
+  a combobox displaying percent zoom values, with **int** variable, an **int[]**
+  array (0-terminated) of some values, and a handler for //CHANGE// event; has no
+  border
+
+
+In case a choice's name is an empty string, the corresponding index is just
+skipped.
+
+
+=== Specialized controls ===
+
+All widgets in this group have slots in the "tape", those with a builtin event
+have an extra slot for the event.
+
+: //PROGRESSp(text_field)// :
+  a progressbar, with text for it passed in a **char*** field
+: //GRADBAR(chan_field, idx_field, len_field, max, map_array_field, cmap_array_field, SELECT_handler)// :
+  a "gradient bar" for displaying and selecting points in a gradient, with
+  currently selected index in **int** //idx_field//, gradient's length in
+  //len_field//, gradient's channel in **int** //chan_field//, colormap for
+  non-RGB cases in **unsigned char[768]** //cmap_array_field//, gradient's
+  values/colors at points in **unsigned char[]** //map_array_field//, and a
+  handler for //SELECT// event
+: //KEYBUTTON(field)// :
+  a button for choosing key combos, with **char*** field where it places keyname
+  string
+: //TABLETBTN(name)// :
+  a named button for calling up tablet configuration dialog
+: //FONTSEL(array_field)// :
+  a font chooser, with font description string and the text to render in a
+  **char*[2]** array field, packed expanding
+: //EYEDROPPER(field, CHANGE_handler, x, y)// :
+  a button calling up eyedropper, with color it picked up in an **int** field, and
+  a handler for //CHANGE// event, packed into a table at column //x//, row //y//
+: //COLOR(array_field)// :
+  a color chooser for opaque colors, with RGBA in **unsigned char[4]** array field
+: //TCOLOR(array_field)// :
+  same for colors with alpha
+
+
+=== Lists ===
+
+The //LISTCC*// widgets have a default border area: //BORDER(LISTCC)//. All list
+widgets and columns have slots in the "tape", those with a builtin event have an
+extra slot for the event, those with two, extra two slots.
+
+: //COLORLIST(names_field, idx_field, rgb_array_field, SELECT_handler, EXT_handler)// :
+  a list of named colors, with currently selected index in **int** field, a
+  **char**** field pointing to a NULL-terminated **char*[]** array of names,
+  colors themselves in **unsigned char[]** array field, a handler for //SELECT//
+  event, and a handler for //EXT// event (an **evtx_fn**)
+: //COLORLISTN(cnt_field, idx_field, rgb_array_field, SELECT_handler, EXT_handler)// :
+  same for numbered colors, with count of them in **int** field
+: //LISTCCHr(idx_field, len_field, max, SELECT_handler)// :
+  a simpler (headerless, unsorted) columned list, with index and length (dynamic,
+  limited to //max// items) in **int** fields, and a handler for //SELECT// event
+: //LISTCCHr(idx_field, len_field, SELECT_handler)// :
+  same with static (unchanging) length
+: //LISTC(idx_field, len_field, SELECT_handler)// :
+  a complex (with column headers and sorting) columned list, with index and length
+  in **int** fields, and a handler for //SELECT// event
+: //LISTCu(idx_field, len_field, SELECT_handler)// :
+  same, unsorted
+: //LISTCd(idx_field, len_field, SELECT_handler)// :
+  same, with draggable rows
+: //LISTCS(idx_field, len_field, sortmode_field, SELECT_handler)// :
+  a complex columned list, with selectable sort column and direction; the sort
+  mode in **int** field is column+1 if sorted ascending, and the same negated if
+  descending
+: //LISTCX(idx_field, len_field, sortmode_field, map_field, SELECT_handler, EXT_handler)// :
+  same, with user-resizable columns and filtering: **int**** field points to
+  mapping array (row indices to display, in order; also used for sorting); and
+  with a handler for //EXT// event (an **evtx_fn**)
+
+
+Index in //LISTC()// and its brethren refers to raw (unsorted and unfiltered)
+data. The //EXT// handler of //LISTCX()// is triggered by right click on a row,
+and receives in its //xdata// parameter an **int** index of that row.
+
+The //EXT// handler of //COLORLIST()// and //COLORLISTN()// is triggered by click 
+on a color, and receives in its //xdata// parameter a pointer to **colorlist_ext**.
+
+The columns of a columned list sit between //WLIST// command and the list itself,
+and describe what, how, and where from goes into each. They can refer either to
+an array, or to a structure and a field in it; if the latter, the //COLUMNDATA()//
+command is needed, describing an array of those structures.
+
+: //WLIST// :
+  start a group of columns
+: //COLUMNDATA(field, step)// :
+  set a **void*** field as pointer to the array of data structures for columns in
+  this group
+: //IDXCOLUMN(init, step, width, align)// :
+  add a column of indices, starting at //init// and changing by //step//,
+  //width// pixels wide, aligned per //align//: 0 - left, 1 - center, 2 - right
+: //TXTCOLUMNv(array, step, width, align)// :
+  add a column of text strings from **char[]** array (buffers, not pointers), with
+  specified step, width and alignment
+: //XTXTCOLUMNv(array, step, width, align)// :
+  same, expanding
+: //NTXTCOLUMNv(name, array, step, width, align)// :
+  add a column of text strings from **char[]** array, with column name/title
+: //NTXTCOLUMND(name, struct_type, struct_field, width, align)// :
+  same, from a **char[]** array field (buffer) in //COLUMNDATA//
+: //PTXTCOLUMN(array_field, step, width, align)// :
+  add a column of text strings from **char*[]** array field (pointers)
+: //PTXTCOLUMNp(field, step, width, align)// :
+  same, from **char*[]** array pointed to by //field//
+: //RTXTCOLUMNDi(width, align)// :
+  add a column of text strings relative to elements of **int[]** array that is
+  //COLUMNDATA//: each element holds an offset **from itself** to the string
+: //RTXTCOLUMND(struct_type, struct_field, width, align)// :
+  same, relative to **int** field in //COLUMNDATA//
+: //NRTXTCOLUMND(name, struct_type, struct_field, width, align)// :
+  same, with column name/title
+: //NRTXTCOLUMNDax(name, index, width, align, ini_var_name)// :
+  same, relative to //index//-th element of **int[]** sub-array in //COLUMNDATA//,
+  with inifile variable (integer) storing modified width
+: //NRTXTCOLUMNDaxx(name, index, width, align, ini_var_name, test_string)// :
+  same, at least wide enough for //test_string//
+: //NRFILECOLUMNDax(name, index, width, align, ini_var_name)// :
+  add a column of filenames relative to element of sub-array: the 0th character
+  denotes the type: 'F' for file, 'D' for directory, ' ' for ".."
+: //CHKCOLUMNv(array, step, width, align, CHANGE_handler)// :
+  add a column of checkbuttons from **int[]** array, with a handler for //CHANGE//
+  event (an **evtxr_fn**)
+
+
+The //CHANGE// handler of //CHKCOLUMNv()// receives in its //xdata// parameter
+an **int** index of the row that was toggled.
+
+
+=== Text entry fields ===
+
+All entry widgets, when packed into boxes and tables, have padding by default;
+its size can be set by //BORDER(ENTRY)//. All pathboxes have a default border
+area: //BORDER(PATH)//. All widgets in this group have slots in the "tape", those
+with a builtin event have an extra slot for the event.
+
+: //XENTRY(field)// :
+  an entry with **char*** field, packed expanding
+: //XLENTRY(field, max)// :
+  same, with max length in chars
+: //TLENTRY(field, max, x, y, length)// :
+  same, packed into //length// columns in a table, starting at column //x//,
+  row //y//
+: //MLENTRY(field)// :
+  a multiline entry (accepts **Ctrl+Enter** for a newline) with **char*** field
+: //XPENTRY(field, max)// :
+  an entry for filenames (in system encoding) with **char*** field, with max
+  length in chars, packed expanding
+: //TPENTRYv(text, var, max)// :
+  an entry for filenames with **char*** variable, with max length, packed into the
+  second column of a table, combined with label that goes into the first column
+: //PATH(name, fsel_name, mode, field)// :
+  a pathbox (a named frame with entry in system encoding and button calling up
+  file selector) with **char*** field, with name and mode for the fileselector
+: //PATHv(name, fsel_name, mode, var)// :
+  same, with **char*** variable
+: //PATHv(name, fsel_name, mode, ini_var_name)// :
+  same, with inifile variable (string)
+: //TPATHv(name, fsel_name, mode, var)// :
+  a frameless pathbox with **char*** variable, packed into the second column of a
+  table, combined with label that goes into the first column
+: //uPATHSTR(field)// :
+  a script-only simulated entry for filenames with **char*** field
+: //TEXT(field)// :
+  a text widget with **char*** field, packed expanding
+: //COMBOENTRY(field, list_field, OK_handler)// :
+  an entry with dropdown list with **char*** field, with **char**** //list_field//
+  pointing to NULL-terminated **char*[]** array of choices, and a handler for
+  //OK// event, packed expanding
+: //HEXENTRY(field, CHANGE_handler, x, y)// :
+  an entry for color hex code / name, with **int** field (packed RGB), and a
+  handler for //CHANGE// event, packed into a table at column //x//, row //y//
+
+
+The //XENTRY//, //*LENTRY// and //COMBOENTRY// widgets immediately replace the
+string values used for initialization with copies owned by the widgets, so that
+there is no chance of incidental access if the original strings are freed after
+**run_create()**. The //TEXT// widget just replaces it with NULL, for the same
+reason.
+
+
+=== Buttons ===
+
+All buttons have a default border area: //BORDER(BUTTON)//. They all have two
+slots in the "tape": for themselves and for their builtin event.
+
+Buttons, except toggle buttons, are not scriptable by default, unless explicitly
+tagged by the "script flag"; some of macros below are for such buttons.
+
+: //OKBTN(name, OK_handler)// :
+  a named button reacting to **Enter** key, with //OK// event handler, packed
+  expanding
+: //uOKBTN(OK_handler)// :
+  a script-only simulated button with //OK// event handler
+: //CANCELBTN(name, CANCEL_handler)// :
+  a named button reacting to **Esc** key, with //CANCEL// event handler, packed
+  expanding
+: //CANCELBTNp(field, CANCEL_handler)// :
+  same, with name in a **char*** field
+: //UCANCELBTN(name, CANCEL_handler)// :
+  a cancel button packed the default way (//pk_PACK//)
+: //ECANCELBTN(name, CANCEL_handler)// :
+  same, packed from the end
+: //UDONEBTN(name, OK_handler)// :
+  a named button reacting to **Enter** and **Esc** keys, with //OK// event handler
+: //TOGGLE(name, field, CHANGE_handler)// :
+  a named toggle button with an **int** field and //CHANGE// event handler, packed
+  expanding
+: //UTOGGLEv(name, var, CHANGE_handler)// :
+  same with an **int** variable, packed the default way
+: //BUTTON(name, CLICK_handler)// :
+  a named button with //CLICK// event handler, packed expanding
+: //BUTTONs(name, CLICK_handler)// :
+  same, scriptable
+: //BUTTONp(field, CLICK_handler)// :
+  same, with name in a **char*** field, not scriptable
+: //UBUTTON(name, CLICK_handler)// :
+  a named button with //CLICK// event handler, packed the default way
+: //EBUTTON(name, CLICK_handler)// :
+  same, packed from the end
+: //TLBUTTON(name, CLICK_handler, x, y)// :
+  same, packed into a table at column //x//, row //y//
+: //TLBUTTONs(name, CLICK_handler, x, y)// :
+  same, scriptable
+: //uBUTTONs(name, CLICK_handler)// :
+  a script-only simulated named button with //CLICK// event handler, scriptable
+  (obviously)
+: //OKBOX(ok_name, OK_handler, cancel_name, CANCEL_handler)// :
+  a convenience macro creating an //EQBOX// with //CANCELBTN// and //OKBTN//; the
+  box is left unclosed (without //WEND//) but no practical reason to add more
+  things into it, and it is normally the last thing in a dialog anyway
+: //OKBOXP(ok_name, OK_handler, cancel_name, CANCEL_handler)// :
+  same, with a box with padding (//EQBOXP//)
+: //OKBOXB(ok_name, OK_handler, cancel_name, CANCEL_handler)// :
+  same, with a box with border (//EQBOXB//)
+: //OKBOX3(ok_name, OK_handler, cancel_name, CANCEL_handler, button_name, CLICK_handler)// :
+  an //EQBOX// with //CANCELBTN//, regular //BUTTON//, and //OKBTN//
+: //OKBOX3B(ok_name, OK_handler, cancel_name, CANCEL_handler, button_name, CLICK_handler)// :
+  same, with a box with border
+
+
+=== Toolbar ===
+
+Toolbars are containers for their buttons, and need //WEND// to close.
+//TOOLBAR*// widgets have a default border area: //BORDER(TOOLBAR)//. All toolbars
+and toolbar buttons have slots in the "tape"; the toolbars have an extra slot or
+two for their builtin events. Toolbar buttons call their toolbar's event handlers
+when things happen to them, so that they do not need //EVENT//s of their own.
+
+: //TOOLBAR(CHANGE_handler)// :
+  a regular toolbar with //CHANGE// event handler (to which, despite the name,
+  regular toolbuttons getting pressed is routed too)
+: //TOOLBARx(CHANGE_handler, CLICK_handler)// :
+  same, with also a //CLICK// event handler for right-clicking on a button
+: //SMARTTBAR(CHANGE_handler)// :
+  a toolbar that, if buttons do not fit, adds a dropdown with the overflow ones;
+  with //CHANGE// event handler
+: //SMARTTBARx(CHANGE_handler, CLICK_handler)// :
+  same, with also a //CLICK// event handler
+: //SMARTTBMORE(name)// :
+  a button that shows said dropdown; after it go regular widgets (not toolbuttons)
+  that will stay displayed regardless
+: //TBBUTTON(name, icon, action)// :
+  a toolbar button with icon, tooltip (also used for scripting), and action code
+  (two numbers packed into one by //ACTMOD()// macro)
+: //TBBUTTON(name, icon, action, rclick_action)// :
+  same, with another action code for right click
+: //TBTOGGLE(name, icon, action, field)// :
+  a toolbar toggle button with an **int** field, icon, tooltip, and action code
+: //TBTOGGLEv(name, icon, action, var)// :
+  same, with an **int** variable
+: //TBTOGGLExv(name, icon, action, rclick_action, var)// :
+  same, with another action code for right click
+: //TBBOXTOGxv(name, icon, action, rclick_action, var)// :
+  a regular toggle button that actually goes into the container that the toolbar
+  sits in, but still acts like //TBTOGGLExv//
+: //TBRBUTTONv(name, icon, action, var)// :
+  a toolbar radiobutton with an **int** variable, icon, tooltip, and action code
+: //TBRBUTTONxv(name, icon, action, rclick_action, var)// :
+  same, with another action code for right click
+: //TBSPACE// :
+  a toolbar separator
+
+
+=== Menu ===
+
+Menubars and submenus are containers for menuitems and submenus, and need //WEND//
+to close. They and menuitems all have slots in the "tape"; the menubars have an
+extra slot for their builtin event. Menuitems call their menubar's event handler
+when they activate.
+
+Menuitems are not scriptable by default; those that are (tagged by "script flag")
+have their macros' names ending in "s".
+
+: //MENUBAR(CHANGE_handler)// :
+  a regular menubar with //CHANGE// event handler, to which all its menuitems'
+  activations get routed
+: //SMARTMENU(CHANGE_handler)// :
+  a menubar that, if not wide enough, moves some of regular submenus into an
+  overflow submenu; with //CHANGE// event handler
+: //SUBMENU(name)// :
+  a submenu
+: //ESUBMENU(name)// :
+  a submenu placed at the end of menubar
+: //SSUBMENU(name)// :
+  the overflow submenu
+: //MENUITEM(name, action)// :
+  a menuitem with action code (//ACTMOD()// made)
+: //MENUITEMs(name, action)// :
+  same, scriptable
+: //MENUITEMi(name, action, icon)// :
+  a menuitem with an icon, with action code
+: //MENUITEMis(name, action, icon)// :
+  same, scriptable
+: //MENUCHECKv(name, action, var)// :
+  a check menuitem with an **int** variable, with action code
+: //MENUCHECKvs(name, action, var)// :
+  same, scriptable
+: //MENURITEMv(name, action, var)// :
+  a radio menuitem with an **int** variable, with action code
+: //MENURITEMvs(name, action, var)// :
+  same, scriptable
+: //MENUTEAR// :
+  a tearoff menuitem
+: //MENUSEP// :
+  a menu separator
+: //MENUSEPr// :
+  same, with a slot of its own (to hide/show it)
+: //uMENUBAR(CHANGE_handler)// :
+  a script-only simulated menubar with //CHANGE// event handler
+: //uMENUITEM(name, action)// :
+  a script-only simulated menuitem; not scriptable, is used for keybindings
+: //uMENUITEMs(name, action)// :
+  same, scriptable
+
+
+=== Control flow ===
+
+The commands in this group control what other commands get executed after.
+
+: //GOTO(array)// :
+  go execute specified V-code array
+: //CALL(array)// :
+  push current execution address onto return stack, and go execute specified
+  V-code array
+: //CALLp(field)// :
+  same, with address of the array given in **void**** field
+: //RET// :
+  pop execution address from return stack, and continue from there
+: //IF(field)// :
+  if **int** field is 0, skip the next command (caution: do not put before those
+  macros that are internally multiple commands)
+: //IFv(var)//
+  same, if **int** variable is 0
+: //IFx(field, id)// :
+  if **int** field is 0, skip the following commands till an //ENDIF()// with the
+  same id number
+: //IFx(var, id)// :
+  same, if **int** variable is 0
+: //UNLESS(field)// :
+  if **int** field isn't 0, skip the next command
+: //UNLESSv(field)// :
+  same, if **int** variable isn't 0
+: //UNLESSx(field, id)// :
+  if **int** field isn't 0, skip the following commands till an //ENDIF()// with
+  the same id
+: //UNLESSbt(ini_var_name)// :
+  if inifile variable (boolean) isn't FALSE, skip the next command
+: //ENDIF(id)// :
+  mark the point for //IFx/UNLESSx// with corresponding id, otherwise do nothing
+
+
+Complex conditions can be implemented in three ways; either the flag
+variable/field itself can be calculated from the condition, or //IFx/UNLESSx// can
+be wrapped around another (sharing the same //ENDIF//), or //IF//UNLESS// can
+precede another conditional to skip it: "//IF(A), IF(B), command//" results in
+"if (!a || b) command".
+
+
+=== Memory allocation and referencing ===
+
+: //REF(field)// :
+  put address of current slot in the "tape" into **void**** field
+: //REFv(var)// :
+  same, into **void**** variable
+: //CLEANUP(field)// :
+  in **run_destroy()** free the memory block pointed to by the **void*** field
+: //TALLOC(field, length_field)// :
+  in **run_create()** allocate **int** //length_field// bytes (**void*** aligned)
+  below current **dtail** and put their address (new **dtail**) into **void***
+  field
+: //TCOPY(field, length_field)// :
+  same but copy whatever the **void*** field was pointing to into the allocated
+  block before overwriting the field with its (now the copy's) address
+
+
+In case //TALLOC()// is used to allocate **double** arrays on a 32-bit
+architecture, the block will need be allocated with one **double** extra, and
+properly aligned on **double** afterwards.
+
+
+=== Keymap and action map ===
+
+Action map serves to easily enable/disable or show/hide multiple widgets in
+response to combinations of various conditions.
+
+: //VISMASK(mask)// :
+  choose which bits of action map will control visibility instead of sensitivity
+  (default is none)
+: //ACTMAP(mask)// :
+  the widget after whose slot in the "tape" this goes, will be sensitive/shown
+  when any bits in the mask are set in the action map, and insensitive/hidden
+  when none are
+
+
+Keymap serves to dynamically map keys to widgets (represented as their slots in
+the "tape"). The default mappings are set in V-code, and keymap allows to modify
+them afterwards and saves/restores the modifications using the inifile.
+
+: //KEYMAP(field, name)// :
+  add a named keymap, with **void**** field to put the found slot into
+: //SHORTCUTs(string)// :
+  add a shortcut represented in GTK+ string format, like "<Alt><Shift>F1"
+: //SHORTCUT(keyval, mods)// :
+  add a shortcut representes as keyname and modifiers, like //SHORTCUT(F2, CS)//
+  for Ctrl+Shift+F2
+: //SHORTCUT0//
+  add no shortcut but tell the keymap to allow user to add one (or more)
+
+
+All //SHORTCUT*// commands affect the last widget with a slot in the "tape" before
+them, as does //ACTMAP// and other "postfix modifier" commands.
+
+
+=== Grouping ===
+
+Group marks serve to direct **cmd_reset()** to a range of widgets all at once,
+and to differentiate groups of like-named widgets for scripting. They all have a
+slot in the "tape".
+
+: //GROUPR// :
+  begin a resetting-group
+: //GROUPN// :
+  begin a scripting-group, taking its name from the preceding label
+: //GROUP(name)// :
+  begin a scripting-group with specified name
+: //GROUP0// :
+  end the current group
+
+
+=== Sizing and placement ===
+
+: //BORDER(category, num)// :
+  set border/spacing for specified category of widgets to specified number of
+  pixels
+: //DEFBORDER(category)// :
+  set border/spacing for specified category of widgets to the default (5 pixels)
+: The categories are:
+| TABLE     | tables
+| NBOOK     | notebooks
+| SCROLL    | scrolledwindows
+| SPIN      | spinbuttons
+| SPINSLIDE | spinsliders
+| LABEL     | labels
+| OPT       | option menus
+| BUTTON    | buttons
+| TOOLBAR   | toolbars
+| POPUP     | popup windows
+| TOPVBOX   | toplevel vboxes
+| CHECK     | checkbuttons
+| FRAME     | frames
+| RPACK     | radiobutton packs
+| ENTRY     | text entries
+| LISTCC    | simple lists
+| PATH      | pathboxes
+: //MKSHRINK// :
+  make toplevel window shrinkable (to prevent it becoming larger than screen)
+: //NORESIZE// :
+  make toplevel window not user-resizable (to make it automatically shrink when
+  widgets get hidden)
+: //WANTMAX// :
+  tell scrolledwindow that goes //after// it to request full size of its contents
+: //WANTMAXW// :
+  same, for width only
+: //WXYWH(prefix, width, height)//
+  make the toplevel save/restore its size and position using inifile variables
+  with specified prefix, and set default width and height for it
+: //DEFW(width)// :
+  set default width for toplevel
+: //DEFH(height)// :
+  set default height for toplevel
+: //DEFSIZE(width, height)// :
+  set default width and height for toplevel
+: //WPMOUSE// :
+  tell window manager to show the toplevel at the mouse cursor location
+: //WPWHEREVER// :
+  tell window manager to show the toplevel wherever it chooses
+: //WIDTH(width)// :
+  set width for the next widget
+: HEIGHT(height)// :
+  set height for the next widget
+: //MINWIDTH(width)// :
+  set minimum width for the next widget
+: //KEEPWIDTH// :
+  make the //preceding// widget to never shrink in width
+: //KEEPHEIGHT// :
+  same in height
+: //ONTOP(field)// :
+  make the toplevel sit above the one whose **wdata** is passed in **void****
+  field (set it as its transient parent)
+: //ONTOP0// :
+  let the toplevel sit either over or under the main window (which is default
+  transient parent of everything else **run_create()** makes); i.e. unset
+  transient parent
+
+
+By default, **run_create()** tells window manager to show the toplevels in the
+center of the screen.
+
+
+=== Initial state ===
+
+: //HIDDEN// :
+  make the preceding widget initially hidden
+: //INSENS// :
+  make it initially insensitive
+: //FOCUS// :
+  make it initially focused
+: //RAISED// :
+  initially raise the toplevel above other windows
+
+
+=== Cursors ===
+
+These commands make cursors for later use. They all have slots in the "tape",
+by which the cursors can later be referred to.
+
+: //XBMCURSOR(xbm_name, x, y)// :
+  a 21x21 cursor from two XBM bitmaps (image and mask) specified by the variable
+  part of their filenames ("select" for xbm_select.xbm and xbm_select_mask.xbm,
+  for example), with specified hotspot coordinates
+: //SYSCURSOR(id)// :
+  a builtin cursor, identified as per GdkCursorType
+
+
+=== Events ===
+
+Event handlers, in V-code, get a slot in the "tape" after the widget they are
+attached to. There should be only one handler for a given event type per widget.
+
+: //EVENT(type, handler)// :
+  add a handler for specified event type to the preceding widget
+: //TRIGGER// :
+  trigger the preceding event handler after **run_create()** finishes creating
+  widgets (but before the toplevel gets shown); has a slot of its own
+: //MTRIGGER(handler)// :
+  trigger specified event handler (should be the same as on the menubar) for the
+  preceding menuitem; has a slot of its own and another for the //CHANGE// event
+: //WANTKEYS(handler)// :
+  install priority //KEY// event handler for when the preceding widget is focused;
+  has a slot of its own and another for the //KEY// event
+
+
+The event types and their causes (widgets denoted by underlying opcodes):
+: OK :
+  - pressing //OKBTN// or //DONEBTN//
+  - pressing //Enter// in text entry or pathbox's entry
+  - choosing from list or pressing //Enter// in //COMBOENTRY//
+  - double click or pressing //Enter// in a complex list
+: CANCEL :
+  - pressing //CANCELBTN//
+  - closing a window (call **run_destroy()** if agreeing to it, return without
+    doing that if ignoring the request)
+: CLICK :
+  - pressing //BUTTON//
+  - right click on a toolbar button
+: SELECT :
+  - changing selection in radiobutton pack, option menu, list, or //GRADBAR//
+: CHANGE :
+  - changing value in spinbutton or spinslider
+  - changing value in //TLSPINPACK//, //PCTCOMBO//, //HEXENTRY//, //EYEDROPPER//
+  - changing text in text entry, pathbox, or //TEXT//
+  - changing color in color selector
+  - changing state of //TOGGLE// or checkbutton
+  - pressing a toolbar button
+  - selecting a menuitem
+  - leasing/unleasing the element from //MOUNT//
+  - scrolling a //CSCROLL//
+  - resizing //CANVAS//
+  - changing sort mode in //LISTCX// (should re-sort its map array)
+: DESTROY :
+  - running **run_destroy()** (after the toplevel is unrealized but before most
+    everything else)
+: SCRIPT :
+  - setting value in the widget from a script
+: MULTI :
+  - setting a list of values to the widget from a script - **evtxr_fn**
+: KEY :
+  - pressing a key when focus is in the widget - **evtxr_fn**
+: MOUSE and XMOUSE:
+  - pressing a mouse button in the widget - **evtxr_fn**
+: MMOUSE and MXMOUSE:
+  - moving mouse in the widget - **evtxr_fn**
+: RMOUSE and RXMOUSE:
+  - releasing a mouse button after pressing it in the widget - **evtxr_fn**
+: CROSS :
+  - cursor entering or leaving the widget - **evtx_fn**
+: SCROLL :
+  - rotating mouse scroll wheel in the widget - **evtx_fn**
+: EXT :
+  - needing to render an area of //CANVAS// - **evtxr_fn**
+  - right click in //LISTCX// - **evtx_fn**
+  - click in //COLORLIST// - **evtx_fn**
+: DRAGFROM :
+  - dragging from //DRAGDROP//'s widget - **evtxr_fn**
+: DROP :
+  - dropping to //DRAGDROP//'s widget - **evtx_fn**
+: COPY :
+  - data request from //CLIPBOARD// - **evtx_fn**
+: PASTE :
+  - data received by //CLIPBOARD// - **evtxr_fn**
+
+
+Unless otherwise noted, the event handlers are of type **evt_fn**. For those of
+types **evtx_fn** and **evtxr_fn**, what they get in the extra parameter and what
+their return value does, is described under "Callbacks" below.
+
+The difference between //MOUSE/MMOUSE/RMOUSE// and //XMOUSE/MXMOUSE/RXMOUSE//
+events is, the latter 3 ask for, and report, tablet pressure.
+
+Outside //EVENT()// commands, event types are referred to by their opcodes, which
+have "//op_EVT_//" prefix; like //op_EVT_OK// for //OK// event.
+
+
+=== Clipboard and drag-drop ===
+
+Clipboard and drag-drop use the same type of data format descriptions. The
+//CLIPFORM// command prepares those descriptions for them; its slot in the "tape"
+is then passed to the commands that use the formats.
+
+: //CLIPFORM(array, count)// :
+  a group of formats from **clipform_dd[]** array; has a slot in the "tape"
+: //DRAGDROP(field, DRAGFROM_handler, DROP_handler)// :
+  add handlers for drag and/or drop to the preceding widgets, with formats in
+  **void**** field; has a slot for itself and two more for the events
+: //DRAGDROPm(field, DRAGFROM_handler, DROP_handler)// :
+  the same but allows the "move" type of drop in addition to "copy" (some programs
+  use the "move" type when they really should not)
+: //CLIPBOARD(field, which, COPY_handler, PASTE_handler)// :
+  add handlers for copy and paste for specified clipboards (//which//: 1 if the
+  regular clipboard, 2 if the "primary selection" i.e. what is highlighted, 3 if
+  both at once), with formats in **void**** field; has a slot for itself and two
+  more for the events
+
+
+The //DROP// event handler receives in its //xdata// parameter a pointer to
+**drag_ext**;  the //PASTE// event, to **copy_ext** and returns TRUE if
+successfully imported the data. The //DRAGFROM// and //COPY// events are handled
+differently from most others; their handlers receive in their //xdata// parameter
+a slot (dynamically created) with which they then interact to send or receive the
+data. //DRAGFROM// handler also should return TRUE if it agrees to initiate drag,
+FALSE otherwise.
+
+
+=== Scripting ===
+
+The below commands exist solely to facilitate scripting.
+
+: //ALTNAME(name)// :
+  add another name (identifier) for the preceding widget; has a slot in the
+  "tape"
+: //FLATTEN// :
+  make option names from the preceding option menu or radiobutton pack be
+  directly referrable from script like widget names (in addition to being
+  referrable as values); has a slot in the "tape"
+: //OPNAME(name)// :
+  set (override) name for the preceding widget
+: //OPNAME0// :
+  unset the current name (the initial empty-string one, or the preceding
+  unattached label) to prevent it mis-attaching to the next widget
+: //UNNAME// :
+  hide the preceding widget from scripts (by setting it an impossible name)
+: //SCRIPTED// :
+  tell **run_create()** to start a range of "live-scriptable" widgets (those
+  get extra //ALTNAME// slots automatically added, to make them visible from
+  script despite being real widgets)
+: //ENDSCRIPT// :
+  end a range of "live-scriptable" widgets; has a slot in the "tape" (to tell
+  script interpreter where the range ends)
+
+
+== Functions and macros ==
+
+There are two main groups of functions; the **run_*()** that affect the entire
+"tape", and the **cmd_*()** affecting a single slot. Also a few assorted helper
+functions and macros.
+
+: **void **run_create_(void **ifcode, void *ddata, int ddsize, char **script);**
+  build a dialog window out of V-code decription; takes an array with that
+  description, address and size of the struct that will be copied into its
+  **ddata**, and an array of script commands or NULL; returns **wdata** of what
+  got built (possibly already freed, if script was passed in), or NULL if failed
+: **void **run_create(void **ifcode, void *ddata, int ddsize);**
+  same without script commands (a convenience macro)
+: **void run_query(void **wdata);**
+  query dialog contents using its "tape"; takes dialog's **wdata**
+: **void run_destroy(void **wdata);**
+  destroy a dialog; takes dialog's **wdata**
+
+
+: **void cmd_event(void **slot, int op);**
+  raise event (specified by opcode) on slot
+: **void cmd_sensitive(void **slot, int state);**
+  set sensitive state on slot
+: **void cmd_showhide(void **slot, int state);**
+  set visible state on slot
+: **void cmd_set(void **slot, int v);**
+  set value on slot
+: **int cmd_setstr(void **slot, char *s);**
+  set text-encoded value on slot; returns -1 if failed, 0 if value was left
+  unused (when only the fact of setting something mattered), 1 if set
+: **void *cmd_read(void **slot, void *ddata);**
+  read back slot value (as is) given **ddata** (to calculate fields' addresses
+  faster); returns the value's storage location
+: **void cmd_repaint(void **slot);**
+  repaint slot
+: **void cmd_reset(void **slot, void *ddata);**
+  reset slot or group given **ddata**; causes the widget(s) to reinitialize
+: **void cmd_cursor(void **slot, void **cursor);**
+  set cursor on slot (for its widget's window) given the cursor's slot
+: **int cmd_run_script(void **slot, char **strs);**
+  run script on slot; returns -1 if error happened, 0 if //OK// event handler got
+  activated, 1 if not
+
+
+: **void **get_wdata(GtkWidget *widget, char *id);**
+  from widget to its **wdata**
+: **void **wdata_slot(void **slot);**
+  from slot to its **wdata**
+: **void **origin_slot(void **slot);**
+  from event to its originator
+: **void *slot_data(void **slot, void *ddata);**
+  from slot to its storage location (its own, //not// originator's), given
+  **ddata**
+: **void **find_slot(void **slot, char *id, int l, int mlevel);**
+  find slot by text name (with explicit length) and menu level (//MLEVEL_*//)
+: **void do_evt_1_d(void **slot);**
+  run event handler in slot, defaulting to run_destroy() if NULL there
+: **void dialog_event(void *ddata, void **wdata, int what, void **where);**
+  handle dialog buttons' events (from //OKBTN// and //CANCELBTN//)
+
+
+The next three are for those (widget-type-specific) actions that the above
+functions do not cover. Such actions were not made into functions to avoid the
+interface ballooning up with functions that are applicable to very few widgets
+each. Sending requests and receiving responses through a generic interface
+instead, is convenient enough in practice.
+
+: **void cmd_peekv(void **slot, void *res, int size, int idx);**
+  read extra data from slot, given data's index/id, destination, and size
+: **void cmd_setv(void **slot, void *res, int idx);**
+  set extra data on slot, given data's index/id and source; for some functions,
+  //res// itself is the value (**int** converted to pointer)
+: **int cmd_checkv(void **slot, int idx);**
+  check extra state on slot, given state's index/id
+
+
+Now, the indices/ids per slot type, what each does, and what type of data expects.
+Types are denoted by representative opcodes. Most actions are either get or set,
+only very few are valid for both; the check actions are not valid for either get
+or set and vice versa, as in totally unrelated.
+
+- //FPICK// :
+ : //FPICK_VALUE//
+   get/set the filename with full path, in system encoding: **char[]**
+ : //FPICK_RAW//
+   get/set the raw filename; only the file part without path, in UTF8: **char[]**
+- //PATH// and //PENTRY// :
+ : //PATH_VALUE//
+   get/set the filename: **char[]**
+ : //PATH_RAW//
+   get/set the raw filename: **char[]**
+- //LISTCC// :
+ : //LISTCC_RESET_ROW//
+   set the row index to reset: **int**
+- //LISTC// :
+ : //LISTC_RESET_ROW//
+   set the row index to reset: **int**
+ : //LISTC_ORDER//
+   get sort order: **int[]**
+ : //LISTC_SORT//
+   set sort mode: **int**
+- //LABEL// and //MENUITEM// :
+ : //LABEL_VALUE//
+   set label text: **char***
+- //NBOOK// :
+ : //NBOOK_TABS//
+   set show/hide tabs: **int**
+- //ENTRY// and //COMBOENTRY// :
+ : //ENTRY_VALUE//
+   set value: **char***
+- //TEXT// :
+ : //TEXT_VALUE//
+   set value: **char***
+- **wdata** :
+ : //WDATA_ACTMAP//
+   set action map: **unsigned int**
+ : //WDATA_TABLET//
+   get name of tablet device: **char****
+- //WINDOW// :
+ : //WINDOW_TITLE//
+   set window title: **char***
+ : //WINDOW_ESC_BTN//
+   set slot to react (get "clicked") to //Esc// keypress in window: **void****
+ : //WINDOW_FOCUS//
+   set focus to slot (or to nowhere if NULL): **void****
+ : //WINDOW_RAISE//
+   set window to raise; value is ignored: **void**
+ : //WINDOW_DISAPPEAR//
+   set window to hide from view (to allow a screenshot), or to unhide: **int**
+ : //WINDOW_DPI//
+   get DPI: **int***
+ : //WINDOW_TEXTENG//
+   set to render text: **texteng_dd***
+- //COLOR// :
+ : //COLOR_RGBA//
+   set current color and alpha: **int[2]**
+ : //COLOR_ALL//
+   set current and previous color and alpha: **int[4]**
+- //SPIN// and //SPINSLIDE// :
+ : //SPIN_ALL//
+   set value, min and max: **int[3]**
+- //COLORLIST// :
+ : //COLORLIST_RESET_ROW//
+   set the row index to reset: **int**
+- //PROGRESS// :
+ : //PROGRESS_PERCENT//
+   set progress percentage: **int**
+- //CSCROLL// :
+ : //CSCROLL_XYSIZE//
+   get x offset, y offset, onscreen width, onscreen height: **int[4]**
+ : //CSCROLL_LIMITS//
+   get full width minus onscreen width, and full height minus onscreen height:
+   **int[2]**
+ : //CSCROLL_XYRANGE//
+   set x offset, y offset, full width, and full height, for a delayed resize:
+   **int[4]**
+- //CANVASIMG//:
+ : CANVAS_SIZE
+   set full size: **int[2]**
+- //CANVAS// :
+ : CANVAS_SIZE
+   get onscreen size / set full size: **int[2]**
+ : CANVAS_VPORT
+   get viewport (x, y, x + width, y + height): **int[4]**
+ : CANVAS_REPAINT
+   set area that needs repaint (x, y, x + width, y + height): **int[4]**
+ : CANVAS_PAINT
+   set area you want to repaint (//rgb// = NULL) - bounds will be modified and
+   buffer allocated / set image data (//rgb// != NULL) - buffer will be painted
+   into the bounded area: **rgbcontext***
+ : CANVAS_FIND_MOUSE
+   get mouse state: **mouse_ext***
+ : CANVAS_BMOVE_MOUSE
+   set to nudge mouse cursor by dx, dy: **int[2]**
+- //FCIMAGE// :
+ : //FCIMAGE_XY//
+   set location marker to x, y: **int[2]**
+- //KEYMAP// :
+ : //KEYMAP_KEY//
+   set key to map to slot: **key_ext***
+ : //KEYMAP_MAP//
+   get/set keymap: **keymap_dd***
+- //EV_MOUSE// :
+ : //MOUSE_BOUND//
+   check to keep cursor inside canvas' visible area, by scrolling the canvas &
+   moving the cursor back in; return TRUE if moved it
+- //EV_DRAGFROM// :
+ : //DRAG_DATA//
+   set start & end of data exported through drag: **char*[2]**
+ : //DRAG_ICON_RGB//
+   set RGB color (packed) for drag icon (color patch): **int**
+- //EV_COPY// :
+ : //COPY_DATA//
+   set start & end of data exported through copying: **char*[2]**
+- //CLIPBOARD// :
+ : //CLIP_TEXT//
+   set text to export through clipboard: **char***
+ : //CLIP_OFFER//
+   check to offer data through clipboard; return TRUE if successful
+ : //CLIP_PROCESS//
+   check to request data from clipboard; return TRUE if successful
+- all regular widgets :
+ : //SLOT_SENSITIVE//
+   check sensitive state; return TRUE if sensitive
+ : //SLOT_FOCUSED//
+   check focused state; return TRUE if focus in toplevel window is inside the
+   widget
+ : //SLOT_SCRIPTABLE//
+   check scriptability; return TRUE if script flag is set in opcode
+ : //SLOT_UNREAL//
+   check unreality; return TRUE if the widget is simulated
+ : //SLOT_RADIO//
+   check radio-ness; return TRUE if the widget is radio toolbutton or radio
+   menuitem
+- //FONTSEL// :
+ : //FONTSEL_DPI//
+   set DPI: **int**
+
+
+Finally, the macros.
+
+: //VSLOT_SIZE// :
+  size of a slot, in void pointers: 3
+: //GET_DDATA(wdata)// :
+  from **wdata** to **ddata**: **void***
+: //GET_WINDOW(wdata)// :
+  from **wdata** to its toplevel widget's slot: **void****
+: //GET_REAL_WINDOW(wdata)// :
+  from **wdata** to actual toplevel widget: **void***, in fact **GtkWidget***
+: //NEXT_SLOT(slot)// :
+  from slot to the next one: **void****
+: //PREV_SLOT(slot)// :
+  from slot to the previous one: **void****
+: //SLOT_N(slot, n)// :
+  from slot to the n-th one after: **void****
+: //TOOL_ID(slot)// :
+  get toolbutton's action code: **int**
+: //TOOL_IR(slot)// :
+  get toolbutton's right-click action code: **int**
+: //ACTMOD(action, mode)// :
+  combine action and mode into action code
+
+
+== Callbacks ==
+
+Most events are handled by **evt_fn** function (the default one):
+
+**void (*evt_fn)(void *ddata, void **wdata, int what, void **where);**
+
+The //ddata// and //wdata// parameters are precisely that; the backing struct, and
+the "tape". The //what// parameter is the event's opcode, and the //where// is
+its slot.
+
+One handler for all (or most) events happening in the dialog, is the usual
+pattern when using V-code. When inside it need do different things depending on
+what is happening to what, there are 3 ways to make the decision.
+
+One is to use the "//what//" parameter; it is mostly done to separate out final
+button presses (the //op_EVT_OK// and //op_EVT_CANCEL//) from everything else.
+
+Another is to do "**void *cause = cmd_read(where, ddata);**" and compare the
+"//cause//" to addresses of variables and/or fields that V-code commands refer to.
+This serves for most types of controls, and with them **cmd_read()** is usually
+needed anyway, to get the newly-modified value (a few are "self-reading" but that
+is rarely significant; only affects when to save the previous value if you need
+it).
+
+The third is to do "**void **slot = origin_slot(where);**" and compare the slot
+with controls' slots stored using //REF()// commands. This in practice is only
+needed when several //BUTTON()//s are in one dialog; with them all having
+//CLICK// events and not referring to any memory locations, their slots are the
+only thing differentiating them.
+
+Now, some events need send some extra data to their handler. Those are handled by
+**evtx_fn** function:
+
+**void (*evtx_fn)(void *ddata, void **wdata, int what, void **where, void *xdata);**
+
+What, specifically, the handler receives in //xdata//, depends on the event.
+
+: //CROSS// :
+  TRUE if entering, FALSE if leaving: **int** converted to pointer
+: //SCROLL// :
+  pointer to **scroll_ext**
+: //EXT// from //LISTCX// :
+  row index where right click happened: **int** converted to pointer
+: //EXT// from //COLORLIST//:
+  pointer to **colorlist_ext**
+: //DROP// :
+  pointer to **drag_ext**
+: //COPY// :
+  pointer to **copy_ext**
+
+
+Yet other events not only send extra data to the handler, but also await a return
+value from it. The value, for nearly all, is simply TRUE or FALSE, and the function
+handling them is **evtxr_fn**:
+
+**int (*evtxr_fn)(void *ddata, void **wdata, int what, void **where, void *xdata);**
+
+What the handler receives in //xdata//, and what its return value means, again
+depends on the event.
+
+: //KEY// :
+  pointer to **key_ext**; return TRUE if the key was handled, FALSE otherwise
+: //MOUSE//, //XMOUSE//, //MMOUSE//, //MXMOUSE//, //RMOUSE//, //RXMOUSE//:
+  pointer to **mouse_ext**; return TRUE if the mouse event was handled
+: //EXT// from //CANVAS//:
+  pointer to **rgbcontext**; return TRUE if something was rendered into buffer
+: //DRAGFROM// :
+  pointer to **drag_ext**; return TRUE to initiate drag
+: //PASTE// :
+  pointer to **copy_ext**; return TRUE if data successfully imported
+: //MULTI// :
+  pointer to **multi_ext**; return 0 if error, 1 if success and the //xdata// not
+  needed anymore, -1 if success and the struct should be kept (not freed)
+
+
+Handling some events can include system-dependent interactions with their
+//xdata//. Instead of saddling some poor unsuspecting widget with those, an
+"intercessor" capable of processing that is passed as the originating event, in
+the "//where//" parameter. The intercessors' opcodes are //op_EV_*// to their
+events' //op_EVT_*//; their functions are described under the headings
+//EV_MOUSE//, //EV_DRAGFROM//, and //EV_COPY// in the "Functions and macros"
+chapter above. They are accessed like this: "**cmd_setv(where, pp, DRAG_DATA);**".
+
+
+== THE END ==

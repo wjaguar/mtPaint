@@ -1,6 +1,7 @@
 #!/bin/bash
 WRKDIR=`pwd`
-VERSION=3.40
+VERSION=3.50
+ARCH=i386
 tar xf mtpaint-$VERSION.tar.bz2
 cd mtpaint-$VERSION || exit 1
 ./configure release intl man staticgif --prefix=/usr --fakeroot=$WRKDIR/ubuntulibs
@@ -19,14 +20,14 @@ SIZE=${SIZE%%[!0-9]*}
 cat > control << CONTROL
 Package: mtpaint
 Version: $VERSION
-Architecture: i386
+Architecture: $ARCH
 Maintainer: Dmitry Groshev <wjaguar@users.sourceforge.net>
 Installed-Size: $SIZE
 Section: graphics
 Priority: extra
 Homepage: http://mtpaint.sourceforge.net/
 Description: mtPaint - Mark Tyler's Painting Program
- mtPaint is a GTK+1/2 based painting program designed for creating
+ mtPaint is a GTK+1/2/3 based painting program designed for creating
  icons and pixel based artwork. It can edit indexed palette or 24 bit
  RGB images and offers painting and palette manipulation tools.
 CONTROL
