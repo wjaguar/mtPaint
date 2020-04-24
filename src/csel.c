@@ -1,5 +1,5 @@
 /*	csel.c
-	Copyright (C) 2006-2019 Dmitry Groshev
+	Copyright (C) 2006-2020 Dmitry Groshev
 
 	This file is part of mtPaint.
 

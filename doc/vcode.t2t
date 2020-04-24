@@ -1235,8 +1235,11 @@ tagged by the "script flag"; some of macros below are for such buttons.
   a named button with //CLICK// event handler, packed the default way
 : //EBUTTON(name, CLICK_handler)// :
   same, packed from the end
+: //EBUTTONs(name, CLICK_handler)// :
+  same, scriptable
 : //TLBUTTON(name, CLICK_handler, x, y)// :
-  same, packed into a table at column //x//, row //y//
+  a named button with //CLICK// event handler, packed into a table at column
+  //x//, row //y//
 : //TLBUTTONs(name, CLICK_handler, x, y)// :
   same, scriptable
 : //uBUTTONs(name, CLICK_handler)// :

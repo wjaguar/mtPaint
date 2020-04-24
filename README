@@ -8,7 +8,7 @@ mtPaint is free software; you can redistribute it and/or modify it under the ter
 
 mtPaint is distributed in the hope that it will be useful, but WITHOUT ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License for more details.
 
-mtPaint is a simple GTK+1/2 painting program designed for creating icons and pixel based artwork. It can edit indexed palette or 24 bit RGB images and offers basic painting and palette manipulation tools. It also has several other more powerful features such as channels, layers and animation. Due to its simplicity and lack of dependencies it runs well on GNU/Linux, Windows and older PC hardware.
+mtPaint is a simple GTK+1/2/3 painting program designed for creating icons and pixel based artwork. It can edit indexed palette or 24 bit RGB images and offers basic painting and palette manipulation tools. It also has several other more powerful features such as channels, layers and animation. Due to its simplicity and lack of dependencies it runs well on GNU/Linux, Windows and older PC hardware.
 
 There is full documentation of mtPaint's features contained in a handbook.  If you don't already have this, you can download it from the mtPaint website.
 
@@ -20,7 +20,7 @@ http://sourceforge.net/mail/?group_id=155874
 Compilation
 -----------
 
-In order to compile mtPaint on a GNU/Linux system you will need to have the libraries and headers for GTK+1 and/or GTK+2, libpng and zlib.  If you want to load or save GIF, JPEG, TIFF, JPEG2000 and WebP files you will also need giflib, libjpeg, libtiff, libopenjpeg or libjasper, and libwebp.  If you want to compile the international version you will need to have the gettext system and headers installed.  You may then adjust the Makefile/sources to cater for your needs and then:
+In order to compile mtPaint on a GNU/Linux system you will need to have the libraries and headers for GTK+1 and/or GTK+2 and/or GTK+3, libpng and zlib.  If you want to load or save GIF, JPEG, TIFF, JPEG2000 and WebP files you will also need giflib, libjpeg, libtiff, libopenjpeg or libjasper, and libwebp.  If you want to compile the international version you will need to have the gettext system and headers installed.  You may then adjust the Makefile/sources to cater for your needs and then:
 
 For GTK+2
 =========
@@ -33,6 +33,13 @@ For GTK+1
 =========
 
 ./configure gtk1
+make
+su -c "make install"
+
+For GTK+3
+=========
+
+./configure gtk3
 make
 su -c "make install"
 

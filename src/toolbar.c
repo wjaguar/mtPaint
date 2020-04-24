@@ -1,5 +1,5 @@
 /*	toolbar.c
-	Copyright (C) 2006-2019 Mark Tyler and Dmitry Groshev
+	Copyright (C) 2006-2020 Mark Tyler and Dmitry Groshev
 
 	This file is part of mtPaint.
 
@@ -309,7 +309,7 @@ static void *blend_code[] = {
 	CHECK(_("Reverse"), reverse),
 	HBOX,
 	REF(xb), CHECK(_("Transform Colour"), xform), EVENT(CHANGE, blend_xf),
-	EBUTTON(_("Settings"), blend_xf),
+	EBUTTONs(_("Settings"), blend_xf),
 	WDONE, // HBOX
 	BORDER(OPT, 0),
 	FHBOXB(_("Source")), XOPTD(lnames, src), WDONE,
@@ -410,8 +410,9 @@ static void toolbar_click(void *dt, void **wdata, int what, void **where)
 #define WBbase settings_dd
 static void *settings_code[] = {
 	TOPVBOXV, // Keep height at max requested, to let dock contents stay put
-	SCRIPTED, BORDER(TOOLBAR, 0),
+	BORDER(TOOLBAR, 0),
 	TOOLBARx(toolbar_click, toolbar_click),
+	SCRIPTED,
 	REFv(settings_buttons[SETB_CONT]),
 	TBTOGGLExv(_("Continuous Mode"), XPM_ICON(mode_cont),
 		ACTMOD(ACT_MODE, SETB_CONT), ACTMOD(DLG_STEP, 0),
@@ -607,7 +608,8 @@ void *toolbar_code[] = {
 		ACTMAP(NEED_LAS2),
 	TBBUTTONx(_("Paste Text"), XPM_ICON(text),
 		ACTMOD(DLG_TEXT, 0), ACTMOD(DLG_TEXT_FT, 0)), UNNAME,
-// !!! Basic text dialog not yet scriptable
+	/* Not a good access point for scripting the text tools: cannot disable
+	 * only one of the two, here. Better to remove the temptation */
 	TBSPACE,
 	TBBUTTON(_("Ellipse Outline"), XPM_ICON(ellipse2),
 		ACTMOD(ACT_ELLIPSE, 0)),

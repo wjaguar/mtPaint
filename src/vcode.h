@@ -592,6 +592,7 @@ enum {
 #define WBr2hf_t1(NM,L) WBp_(op_##NM, L, TABLE1x, R2F)
 #define WBr2hs_(NM,L) WBp_(op_##NM, L, PACK, R2S)
 #define WBr2hs_x(NM,L) WBp_(op_##NM, L, XPACK, R2S)
+#define WBr2hs_e(NM,L) WBp_(op_##NM, L, PACKEND, R2S)
 #define WBr2hs_t(NM,L) WBp_(op_##NM, L, TABLE, R2S)
 #define WBr3h_(NM,L) WBp_(op_##NM, L, PACK, R3)
 #define WBr3h_e(NM,L) WBp_(op_##NM, L, PACKEND, R3)
@@ -929,6 +930,7 @@ enum {
 #define BUTTONp(NP,H) WBr2hnf_x(BUTTON, 1 + 2), WBfield(NP), EVENT(CLICK, H)
 #define UBUTTON(NM,H) WBr2h_(BUTTON, 1 + 2), (NM), EVENT(CLICK, H)
 #define EBUTTON(NM,H) WBr2h_e(BUTTON, 1 + 2), (NM), EVENT(CLICK, H)
+#define EBUTTONs(NM,H) WBr2hs_e(BUTTON, 1 + 2), (NM), EVENT(CLICK, H)
 #define TLBUTTON(NM,H,X,Y) WBr2h_t(BUTTON, 2 + 2), (NM), EVENT(CLICK, H), \
 	WBxyl(X, Y, 1)
 #define TLBUTTONs(NM,H,X,Y) WBr2hs_t(BUTTON, 2 + 2), (NM), EVENT(CLICK, H), \

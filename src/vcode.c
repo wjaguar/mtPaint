@@ -146,6 +146,7 @@ typedef struct {
 	char raise;	// Raise after displaying
 	char unfocus;	// Focus to NULL after displaying
 	char done;	// Set when destroyed
+	char run;	// Set when script is running
 } v_dd;
 
 /* Actmap array */
@@ -8764,7 +8765,8 @@ G_GNUC_END_IGNORE_DEPRECATIONS
 			if (ref > 2) ADD_SLOT(r, res, pp + lp - 3, NULL);
 			if (ref > 1) ADD_SLOT(r, res, pp + lp - 1, NULL);
 			/* Remember name */
-			if (scripted && cmds[op] && (cmds[op]->uop > 0))
+			if (scripted && cmds[op] && (cmds[op]->uop > 0) &&
+				(cmds[op]->uop != op_uLABEL))
 			{
 				static void *id_ALTNAME = WBrh(uALTNAME, 0);
 				dtail -= VVS(sizeof(swdata));
@@ -9874,6 +9876,9 @@ void cmd_showhide(void **slot, int state)
 		if ((GET_OP(PREV_SLOT(slot)) == op_WDONE) && state)
 		{
 			v_dd *vdata = GET_VDATA(PREV_SLOT(slot));
+			/* Script is run when the window is first displayed */
+			if (vdata->run) return; // Redisplay
+			vdata->run = TRUE;
 			if ((cmd_run_script(slot, vdata->script) < 0) &&
 				(GET_UOP(slot) == op_uWINDOW))
 				run_destroy(PREV_SLOT(slot)); // On error
