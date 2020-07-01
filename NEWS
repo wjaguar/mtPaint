@@ -66,6 +66,7 @@ Here is a summary of the main changes in this release (see handbook for full det
 	* Initial undo memory size is now 1/4 of available memory
 	* Support for compiling with giflib 5, libpng 1.6, libjpeg 9, OpenJPEG 2.3 added
 	* Compilation now works using gcc-5.5 and GTK+1
+	* Compilation now works using gcc-10
 	* BUGFIX - Compilation without JPEG and TIFF support now works again
 	* BUGFIX - FreeType text tool now skips directory loops when scanning font directories
 	* BUGFIX - Geometry info on the status bar now correctly updates after arrow keys or Escape key

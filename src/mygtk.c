@@ -1025,7 +1025,7 @@ void spin_set_range(GtkWidget *spin, int min, int max)
 
 char *gtkxncpy(char *dest, const char *src, int cnt, int u)
 {
-#if GTK_MAJOR_VERSION == 2
+#if GTK_MAJOR_VERSION >= 2
 	char *c = (u ? g_locale_to_utf8 : g_locale_from_utf8)((gchar *)src, -1,
 		NULL, NULL, NULL);
 	if (c)

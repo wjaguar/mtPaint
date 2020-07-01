@@ -364,7 +364,7 @@ static gboolean window_evt_key(GtkWidget *widget, GdkEventKey *event, gpointer u
 		if (GET_HANDLER(slot) &&
 			(res = stop = get_evt_key(widget, event, slot))) break;
 
-#if GTK_MAJOR_VERSION == 2
+#if GTK_MAJOR_VERSION >= 2
 		/* We let widgets in the focused part process the keys first */
 		res = gtk_window_propagate_key_event(GTK_WINDOW(widget), event);
 		if (res) break;

@@ -4,8 +4,8 @@
 
 echo
 
-MT_V="3.49.27"
-MT_DATE="2020-04-24"
+MT_V="3.49.28"
+MT_DATE="2020-07-01"
 
 MT_VERSION="mtPaint $MT_V"
 MT_LANG=NO
@@ -499,6 +499,8 @@ then
 	CFLAGS="-mms-bitfields $CFLAGS"
 	LDFLAGS="-mwindows $LDFLAGS"
 fi
+# Revert the changed defaults in GCC 10
+HAVE_GCC_VER 10.0 && CFLAGS="$CFLAGS -fcommon"
 # Enable warnings
 WARN="-Wall $WARN"
 if HAVE_GCC_VER 4.0
@@ -508,6 +510,14 @@ fi
 if HAVE_GCC_VER 4.1
 then # Tell gcc 4.1+ to shut up some more
 	WARN="$WARN -Wno-int-to-pointer-cast -Wno-pointer-to-int-cast"
+fi
+if HAVE_GCC_VER 6.0
+then # Tell gcc 6.x to stop misleading
+	WARN="$WARN -Wno-misleading-indentation"
+fi
+if HAVE_GCC_VER 9.3
+then # Tell gcc 9.3+ to cut it short
+	WARN="$WARN -Wno-stringop-truncation -Wformat-truncation=0 -Wformat-overflow=0"
 fi
 # Deterministic compile
 SET_RANDSEED=
@@ -716,6 +726,9 @@ then # GTK+3 compatible things need some compatibility
 else # GTK+1
 	MT_LISTS=1
 fi
+
+# Stop the spam
+[ "$GTK" = 2 ] && WARN="$WARN -Wno-deprecated-declarations"
 
 ### Set feature flags
 
