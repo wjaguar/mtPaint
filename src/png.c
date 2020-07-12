@@ -292,6 +292,7 @@ static int allocate_image(ls_settings *settings, int cmask)
 	/* Don't show progress bar where there's no need */
 	if (settings->width * settings->height <= (1 << silence_limit))
 		settings->silent = TRUE;
+	if (mode == FS_PATTERN_LOAD) settings->silent = TRUE;
 
 	/* Reduce cmask according to mode */
 	if (mode == FS_CLIP_FILE) cmask &= CMASK_CLIP;
@@ -373,7 +374,6 @@ static int allocate_image(ls_settings *settings, int cmask)
 		if (!settings->img[CHN_IMAGE]) return (FILE_MEM_ERROR);
 		break;
 	case FS_PATTERN_LOAD: /* Patterns */
-		settings->silent = TRUE;
 		/* Check dimensions & depth */
 		if (!set_patterns(settings)) return (-1);
 		/* Allocate temp memory */
@@ -4372,19 +4372,23 @@ static int ch_insert(str_hash *cuckoo, char *str)
 
 #define XPM_COL_DEFS 5
 
+#define BUCKET_SIZE 8
+
 /* Comments are allowed where valid */
 static int load_xpm(char *file_name, ls_settings *settings)
 {
 	static const char *cmodes[XPM_COL_DEFS] =
 		{ "c", "g", "g4", "m", "s" };
-	unsigned char *src, *dest, pal[XPM_MAXCOL * 3];
-	char lbuf[4096], *buf = lbuf;
+	unsigned char *cbuf, *src, *dest, pal[XPM_MAXCOL * 3], *dst0 = pal;
+	guint32 *slots;
+	char lbuf[4096], *buf = lbuf, *bh = NULL;
 	char ckeys[XPM_MAXCOL * 32], *cdefs[XPM_COL_DEFS], *r, *r2, *t;
 	str_hash cuckoo;
 	cctx ctx;
 	FILE *fp;
+	int uninit_(n), uninit_(nx), uninit_(nslots);
 	int w, h, cols, cpp, hx, hy, res = -1, bpp = 1, trans = -1;
-	int i, j, k, l, lsz = sizeof(lbuf);
+	int i, j, k, l, lsz = sizeof(lbuf), step = 3, pr = FALSE;
 
 
 	if (!(fp = fopen(file_name, "r"))) return (-1);
@@ -4403,10 +4407,12 @@ static int load_xpm(char *file_name, ls_settings *settings)
 	else if (i != 6) goto fail;
 	/* Extension marker is ignored, as are extensions themselves */
 
-	/* More than 4096 colors or no colors at all aren't accepted */
-	if ((cols < 1) || (cols > XPM_MAXCOL)) goto fail;
-	/* Stupid colors per pixel values aren't either */
+	/* More than 16M colors or no colors at all aren't accepted */
+	if ((cols < 1) || (cols > 0x1000000)) goto fail;
+	/* Stupid chars per pixel values aren't either */
 	if ((cpp < 1) || (cpp > 31)) goto fail;
+	/* More than 4096 colors accepted only if 4 cpp or less */
+	if ((cols > XPM_MAXCOL) && (cpp > 4)) goto fail;
 
 	/* RGB image if more than 256 colors */
 	if (cols > 256) bpp = 3;
@@ -4420,25 +4426,65 @@ static int load_xpm(char *file_name, ls_settings *settings)
 	settings->hot_y = hy;
 	settings->xpm_trans = -1;
 
-	/* Init hash */
-	memset(&cuckoo, 0, sizeof(cuckoo));
-	cuckoo.keys = ckeys;
-	cuckoo.step = 32;
-	cuckoo.cpp = cpp;
-	cuckoo.seed = HASHSEED;
+	/* Allocate things early, to avoid reading huge color table and THEN
+	 * failing for bad dimensions of / lack of memory for the image itself */
+	if ((settings->mode != FS_PALETTE_LOAD) && (settings->mode != FS_PALETTE_DEF))
+	{
+		if ((res = allocate_image(settings, CMASK_IMAGE))) goto fail;
+		/* Allocate row buffer */
+		i = w * cpp + 4 + 1024;
+		if (i > lsz) buf = malloc(lsz = i);
+		res = FILE_MEM_ERROR;
+		if (!buf) goto fail;
+		fsetC(&ctx, NULL, buf, lsz); /* Switch buffers */
+
+		/* Init bucketed hash */
+		if (cols > XPM_MAXCOL)
+		{
+			nslots = (cols + BUCKET_SIZE - 1) / BUCKET_SIZE;
+			bh = multialloc(MA_ALIGN_DEFAULT,
+				&slots, (nslots + 1) * sizeof(*slots),
+				&cbuf, cols * (4 + 3), NULL);
+			if (!bh) goto fail2;
+
+			dst0 = cbuf + 4;
+			step = 4 + 3;
+		}
+
+		if ((pr = !settings->silent))
+		{
+			ls_init("XPM", 0);
+			progress_update(0.0);
+			/* A color seems to cost like about 2 pixels to load */
+			n = (cols * 2) / w;
+			nx = n + h;
+		}
+	}
+	/* Too many colors do not a palette make */
+	else if (bpp > 1) goto fail;
+
+	/* Init cuckoo hash */
+	if (!bh)
+	{
+		memset(&cuckoo, 0, sizeof(cuckoo));
+		cuckoo.keys = ckeys;
+		cuckoo.step = 32;
+		cuckoo.cpp = cpp;
+		cuckoo.seed = HASHSEED;
+	}
 
 	/* Read colormap */
-// !!! When/if huge numbers of colors get allowed, will need a progressbar here
-	dest = pal;
-	for (i = 0; i < cols; i++ , dest += 3)
+	res = -1;
+	for (i = 0 , dest = dst0; i < cols; i++ , dest += step)
 	{
-		if (!(r = fstrC(&ctx))) goto fail;
+		if (!(r = fstrC(&ctx))) goto fail3;
 		l = strlen(r);
-		if (l < cpp + 4) goto fail;
+		if (l < cpp + 4) goto fail3;
 		r[l - 1] = '\0'; // Cut off closing quote
 
 		/* Insert color into hash */
-		ch_insert(&cuckoo, r + 1);
+		if (bh) strncpy(dest - 4, r + 1, 4);
+		else ch_insert(&cuckoo, r + 1);
 
 		/* Parse color definitions */
 		memset(cdefs, 0, sizeof(cdefs));
@@ -4465,7 +4511,7 @@ static int load_xpm(char *file_name, ls_settings *settings)
 			}
 			if (!r2) /* Color name */
 			{
-				if (k < 0) goto fail;
+				if (k < 0) goto fail3;
 				cdefs[k] = r2 = t;
 				k = -1;
 			}
@@ -4476,7 +4522,7 @@ static int load_xpm(char *file_name, ls_settings *settings)
 				memmove(r2 + l + 1, t, strlen(t) + 1);
 			}
 		}
-		if (!r2) goto fail; /* Key w/o name */
+		if (!r2) goto fail3; /* Key w/o name */
 
 		/* Translate the best one */
 		for (j = 0; j < XPM_COL_DEFS; j++)
@@ -4497,14 +4543,16 @@ static int load_xpm(char *file_name, ls_settings *settings)
 			break;
 		}
 		/* Not one understandable color */
-		if (j >= XPM_COL_DEFS) goto fail;
+		if (j >= XPM_COL_DEFS) goto fail3;
 	}
+	/* With bucketed hashing, half the work per color is not done yet */
+	if (pr) progress_update((float)(bh ? n / 2 : n) / nx);
 
 	/* Create palette */
 	if (bpp == 1)
 	{
-		dest = pal;
-		for (i = 0; i < cols; i++ , dest += 3)
+		dest = dst0;
+		for (i = 0; i < cols; i++ , dest += step)
 		{
 			settings->pal[i].red = dest[0];
 			settings->pal[i].green = dest[1];
@@ -4519,37 +4567,81 @@ static int load_xpm(char *file_name, ls_settings *settings)
 		/* If palette is all we need */
 		res = 1;
 		if ((settings->mode == FS_PALETTE_LOAD) ||
-			(settings->mode == FS_PALETTE_DEF)) goto fail;
+			(settings->mode == FS_PALETTE_DEF)) goto fail3;
 	}
 
 	/* Find an unused color for transparency */
 	else if (trans >= 0)
 	{
-		char cmap[XPM_MAXCOL + 1];
+		unsigned char cmap[XPM_MAXCOL / 8], *cc = cmap;
+		int l = XPM_MAXCOL;
 
-		memset(cmap, 0, sizeof(cmap));
-		dest = pal;
-		for (i = 0; i < cols; i++ , dest += 3)
+		if (bh) // Allocate color cube
 		{
-			j = MEM_2_INT(dest, 0);
-			if (j < XPM_MAXCOL) cmap[j] = 1;
+			l = 0x1000000;
+			cc = malloc(l / 8);
+			res = FILE_MEM_ERROR;
+			if (!cc) goto fail3;
 		}
-		settings->rgb_trans = j = strlen(cmap);
-		dest = pal + trans * 3;
+		memset(cc, 0, l / 8);
+
+		for (i = 0 , dest = dst0; i < cols; i++ , dest += step)
+		{
+			if (i == trans) continue;
+			j = MEM_2_INT(dest, 0);
+			if (j < l) cc[j >> 3] |= 1 << (j & 7);
+		}
+		/* Unused color IS there, as buffer has bits per total colors;
+		 * if one is transparent, then a bit stays unset in there */
+		dest = cc;
+		while (*dest == 0xFF) dest++;
+		j = (dest - cc) * 8;
+		i = *dest;
+		while (i & 1) j++ , i >>= 1;
+
+		if (bh) free(cc);
+
+		/* Store the result */	
+		settings->rgb_trans = j;
+		dest = dst0 + trans * step;
 		dest[0] = INT_2_R(j);
 		dest[1] = INT_2_G(j);
 		dest[2] = INT_2_B(j);
 	}
 
-	/* Allocate row buffer and image */
-	i = w * cpp + 4 + 1024;
-	if (i > lsz) buf = malloc(lsz = i);
-	res = FILE_MEM_ERROR;
-	if (!buf) goto fail;
-	fsetC(&ctx, NULL, buf, lsz); /* Switch buffers */
-	if ((res = allocate_image(settings, CMASK_IMAGE))) goto fail2;
+	if (bh) /* Sort the colors by their buckets */
+	{
+		unsigned char *w, *ww, tbuf[4 + 3];
+		int ds, ins;
 
-	if (!settings->silent) ls_init("XPM", 0);
+		/* First, count how many goes where */
+		for (i = 0 , dest = cbuf; i < cols; i++ , dest += 4 + 3)
+			(slots + 1)[hashf(HASHSEED, dest, cpp) % nslots]++;
+		/* Then, prepare buckets' offsets */
+		for (i = 0; i < nslots; i++) slots[i + 1] += slots[i];
+		/* Now, starting from first, move colors where they belong */
+		for (i = 0; i < cols; )
+		{
+			/* Color */
+			w = cbuf + i * (4 + 3);
+			/* Its home */
+			ds = hashf(HASHSEED, w, cpp) % nslots;
+			/* Its insertion point */
+			ins = --slots[ds + 1];
+			/* Already in place */
+			if (ins <= i)
+			{
+				slots[ds + 1] = ++i; // Adjust
+				continue;
+			}
+			/* Move it */
+			ww = cbuf + ins * (4 + 3);
+			memcpy(tbuf, ww, 4 + 3);
+			memcpy(ww, w, 4 + 3);
+			memcpy(w, tbuf, 4 + 3);
+		}
+		if (pr) progress_update((float)n / nx);
+	}
 
 	/* Now, read the image */
 	res = FILE_LIB_ERROR;
@@ -4561,23 +4653,39 @@ static int load_xpm(char *file_name, ls_settings *settings)
 		if (strlen(++r) < w * cpp + 1) goto fail3;
 		for (j = 0; j < w; j++ , dest += bpp)
 		{
-			k = ch_find(&cuckoo, r);
+			if (bh)
+			{
+				unsigned char *w;
+				int ds, n;
+
+				ds = hashf(HASHSEED, r, cpp) % nslots;
+				k = slots[ds];
+				w = cbuf + k * (4 + 3);
+				n = slots[ds + 1];
+				for (; k < n; k++ , w += 4 + 3)
+					/* Trying to avoid function call */
+					if ((*w == *r) && !memcmp(w, r, cpp)) break;
+				k = k >= n ? 0 : k + 1;
+			}
+			else k = ch_find(&cuckoo, r);
 			if (!k) goto fail3;
 			r += cpp;
 			if (bpp == 1) *dest = k - 1;
 			else
 			{
-				src = (pal - 3) + k * 3;
+				src = dst0 + (k - 1) * step;
 				dest[0] = src[0];
 				dest[1] = src[1];
 				dest[2] = src[2];
 			}
 		}
-		ls_progress(settings, i, 10);
+		if (pr && ((n++ * 10) % nx >= nx - 10))
+			progress_update((float)n / nx);
 	}
 	res = 1;
 
-fail3:	if (!settings->silent) progress_end();
+fail3:	if (pr) progress_end();
+	free(bh);
 fail2:	if (buf != lbuf) free(buf);
 fail:	fclose(fp);
 	return (res);
@@ -4602,15 +4710,33 @@ static char *extract_ident(char *fname, int *len)
 	return (tmp);
 }
 
+#define CTABLE_SIZE (0x1000000 / 32)
+#define CINDEX_SIZE (0x1000000 / 256)
+
+/* Find color index using bitmap with sparse counters */
+static int ct_index(int rgb, guint32 *ctable)
+{
+	guint32 bit = 1U << (rgb & 31), *cindex = ctable + CTABLE_SIZE;
+	int n, d = rgb >> 5, m = d & 7;
+
+	if (!(ctable[d] & bit)) return (-1); // Not found
+	n = cindex[d >> 3];
+	while (m > 0) n += bitcount(ctable[d - m--]);
+	return (n + bitcount(ctable[d] & (bit - 1)));
+}
+
 static int save_xpm(char *file_name, ls_settings *settings)
 {
 	unsigned char rgbmem[XPM_MAXCOL * 4], *src;
+	guint32 *cindex, *ctable = NULL;
 	const char *ctb;
-	char ws[3], *buf, *tmp;
+	char ws[5], tc[5] = "    ";
+	char *buf, *tmp;
 	str_hash cuckoo;
 	FILE *fp;
 	int bpp = settings->bpp, w = settings->width, h = settings->height;
-	int i, j, k, l, cpp, cols, ccmask, trans = -1;
+	int uninit_(ccmask);
+	int i, j, k, l, c, cpp, cols, trans = -1;
 
 
 	tmp = extract_ident(file_name, &l);
@@ -4619,6 +4745,8 @@ static int save_xpm(char *file_name, ls_settings *settings)
 	/* Collect RGB colors */
 	if (bpp == 3)
 	{
+		trans = settings->rgb_trans;
+
 		/* Init hash */
 		memset(&cuckoo, 0, sizeof(cuckoo));
 		cuckoo.keys = rgbmem;
@@ -4631,18 +4759,40 @@ static int save_xpm(char *file_name, ls_settings *settings)
 		for (i = 0; i < j; i++ , src += 3)
 		{
 			if (ch_insert(&cuckoo, src) < 0)
-				return (WRONG_FORMAT); /* Too many colors */
+				break; /* Too many colors for this mode */
 		}
-		cols = cuckoo.cnt;
-		trans = settings->rgb_trans;
-		/* RGB to index */
-		if (trans > -1)
+
+		if (i < j) /* Too many colors, collect & count 'em */
 		{
-			char trgb[3];
-			trgb[0] = INT_2_R(trans);
-			trgb[1] = INT_2_G(trans);
-			trgb[2] = INT_2_B(trans);
-			trans = ch_find(&cuckoo, trgb) - 1;
+			ctable = calloc(CTABLE_SIZE + CINDEX_SIZE, sizeof(*ctable));
+			if (!ctable) return (-1); // No memory
+			src = settings->img[CHN_IMAGE];
+			for (i = 0; i < j; i++ , src += 3)
+			{
+				int n = MEM_2_INT(src, 0);
+				ctable[n >> 5] |= 1U << (n & 31);
+			}
+			cindex = ctable + CTABLE_SIZE;
+			for (i = cols = 0; i < CTABLE_SIZE; i++)
+			{
+				if (!(i & 7)) cindex[i >> 3] = cols;
+				cols += bitcount(ctable[i]);
+			}
+			/* RGB to index */
+			if (trans > -1) trans = ct_index(trans, ctable);
+		}
+		else /* Sensible number of colors, cuckoo hashing works */
+		{
+			cols = cuckoo.cnt;
+			/* RGB to index */
+			if (trans > -1)
+			{
+				char trgb[3];
+				trgb[0] = INT_2_R(trans);
+				trgb[1] = INT_2_G(trans);
+				trgb[2] = INT_2_B(trans);
+				trans = ch_find(&cuckoo, trgb) - 1;
+			}
 		}
 	}
 
@@ -4660,13 +4810,13 @@ static int save_xpm(char *file_name, ls_settings *settings)
 		trans = settings->xpm_trans;
 	}
 
-	cpp = cols > 92 ? 2 : 1;
-	buf = malloc(w * cpp + 16);
-	if (!buf) return -1;
+	cpp = cols > 92 * 92 * 92 ? 4 : cols > 92 * 92 ? 3 : cols > 92 ? 2 : 1;
 
-	if (!(fp = fopen(file_name, "w")))
+	buf = malloc(w * cpp + 16); // Prepare row buffer
+	if (!buf || !(fp = fopen(file_name, "w")))
 	{
 		free(buf);
+		free(ctable);
 		return -1;
 	}
 
@@ -4680,25 +4830,52 @@ static int save_xpm(char *file_name, ls_settings *settings)
 			settings->hot_x, settings->hot_y);
 	else fprintf(fp, "\"%d %d %d %d\",\n", w, h, cols, cpp);
 
-	ccmask = 255 >> cpp; // 63 for 2 cpp, 127 for 1
-
 	/* Create colortable */
 	ctb = cols > 16 ? base64 : hex;
-	ws[1] = ws[2] = '\0';
-	for (i = 0; i < cols; i++)
+	tc[cpp] = '\0';
+	if (ctable) // From bitmap
 	{
-		if (i == trans)
+		for (i = c = 0; i < CTABLE_SIZE; i++)
 		{
-			ws[0] = ' ';
-			if (cpp > 1) ws[1] = ' ';
-			fprintf(fp, "\"%s\tc None\",\n", ws);
-			continue;
+			guint32 n = ctable[i];
+			for (k = 0; n; k++ , n >>= 1)
+			{
+				if (!(n & 1)) continue;
+				l = i * 32 + k; // Color
+
+				/* Color ID */
+				ws[0] = ctb[c % 92];
+				ws[1] = ctb[(c / 92) % 92];
+				ws[2] = ctb[(c / (92 * 92)) % 92];
+				ws[3] = ctb[c / (92 * 92 * 92)];
+				ws[cpp] = '\0';
+
+				if (c == trans) // Transparency
+					fprintf(fp, "\"%s\tc None\",\n", tc);
+				else fprintf(fp, "\"%s\tc #%02X%02X%02X\",\n", ws,
+					INT_2_R(l), INT_2_G(l), INT_2_B(l));
+
+				c++;
+			}
 		}
-		ws[0] = ctb[i & ccmask];
-		if (cpp > 1) ws[1] = ctb[i >> 6];
-		src = rgbmem + i * 4;
-		fprintf(fp, "\"%s\tc #%02X%02X%02X\",\n", ws,
-			src[0], src[1], src[2]);
+	}
+	else // From cuckoo's keys
+	{
+		ccmask = 255 >> cpp; // 63 for 2 cpp, 127 for 1
+		for (i = 0; i < cols; i++)
+		{
+			if (i == trans)
+			{
+				fprintf(fp, "\"%s\tc None\",\n", tc);
+				continue;
+			}
+			ws[0] = ctb[i & ccmask];
+			ws[1] = ctb[i >> 6];
+			ws[cpp] = '\0';
+			src = rgbmem + i * 4;
+			fprintf(fp, "\"%s\tc #%02X%02X%02X\",\n", ws,
+				src[0], src[1], src[2]);
+		}
 	}
 
 	w *= bpp;
@@ -4709,9 +4886,19 @@ static int save_xpm(char *file_name, ls_settings *settings)
 		*tmp++ = '"';
 		for (j = 0; j < w; j += bpp, tmp += cpp)
 		{
-			k = bpp == 1 ? src[j] : ch_find(&cuckoo, src + j) - 1;
-			if (k == trans) tmp[0] = tmp[1] = ' ';
-			else
+			if (bpp == 1) k = src[j];
+			else if (!ctable) k = ch_find(&cuckoo, src + j) - 1;
+			else k = ct_index(MEM_2_INT(src, j), ctable);
+			if (k == trans)
+				tmp[0] = tmp[1] = tmp[2] = tmp[3] = ' ';
+			else if (ctable)
+			{
+				tmp[0] = ctb[k % 92];
+				tmp[1] = ctb[(k / 92) % 92];
+				tmp[2] = ctb[(k / (92 * 92)) % 92];
+				tmp[3] = ctb[k / (92 * 92 * 92)];
+			}
+			else // Backward compatible mapping
 			{
 				tmp[0] = ctb[k & ccmask];
 				tmp[1] = ctb[k >> 6];
@@ -4726,6 +4913,7 @@ static int save_xpm(char *file_name, ls_settings *settings)
 	if (!settings->silent) progress_end();
 
 	free(buf);
+	free(ctable);
 	return 0;
 }
 

@@ -5,7 +5,7 @@ mtPaint NEWS
 Here is a summary of the main changes in this release (see handbook for full details):
 
 3.50	2020-??-??
-        * GTK+3 support - "./configure gtk3"
+	* GTK+3 support - "./configure gtk3"
 	* Scripting added - "Image->Script" to enter or run a script : See handbook chapter 10 for details
 	* Commandline mode added - use "mtpaint --cmd" to run a script without GUI
 	* Keyboard shortcuts can now be reconfigured - "Help->Keyboard shortcuts"
@@ -44,6 +44,7 @@ Here is a summary of the main changes in this release (see handbook for full det
 	* WebP file format save/load added
 	* LBM file format (ILBM/PBM) save/load added
 	* XPM files with 65-92 colours are now saved with smaller size
+	* XPM files with up to 16M colours can now be saved and loaded as RGB images
 	* ICC colour profiles embedded in BMP images now can be applied on load
 	* OS/2 BMP files now load properly
 	* Raw RGB palette files (6-bit PAL and 8-bit ACT) can now be loaded/saved via the Palette menu
