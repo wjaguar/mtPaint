@@ -254,6 +254,8 @@ fi
 
 if [ -n "$OS" ] ; then
 	: # Do nothing
+elif [ "$OSTYPE" != "${OSTYPE#darwin}" ] ; then
+	OS="Darwin"
 elif [ "$OSTYPE" = "msys" ] ; then
 	OS="MinGW/MSYS"
 elif [ -z "$MT_HOST" ] ; then
@@ -316,7 +318,7 @@ fi
 
 INCLUDES=
 LIBS=
-if [ "$OS" != "${OS%GNU/Linux}" ]
+if [ "$OS" != "${OS%GNU/Linux}" ] || [ "$OS" = "Darwin" ]
 then
 	CC=${CC:-`which ${MT_HOST:+$MT_HOST-}gcc`}
 	PKG_CONFIG=${PKG_CONFIG:-${MT_HOST:+$MT_HOST-}pkg-config}
@@ -492,7 +494,7 @@ else # $OPTS = CFLAGS
 	MARCH=
 	# And leave CFLAGS alone
 fi
-[ "$OPTS" != DEBUG ] && LDFLAGS="-s $LDFLAGS" # Strip debug info
+[ "$OPTS" != DEBUG ] && [ "$OS" != "Darwin" ] && LDFLAGS="-s $LDFLAGS" # Strip debug info
 # Set Windows-specific flags
 if [ "$OS" != "${OS#MinGW/}" ]
 then
@@ -711,7 +713,7 @@ fi
 # Also need to add "-lX11" on GTK+2/X systems
 [ "$GTK" = 2 ] && [ "$LIBS" != "${LIBS#*gdk-x11}" ] && LIBS="$LIBS -lX11"
 # Need the same on GTK+3/X systems even more
-[ "$GTK" = 3 ] && [ "$INCLUDES" != "${INCLUDES#*gio-unix}" ] && LIBS="$LIBS -lX11"
+[ "$GTK" = 3 ] && [ "$INCLUDES" != "${INCLUDES#*gio-unix}" ] && [ "$OS" != "Darwin" ] && LIBS="$LIBS -lX11"
 # GTK+2 version to use
 DEFS="$DEFS${GTK2VERSION:+ -DGTK2VERSION=$GTK2VERSION}"
 # Widgets to use
@@ -781,6 +783,8 @@ then
 	INCLUDES="-isystem $FAKE_ROOT/include $FAKE_KEYS $INCLUDES"
 	AS_NEEDED="-Wl,--as-needed,--no-add-needed,--unresolved-symbols=ignore-in-shared-libs"
 fi
+
+[ "$OS" = "Darwin" ] && AS_NEEDED=
 
 ### Write config
 
