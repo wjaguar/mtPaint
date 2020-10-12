@@ -67,6 +67,11 @@
 
 #define KEY(A) GDK_KEY_##A
 
+/* Only one target backend */
+#ifdef GDK_WINDOWING_X11
+#undef GDK_WINDOWING_QUARTZ
+#endif
+
 #else
 #define gtk_widget_get_parent(A) ((A)->parent)
 #define gtk_widget_get_window(A) ((A)->window)
@@ -134,6 +139,8 @@ void cairo_surface_fdestroy(cairo_surface_t *s);
 cairo_surface_t *cairo_upload_rgb(cairo_surface_t *ref, GdkWindow *win,
 	unsigned char *src, int w, int h, int len);
 void cairo_set_rgb(cairo_t *cr, int c);
+/* Prevent color bleed on HiDPI */
+void cairo_unfilter(cairo_t *cr);
 void css_restyle(GtkWidget *w, char *css, char *class, char *name);
 void add_css_class(GtkWidget *w, char *class);
 /* Add CSS, builtin and user-provided, to default screen */
@@ -454,6 +461,14 @@ int parse_color(char *what);
 //	DPI value
 
 double window_dpi(GtkWidget *win);
+
+//	Interface scale
+
+#if GTK_MAJOR_VERSION == 3
+#define window_scale(W) gtk_widget_get_scale_factor(W)
+#else /* if GTK_MAJOR_VERSION <= 2 */
+#define window_scale(W) 1
+#endif
 
 //	Memory size (Mb)
 

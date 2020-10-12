@@ -380,6 +380,10 @@ int main( int argc, char *argv[] )
 #if GTK_MAJOR_VERSION == 3
 	/* No floating random stuff over canvas */
 	putenv("GTK_OVERLAY_SCROLLING=0");
+	/* Prevent confusion */
+#ifdef GDK_WINDOWING_X11
+	gdk_set_allowed_backends("x11");
+#endif
 #else
 	/* Disable bug-ridden eyecandy module that breaks sizing */
 	putenv("LIBOVERLAY_SCROLLBAR=0");

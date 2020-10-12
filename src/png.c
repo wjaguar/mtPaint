@@ -116,7 +116,7 @@ fformat file_formats[NUM_FTYPES] = {
 	{ "", "", "", 0},
 #endif
 #ifdef U_TIFF
-#define TIFF0FLAGS FF_LAYER
+#define TIFF0FLAGS FF_LAYER | FF_MEM
 #define TIFFLAGS (FF_BW | FF_256 | FF_RGB | FF_ALPHA | TIFF0FLAGS)
 	{ "TIFF", "tif", "tiff", TIFFLAGS, XF_COMPT },
 #else
@@ -448,8 +448,8 @@ static size_t mfwrite(void *ptr, size_t size, size_t nmemb, memFILE *mf)
 	l = getmemx2(&mf->m, size * nmemb);
 	nmemb = l / size;
 	memcpy(mf->m.buf + mf->m.here, ptr, l);
-// !!! Nothing in here does fseek() when writing, so no need to track mf->top
-	mf->top = mf->m.here += l;
+	mf->m.here += l;
+	if (mf->top < mf->m.here) mf->top = mf->m.here;
 	return (nmemb);
 }
 
@@ -523,7 +523,7 @@ static unsigned char *prepare_row(unsigned char *buf, ls_settings *settings,
 {
 	unsigned char *tmp, *tmi, *tma, *tms;
 	int i, j, w = settings->width, h = y * w;
-	int bgr = settings->ftype == FT_PNG ? 0 : 2;
+	int bgr = (settings->ftype == FT_BMP) || (settings->ftype == FT_TGA) ? 2 : 0;
 
 	tmi = settings->img[CHN_IMAGE] + h * settings->bpp;
 	if (bpp < (bgr ? 3 : 4)) /* Return/copy image row */
@@ -3284,7 +3284,43 @@ fail:	TIFFClose(tif);
 	return (res);
 }
 
-static int load_tiff(char *file_name, ls_settings *settings)
+static tmsize_t mTIFFread(thandle_t fd, void* buf, tmsize_t size)
+{
+	return mfread(buf, 1, size, (memFILE *)fd);
+}
+
+static tmsize_t mTIFFwrite(thandle_t fd, void* buf, tmsize_t size)
+{
+	return mfwrite(buf, 1, size, (memFILE *)fd);
+}
+
+static toff_t mTIFFlseek(thandle_t fd, toff_t off, int whence)
+{
+	return mfseek((memFILE *)fd, (long)off, whence) ? -1 : ((memFILE *)fd)->m.here;
+}
+
+static int mTIFFclose(thandle_t fd)
+{
+	return 0;
+}
+
+static toff_t mTIFFsize(thandle_t fd)
+{
+	return ((memFILE *)fd)->top;
+}
+
+static int mTIFFmap(thandle_t fd, void** base, toff_t* size)
+{
+	*base = ((memFILE *)fd)->m.buf;
+	*size = ((memFILE *)fd)->top;
+	return 1;
+}
+
+static void mTIFFunmap(thandle_t fd, void* base, toff_t size)
+{
+}
+
+static int load_tiff(char *file_name, ls_settings *settings, memFILE *mf)
 {
 	TIFF *tif;
 	int res;
@@ -3294,14 +3330,17 @@ static int load_tiff(char *file_name, ls_settings *settings)
 	TIFFSetErrorHandler(NULL);
 	TIFFSetWarningHandler(NULL);
 
-	if (!(tif = TIFFOpen(file_name, "r"))) return (-1);
+	if (!mf) tif = TIFFOpen(file_name, "r");
+	else tif = TIFFClientOpen("", "r", (void *)mf, mTIFFread, mTIFFwrite,
+		mTIFFlseek, mTIFFclose, mTIFFsize, mTIFFmap, mTIFFunmap);
+	if (!tif) return (-1);
 	res = load_tiff_frame(tif, settings);
 	if ((res == 1) && TIFFReadDirectory(tif)) res = FILE_HAS_FRAMES;
 	TIFFClose(tif);
 	return (res);
 }
 
-static int save_tiff(char *file_name, ls_settings *settings)
+static int save_tiff(char *file_name, ls_settings *settings, memFILE *mf)
 {
 	unsigned char buf[MAX_WIDTH / 8], *src, *row = NULL;
 	uint16 rgb[256 * 3];
@@ -3312,12 +3351,19 @@ static int save_tiff(char *file_name, ls_settings *settings)
 
 
 	/* Select output mode */
+	sflags = FF_SAVE_MASK_FOR(*settings);
 	type = settings->tiff_type;
 	if (type < 0) type = bpp == 3 ? tiff_rtype : // RGB
 		settings->colors <= 2 ?	tiff_btype : // BW
 		tiff_itype; // Indexed
+	if (settings->mode == FS_CLIPBOARD)
+	{
+		type = 0; // Uncompressed
+		/* RGB for clipboard mask */
+		if (settings->img[CHN_ALPHA]) sflags = FF_RGB , bpp = 3;
+	}
 	tflags = tiff_formats[type].flags;
-	sflags = FF_SAVE_MASK_FOR(*settings) & tflags;
+	sflags &= tflags;
 	bw = !(sflags & (FF_256 | FF_RGB));
 	if (!sflags) return WRONG_FORMAT; // Paranoia
 
@@ -3334,7 +3380,7 @@ static int save_tiff(char *file_name, ls_settings *settings)
 
 	/* !!! When using predictor, libtiff 3.8 modifies row buffer in-place */
 	pf = tiff_predictor && !bw && tiff_formats[type].pflag;
-	if (af || pf)
+	if (af || pf || (bpp > settings->bpp))
 	{
 		row = malloc(w * (bpp + af));
 		if (!row) return -1;
@@ -3342,7 +3388,10 @@ static int save_tiff(char *file_name, ls_settings *settings)
 
 	TIFFSetErrorHandler(NULL);	// We don't want any echoing to the output
 	TIFFSetWarningHandler(NULL);
-	if (!(tif = TIFFOpen( file_name, "w" )))
+	if (!mf) tif = TIFFOpen(file_name, "w");
+	else tif = TIFFClientOpen("", "w", (void *)mf, mTIFFread, mTIFFwrite,
+		mTIFFlseek, mTIFFclose, mTIFFsize, mTIFFmap, mTIFFunmap);
+	if (!tif)
 	{
 		free(row);
 		return -1;
@@ -3407,24 +3456,14 @@ static int save_tiff(char *file_name, ls_settings *settings)
 	if (!settings->silent) ls_init("TIFF", 1);
 	for (i = 0; i < h; i++)
 	{
-		src = settings->img[CHN_IMAGE] + w * i * bpp;
+		src = settings->img[CHN_IMAGE] + w * i * settings->bpp;
 		if (bw) /* Pack the bits */
 		{
 			pack_MSB(buf, src, w, 1);
 			src = buf;
 		}
-		else if (af) /* Interlace the channels */
-		{
-			copy_bytes(row, src, w, bpp + 1, bpp);
-			copy_bytes(row + bpp, settings->img[CHN_ALPHA] + w * i,
-				w, bpp + 1, 1);
-			src = row;
-		}
-		else if (row) /* Copy the row */
-		{
-			memcpy(row, src, w * bpp);
-			src = row;
-		}
+		else if (row) /* Fill the buffer */
+			src = prepare_row(row, settings, bpp + af, i);
 		if (TIFFWriteScanline(tif, src, i, 0) == -1)
 		{
 			res = -1;
@@ -8240,7 +8279,7 @@ static int save_image_x(char *file_name, ls_settings *settings, memFILE *mf)
 	case FT_J2K: res = save_jpeg2000(file_name, &setw); break;
 #endif
 #ifdef U_TIFF
-	case FT_TIFF: res = save_tiff(file_name, &setw); break;
+	case FT_TIFF: res = save_tiff(file_name, &setw, mf); break;
 #endif
 #ifdef U_GIF
 	case FT_GIF: res = save_gif(file_name, &setw); break;
@@ -8424,7 +8463,7 @@ static int load_image_x(char *file_name, memFILE *mf, int mode, int ftype,
 	case FT_J2K: res0 = load_jpeg2000(file_name, &settings); break;
 #endif
 #ifdef U_TIFF
-	case FT_TIFF: res0 = load_tiff(file_name, &settings); break;
+	case FT_TIFF: res0 = load_tiff(file_name, &settings, mf); break;
 #endif
 #ifdef U_WEBP
 	case FT_WEBP: res0 = load_webp(file_name, &settings); break;
@@ -8458,6 +8497,8 @@ static int load_image_x(char *file_name, memFILE *mf, int mode, int ftype,
 
 	/* Consider animated GIF a success */
 	res = res0 == FILE_HAS_FRAMES ? 1 : res0;
+	/* Ignore frames beyond first if in-memory (imported clipboard) */
+	if (mf) res0 = res;
 
 	switch (mode)
 	{

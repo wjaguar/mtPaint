@@ -717,6 +717,12 @@ void cairo_set_rgb(cairo_t *cr, int c)
 		INT_2_B(c) / 255.0);
 }
 
+/* Prevent color bleed on HiDPI */
+void cairo_unfilter(cairo_t *cr)
+{
+	cairo_pattern_set_filter(cairo_get_source(cr), CAIRO_FILTER_NEAREST);
+}
+
 void css_restyle(GtkWidget *w, char *css, char *class, char *name)
 {
 	static GData *d;
@@ -1437,7 +1443,7 @@ static GdkFilterReturn win_keys_peek(GdkXEvent *xevent, GdkEvent *event, gpointe
 	return (GDK_FILTER_CONTINUE);
 }
 
-#else /* if defined GDK_WINDOWING_X11 */
+#elif defined GDK_WINDOWING_X11
 
 /* Gtk-Qt's author was deluded when he decided he knows how to draw focus;
  * doing nothing is *FAR* preferable to opaque box over a widget - WJ */
@@ -1460,7 +1466,7 @@ void gtk_init_bugfixes()
 {
 #if defined GDK_WINDOWING_WIN32
 	gdk_window_add_filter(NULL, (GdkFilterFunc)win_keys_peek, NULL);
-#else /* if defined GDK_WINDOWING_X11 */
+#elif defined GDK_WINDOWING_X11
 	GtkWidget *bt;
 	GtkStyleClass *sc;
 	GType qtt;
@@ -1667,7 +1673,7 @@ guint low_key(GdkEventKey *event)
 	return (gdk_keyval_to_lower(event->keyval));
 }
 
-#else /* X11 */
+#else /* X11/Quartz/whatever */
 
 guint low_key(GdkEventKey *event)
 {
@@ -2452,6 +2458,15 @@ int internal_clipboard(int which)
 	if (which) return (TRUE); // No "PRIMARY" clipboard exists on Windows
 	GetWindowThreadProcessId(GetClipboardOwner(), &pid);
 	return (pid == GetCurrentProcessId());
+}
+
+#elif defined GDK_WINDOWING_QUARTZ
+
+/* Detect if current clipboard belongs to something in the program itself;
+ * on Quartz, GDK is halfbaked, so use a workaround instead */
+int internal_clipboard(int which)
+{
+	return (!!gtk_clipboard_get_owner(gtk_clipboard_get(GDK_SELECTION_CLIPBOARD)));
 }
 
 #else
@@ -3432,6 +3447,7 @@ typedef struct {
 	int	dy;		// Y offset
 	int	w;		// Cache line width
 	int	h;		// Cache height including boundary rows
+	int	scale;		// Window scale factor
 } wcache;
 
 //	Create cache for viewport
@@ -3443,6 +3459,7 @@ static void wcache_init(wcache *cache, int *vport, GdkWindow *win)
 	cache->h -= cache->h % WCACHE_STEP;
 	copy4(cache->xy, vport);
 	cache->dx = cache->dy = 0;
+	cache->scale = gdk_window_get_scale_factor(win);
 	cache->s = gdk_window_create_similar_surface(win,
 		CAIRO_CONTENT_COLOR, cache->w, cache->h);
 }	
@@ -3832,11 +3849,8 @@ static void wjcanvas_get_property(GObject *object, guint prop_id, GValue *value,
 	else G_OBJECT_WARN_INVALID_PROPERTY_ID(object, prop_id, pspec);
 }
 
-static void wjcanvas_unmap(GtkWidget *widget)
+static void wjcanvas_drop_cache(wjcanvas *canvas)
 {
-	wjcanvas *canvas = WJCANVAS(widget);
-
-	GTK_WIDGET_CLASS(wjcanvas_parent_class)->unmap(widget);
 	cairo_region_destroy(canvas->r);
 	canvas->r = NULL;
 	if (canvas->cache.s)
@@ -3846,19 +3860,30 @@ static void wjcanvas_unmap(GtkWidget *widget)
 	}
 }
 
+static void wjcanvas_scale_change(GObject *object, GParamSpec *pspec, gpointer user_data)
+{
+	wjcanvas *canvas = WJCANVAS(object);
+
+	if (canvas->cache.s && (canvas->cache.scale != 
+		gtk_widget_get_scale_factor(GTK_WIDGET(canvas))))
+		wjcanvas_drop_cache(canvas);
+}
+
+static void wjcanvas_unmap(GtkWidget *widget)
+{
+	wjcanvas *canvas = WJCANVAS(widget);
+
+	GTK_WIDGET_CLASS(wjcanvas_parent_class)->unmap(widget);
+	wjcanvas_drop_cache(canvas);
+}
+
 static void wjcanvas_destroy(GtkWidget *widget)
 {
 	wjcanvas *canvas = WJCANVAS(widget);
 
 	wjcanvas_drop_adjustment(canvas, 0);
 	wjcanvas_drop_adjustment(canvas, 1);
-	cairo_region_destroy(canvas->r);
-	canvas->r = NULL;
-	if (canvas->cache.s)
-	{
-		cairo_surface_fdestroy(canvas->cache.s);
-		canvas->cache.s = NULL;
-	}
+	wjcanvas_drop_cache(canvas);
 	GTK_WIDGET_CLASS(wjcanvas_parent_class)->destroy(widget);
 }
 
@@ -3902,6 +3927,9 @@ static void wjcanvas_init(wjcanvas *canvas)
 	canvas->r = NULL;
 	/* And no cache, too */
 	memset(&canvas->cache, 0, sizeof(canvas->cache));
+	/* Track scale */
+	g_signal_connect(canvas, "notify::scale-factor",
+		G_CALLBACK(wjcanvas_scale_change), NULL);
 }
 
 void wjcanvas_draw_rgb(GtkWidget *widget, int x, int y, int w, int h,
@@ -3943,22 +3971,35 @@ void wjcanvas_draw_rgb(GtkWidget *widget, int x, int y, int w, int h,
 
 	/* Paint the area into cache, in up to 4 pieces */
 	if (s) cairo_set_source_surface(cr, s, x, y);
+	cairo_unfilter(cr);
 	cairo_rectangle(cr, x, y, w, h);
 	cairo_fill(cr);
 	if (y1)
 	{
-		if (s) cairo_set_source_surface(cr, s, x, -h);
+		if (s)
+		{
+			cairo_set_source_surface(cr, s, x, -h);
+			cairo_unfilter(cr);
+		}
 		cairo_rectangle(cr, x, 0, w, y1);
 		cairo_fill(cr);
 	}
 	if (x1)
 	{
-		if (s) cairo_set_source_surface(cr, s, -w, y);
+		if (s)
+		{
+			cairo_set_source_surface(cr, s, -w, y);
+			cairo_unfilter(cr);
+		}
 		cairo_rectangle(cr, 0, y, x1, h);
 		cairo_fill(cr);
 		if (y1)
 		{
-			if (s) cairo_set_source_surface(cr, s, -w, -h);
+			if (s)
+			{
+				cairo_set_source_surface(cr, s, -w, -h);
+				cairo_unfilter(cr);
+			}
 			cairo_rectangle(cr, 0, 0, x1, y1);
 			cairo_fill(cr);
 		}
@@ -4703,8 +4744,12 @@ static gboolean wjpixmap_draw(GtkWidget *widget, cairo_t *cr)
 	/* Pixmap window */
 	while (gtk_cairo_should_draw_window(cr, pix->pixwindow))
 	{
+		/* This widget may get moved to differently-scaled monitor while
+		 * retaining the buffer surfaces, so cairo_unfilter() to at least
+		 * prevent blurring if that happens */
 		gtk_cairo_transform_to_window(cr, widget, pix->pixwindow);
 		cairo_set_source_surface(cr, pix->pixmap, 0, 0);
+		cairo_unfilter(cr);
 		cairo_rectangle(cr, 0, 0, pix->pm.width, pix->pm.height);
 //		cairo_set_operator(cr, CAIRO_OPERATOR_SOURCE);
 		cairo_fill(cr); // Hope Cairo won't waste much time on clipped-out parts
@@ -4712,6 +4757,7 @@ static gboolean wjpixmap_draw(GtkWidget *widget, cairo_t *cr)
 		if (!pix->cursor) break;
 		if (pix->focused_cursor && !gtk_widget_has_focus(widget)) break;
 		cairo_set_source_surface(cr, pix->cursor, pix->cr.x, pix->cr.y);
+		cairo_unfilter(cr);
 //		cairo_set_operator(cr, CAIRO_OPERATOR_OVER);
 		cairo_rectangle(cr, pix->cr.x, pix->cr.y, pix->cr.width, pix->cr.height);
 		cairo_fill(cr); // Hope Cairo won't waste time if outside of clip
@@ -4921,6 +4967,7 @@ void wjpixmap_draw_rgb(GtkWidget *widget, int x, int y, int w, int h,
 	cr = cairo_create(pix->pixmap);
 	cairo_set_operator(cr, CAIRO_OPERATOR_SOURCE);
 	cairo_set_source_surface(cr, s, x, y);
+	cairo_unfilter(cr);
 	cairo_rectangle(cr, x, y, w, h);
 	cairo_fill(cr);
 	cairo_destroy(cr);

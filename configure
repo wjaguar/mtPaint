@@ -4,8 +4,8 @@
 
 echo
 
-MT_V="3.49.29"
-MT_DATE="2020-07-12"
+MT_V="3.49.30"
+MT_DATE="2020-10-12"
 
 MT_VERSION="mtPaint $MT_V"
 MT_LANG=NO
@@ -256,6 +256,8 @@ if [ -n "$OS" ] ; then
 	: # Do nothing
 elif [ "$OSTYPE" = "msys" ] ; then
 	OS="MinGW/MSYS"
+elif [ "$OSTYPE" != "${OSTYPE#darwin}" ] ; then
+	OS="Darwin"
 elif [ -z "$MT_HOST" ] ; then
 	OS="GNU/Linux"
 elif [ "$MT_HOST" != "${MT_HOST%mingw32*}" ] ; then
@@ -312,11 +314,15 @@ else
 	MT_PO="$MT_LOCDIR"
 fi
 
-### Setup compiler (only GCC is really supported at this time)
+### Setup compiler
+
+# Only GCC and GNU toolchain are fully supported at the time
+# Clang is recognized mainly to avoid mixups with GCC version checks
+# No support for GNU-incompatible linkers in fakeroot mode
 
 INCLUDES=
 LIBS=
-if [ "$OS" != "${OS%GNU/Linux}" ]
+if [ "$OS" != "${OS%GNU/Linux}" ] || [ "$OS" = "Darwin" ]
 then
 	CC=${CC:-`which ${MT_HOST:+$MT_HOST-}gcc`}
 	PKG_CONFIG=${PKG_CONFIG:-${MT_HOST:+$MT_HOST-}pkg-config}
@@ -324,14 +330,17 @@ fi
 CC=${CC:-gcc}
 # Use compiler as linker in tests - this way, both accept "-Wl," in LDFLAGS
 CCLD=${CCLD:-$CC -nostartfiles}
-# Get GCC version
-GCCVER=`$CC -dumpversion`
+# Get compiler type
+CCNAME=gcc # by default
+$CC -v 2>&1 | grep -q "clang version" && CCNAME=clang
+# Get compiler version
+CCVER=`$CC -dumpversion`
 # Get target architecture
-GCCARCH=`$CC -dumpmachine`
+CCARCH=`$CC -dumpmachine`
 # For eternally misconfigured, Windows-hosted MinGW
-[ "$GCCARCH" != "${GCCARCH#mingw32}" ] && GCCARCH=i586-mingw32
+[ "$CCARCH" != "${CCARCH#mingw32}" ] && CCARCH=i586-mingw32
 # For any properly built toolchain
-ARCH=${ARCH:-${GCCARCH%%-*}}
+ARCH=${ARCH:-${CCARCH%%-*}}
 
 if [ -n "$FAKE_ROOT" ] # A way to replace just some libraries, leaving others be
 then
@@ -375,9 +384,11 @@ HAVE_FUNC()
 
 HAVE_GCC_VER()
 {
+	[ "$CCNAME" = gcc ] || return 1
+
 	# First 2 parts of GCC version
-	MT_VN0=${GCCVER%%.*}
-	MT_VN1=${GCCVER#$MT_VN0}
+	MT_VN0=${CCVER%%.*}
+	MT_VN1=${CCVER#$MT_VN0}
 	MT_VN0=${MT_VN0%%[!0-9]*}
 	MT_VN1=${MT_VN1#.}
 	MT_VN1=${MT_VN1%%[!0-9]*}
@@ -385,6 +396,11 @@ HAVE_GCC_VER()
 	# Compare them to given version
 	[ ${1%%.*} -eq "$MT_VN0" ] && [ ${1#*.} -le "$MT_VN1" ] || \
 		[ ${1%%.*} -lt "$MT_VN0" ]
+}
+
+HAVE_CLANG()
+{
+	[ "$CCNAME" = clang ]
 }
 
 ### Detect libraries and functions
@@ -461,15 +477,20 @@ NCMS=${NCMS:-NO}
 
 if [ "$OPTS" = RELEASE ]
 then
-	# Target i386 when compiling for any x86 CPU;
+	# Target i386 when compiling for any x86 CPU with GCC;
 	# this produces smallest *AND* fastest binary
 # !!! Questionable, now; need retesting, and proper cross-configuring too
+	# With Clang, target pentium4; no incompatible HW expected in the wild,
+	# and anything lesser results in much slower code
 	case $ARCH in
-		i?86) CFLAGS="-O2 ${MARCH:--march=i386}";;
-		*) CFLAGS="-O2 $MARCH";;
+		i?86)	HAVE_CLANG && MARCH=${MARCH:--march=pentium4}
+			MARCH=${MARCH:--march=i386};;
 	esac
+	CFLAGS="-O2 $MARCH"
 	# Add optimizations which are proven to really make mtPaint code faster
-	if HAVE_GCC_VER 4.0
+	if HAVE_CLANG
+	then : # Clang - no useful extra flags
+	elif HAVE_GCC_VER 4.0
 	then # GCC 4.x
 		CFLAGS="$CFLAGS -fweb -fomit-frame-pointer -fmodulo-sched"
 	else # GCC 3.x
@@ -519,12 +540,18 @@ if HAVE_GCC_VER 9.3
 then # Tell gcc 9.3+ to cut it short
 	WARN="$WARN -Wno-stringop-truncation -Wformat-truncation=0 -Wformat-overflow=0"
 fi
+if HAVE_CLANG
+then # Tell Clang to clang less
+	WARN="$WARN -Wno-pointer-sign -Wno-int-to-pointer-cast -Wno-string-plus-int"
+fi
 # Deterministic compile
 SET_RANDSEED=
-if HAVE_GCC_VER 3.3
+if HAVE_CLANG || HAVE_GCC_VER 3.3
 then
 	SET_RANDSEED='-frandom-seed=$*'
 fi
+# Apple linker
+[ "$OS" = "Darwin" ] && AS_NEEDED=
 
 ### Setup libraries
 
@@ -564,7 +591,7 @@ then
 		INCLUDES="$INCLUDES -I/usr/include/openjpeg"
 	LIB_NAME openjpeg "$STATIC_JP2"
 	DEFS="$DEFS -DU_JP2"
-	if [ "$STATIC_JP2" ] || [ "$OS" != "GNU/Linux" ]
+	if [ "$STATIC_JP2" ] || [ "$OS" != "${OS#MinGW}" ]
 	then
 		DEFS="$DEFS -DOPJ_STATIC"
 	fi
@@ -706,12 +733,12 @@ else
 	exit 1
 fi
 
-# Need to add this to use GTK+1 with GCC 5
-[ "$GTK" = 1 ] && HAVE_GCC_VER 5.0 && CFLAGS="$CFLAGS -std=gnu89"
+# Need to add this to use GTK+1 with GCC 5 or Clang
+[ "$GTK" = 1 ] && { HAVE_CLANG || HAVE_GCC_VER 5.0; } && CFLAGS="$CFLAGS -std=gnu89"
 # Also need to add "-lX11" on GTK+2/X systems
 [ "$GTK" = 2 ] && [ "$LIBS" != "${LIBS#*gdk-x11}" ] && LIBS="$LIBS -lX11"
 # Need the same on GTK+3/X systems even more
-[ "$GTK" = 3 ] && [ "$INCLUDES" != "${INCLUDES#*gio-unix}" ] && LIBS="$LIBS -lX11"
+[ "$GTK" = 3 ] && PKGCONFIG gtk+-x11-3.0 && LIBS="$LIBS -lX11"
 # GTK+2 version to use
 DEFS="$DEFS${GTK2VERSION:+ -DGTK2VERSION=$GTK2VERSION}"
 # Widgets to use

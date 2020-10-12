@@ -611,7 +611,7 @@ static void do_render_text(texteng_dd *td)
 	font_desc = pango_font_description_from_string(td->font);
 	if (td->dpi) pango_font_description_set_size(font_desc,
 		(int)(pango_font_description_get_size(font_desc) *
-		(td->dpi / window_dpi(main_window))));
+		(td->dpi / window_dpi(widget))));
 	pango_layout_set_font_description(layout, font_desc);
 	pango_font_description_free(font_desc);
 
@@ -1234,6 +1234,11 @@ static clipform_dd *clip_format(GtkSelectionData *sel, clipform_data *cd)
 		guint res, res0 = G_MAXUINT;
 
 		targets = (GdkAtom *)gtk_selection_data_get_data(sel);
+#ifdef GDK_WINDOWING_QUARTZ
+		/* !!! For debugging */
+		g_print("%d targets:\n", n);
+		for (i = 0; i < n; i++) g_print("%s\n", gdk_atom_name(targets[i]));
+#endif
 		/* Need to scan for each target, to return the earliest slot in
 		 * the array in case more than one match */
 		for (i = 0; i < n; i++)
@@ -1527,6 +1532,46 @@ static int process_clipboard(void **slot)
 	return (FALSE);
 }
 
+#ifdef GDK_WINDOWING_QUARTZ
+
+/* GTK+/Quartz has a dummy stub for gdk_selection_owner_get(), so needs a
+ * workaround to have a working internal_clipboard() */
+
+static void* slot_on_offer;
+
+static void clip_copy(GtkClipboard *clipboard, GtkSelectionData *sel, guint info,
+	gpointer user_data)
+{
+	clip_evt(sel, info, slot_on_offer);
+}
+
+static void clip_clear(GtkClipboard *clipboard, gpointer user_data)
+{
+	clip_evt(NULL, 0, slot_on_offer);
+}
+
+static int offer_clipboard(void **slot, int unused)
+{
+	void **desc = slot[1];
+	clipform_data *cd = slot[0];
+	int i, res = FALSE;
+
+	if ((int)desc[2] & CLIPMASK) // Paranoia
+	// Two attempts, for GTK+ function can fail for strange reasons
+	for (i = 0; i < 2; i++)
+	{
+		if (!gtk_clipboard_set_with_owner(gtk_clipboard_get(
+			GDK_SELECTION_CLIPBOARD), cd->ent, cd->n,
+			clip_copy, clip_clear, G_OBJECT(main_window))) continue;
+		slot_on_offer = slot;
+		res = TRUE;
+		break;
+	}
+	return (res);
+}
+
+#else /* Anything but Quartz */
+
 static void clip_copy(GtkClipboard *clipboard, GtkSelectionData *sel, guint info,
 	gpointer user_data)
 {
@@ -1560,6 +1605,8 @@ static int offer_clipboard(void **slot, int unused)
 	}
 	return (res);
 }
+
+#endif
 
 static void offer_text(void **slot, char *s)
 {
@@ -2159,6 +2206,7 @@ static gboolean redraw_rgb(GtkWidget *widget, cairo_t *cr, gpointer user_data)
 		if (!rd->s) rd->s = cairo_upload_rgb(NULL, gtk_widget_get_window(widget),
 			rd->rgb, rd->w, rd->h, rd->w * 3);
 		cairo_set_source_surface(cr, rd->s, 0, 0);
+		cairo_unfilter(cr);
 		cairo_rectangle(cr, 0, 0, rd->w, rd->h); // Let Cairo clip it
 		cairo_fill(cr);
 	}
@@ -2245,6 +2293,7 @@ static void reset_rgbp(GtkWidget *widget, gpointer user_data)
 	cr = cairo_create(rd->s);
 	cairo_set_operator(cr, CAIRO_OPERATOR_SOURCE);
 	cairo_set_source_surface(cr, s, 0, 0);
+	cairo_unfilter(cr);
 	cairo_paint(cr);
 	cairo_destroy(cr);
 	cairo_surface_fdestroy(s);
@@ -10239,9 +10288,12 @@ void cmd_peekv(void **slot, void *res, int size, int idx)
 	{
 	case op_uWINDOW:
 	case op_MAINWINDOW: case op_WINDOW: case op_WINDOWm: case op_DIALOGm:
-		if ((idx != WINDOW_DPI) || (size < sizeof(int))) break;
-		*(int *)res = cmd_mode ? 72 : // Use FreeType's default DPI
-			(int)(window_dpi(op == op_uWINDOW ? main_window : slot[0]) + 0.5);
+		if ((idx == WINDOW_DPI) && (size >= sizeof(int)))
+		{
+			GtkWidget *w = op == op_uWINDOW ? main_window : slot[0];
+			*(int *)res = cmd_mode ? 72 : // Use FreeType's default DPI
+				(int)(window_dpi(w) / window_scale(w) + 0.5);
+		}
 		break;
 	case op_FPICKpm: fpick_get_filename(slot[0], res, size, idx); break;
 	case op_uFPICK:

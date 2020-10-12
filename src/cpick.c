@@ -711,8 +711,13 @@ GtkWidget *eyedropper(void **r)
 	GtkWidget *button = gtk_button_new();
 	gtk_container_add(GTK_CONTAINER(button), xpm_image(XPM_ICON(picker)));
 
+#ifdef GDK_WINDOWING_QUARTZ
+	/* !!! Does not work with that halfbaked backend anyway */
+	gtk_widget_set_sensitive(button, FALSE);
+#else
 	gtk_signal_connect(GTK_OBJECT(button), "clicked",
 		GTK_SIGNAL_FUNC(click_eyedropper), NEXT_SLOT(r));
+#endif
 
 	return (button);
 }

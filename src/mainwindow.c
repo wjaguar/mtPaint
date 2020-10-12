@@ -398,6 +398,9 @@ static clipform_dd clip_formats[] = {
 	{ "image/bmp", (void *)(FT_BMP) },
 	{ "image/x-bmp", (void *)(FT_BMP) },
 	{ "image/x-MS-bmp", (void *)(FT_BMP) },
+#ifdef U_TIFF
+	{ "image/tiff", (void *)(FT_TIFF) },
+#endif
 #ifdef HAVE_PIXMAPS
 	/* These two don't make sense without X */
 	{ "PIXMAP", (void *)(FT_PIXMAP), sizeof(XID_type), 32 },
