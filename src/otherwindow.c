@@ -1591,6 +1591,23 @@ static void colsel_evt(colsel_dd *dt, void **wdata, int what, void **where)
 	}
 }
 
+static int colsel_pick_pixel(colsel_dd *dt, void **wdata, int what, void **where,
+	multi_ext *mx)
+{
+	int pix, *row = mx->rows[0] + 1;
+
+	/* Sanity check */
+	if ((mx->ncols != 2) || (mx->nrows != 1) || (mx->fractcol >= 0))
+		return (0);
+
+	if ((row[0] < 0) || (row[1] < 0) ||
+		(row[0] >= mem_width) || (row[1] >= mem_height))
+		pix = mem_background * 0x010101; // Grey outside image
+	else pix = get_pixel_RGB(row[0], row[1]);
+	cmd_set(origin_slot(where), pix);
+	return (1);
+}
+
 static char *scales_txt[] = { _("RGB"), _("sRGB"), _("HSV"), _("Gradient") };
 static char *AB_txt[] = { "A", "B", _("Highlight"), _("Index"), NULL };
 static char *csel_txt[] = { _("Centre"), _("Limit"), _("Preview"), NULL };
@@ -1626,6 +1643,7 @@ static void *colsel_code[] = {
 	IF(opflag), TCOLOR(color), // with opacity
 	UNLESS(opflag), COLOR(color), // solid colors
 	EVENT(CHANGE, colsel_evt), OPNAME("Colour"),
+	EVENT(MULTI, colsel_pick_pixel),
 	UNLESS(is_pal), WDONE,
 	/* Task-specific part */
 	BORDER(TABLE, 0),
@@ -2297,6 +2315,7 @@ static void *ged_code[] = {
 		EVENT(CHANGE, ged_event), OPNAME("Value"),
 	UNLESSx(mode, 1), /* RGB */
 		REF(col), COLOR(crgb), EVENT(CHANGE, ged_event), OPNAME("Colour"),
+		EVENT(MULTI, colsel_pick_pixel),
 		EQBOXS, BORDER(OPT, 0),
 		REF(opt), XOPTe(interp_txt, 5, interp, ged_event), OPNAME("Type"),
 	ENDIF(1),

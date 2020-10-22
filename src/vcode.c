@@ -1234,7 +1234,7 @@ static clipform_dd *clip_format(GtkSelectionData *sel, clipform_data *cd)
 		guint res, res0 = G_MAXUINT;
 
 		targets = (GdkAtom *)gtk_selection_data_get_data(sel);
-#ifdef GDK_WINDOWING_QUARTZ
+#if 0 /* #ifdef GDK_WINDOWING_QUARTZ */
 		/* !!! For debugging */
 		g_print("%d targets:\n", n);
 		for (i = 0; i < n; i++) g_print("%s\n", gdk_atom_name(targets[i]));

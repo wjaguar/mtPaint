@@ -179,8 +179,7 @@ typedef struct {
 	int tool_pat, tool_pat_B;	// Tool pattern number
 	int xbm_hot_x, xbm_hot_y;	// Current XBM hot spot
 	char prot_mask[256];		// 256 bytes used for indexed images
-	int prot;			// Number of protected colours in prot_RGB
-	int prot_RGB[256];		// Up to 256 RGB colours protected
+	int prot;			// Number of protected colours
 	int col_[2];			// Index for colour A & B
 	png_color col_24[2];		// RGB for colour A & B
 	int iover, aover;		// Image hidden / alpha overlayed
@@ -381,7 +380,6 @@ image_state mem_state;			// Current edit settings
 #define mem_xbm_hot_x		mem_state.xbm_hot_x
 #define mem_xbm_hot_y		mem_state.xbm_hot_y
 #define mem_prot_mask		mem_state.prot_mask
-#define mem_prot_RGB		mem_state.prot_RGB
 #define mem_prot		mem_state.prot
 #define mem_col_		mem_state.col_
 #define mem_col_A		mem_state.col_[0]
@@ -754,7 +752,7 @@ void mem_normalize();			// Normalize contrast in image or palette
 //	Clear/set protection (what = NULL - color n, n = -1 - all colors)
 void mem_mask_setv(int *what, int n, int state);
 void mem_mask_init();			// Initialise RGB protection mask
-int mem_protected_RGB(int intcol);	// Is this intcol in list?
+int mem_protected_RGB(int intcol);	// Is this intcol in mask?
 
 void mem_swap_cols(int redraw);		// Swaps colours and update memory
 void mem_set_trans(int trans);		// Set transparent colour and update

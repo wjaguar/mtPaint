@@ -1332,9 +1332,9 @@ void update_stuff(int flags)
 		layer_show_trans();
 }
 
-void pressed_do_undo(int redo)
+void pressed_do_undo(int redo, int cnt)
 {
-	mem_do_undo(redo);
+	while (cnt--) mem_do_undo(redo);
 	update_stuff(UPD_ALL | CF_NAME);
 }
 

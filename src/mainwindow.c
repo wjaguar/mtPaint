@@ -205,7 +205,7 @@ int	files_passed, cmd_mode, tablet_working;
 char **file_args, **script_cmds;
 
 static int show_dock;
-static int mouse_left_canvas;
+static int mouse_left_canvas, is_tracking;
 static int cvxy[2];	// canvas window position
 
 typedef struct {
@@ -1554,7 +1554,10 @@ static void mouse_event(mouse_ext *m, int mflag, int dx, int dy)
 
 	/* ****** Now to mouse-move-specific part ****** */
 
-	if (!m->count)
+	/* A focus change caused by a click results in leave and enter events
+	 * immediately followed by a click event, so the task to restore the
+	 * tracking state then by necessity falls to that click - WJ */
+	if (!m->count || !is_tracking)
 	{
 		if ((poly_status == POLY_SELECTING) && !m->button)
 			stretch_poly_line(x, y);
@@ -1613,6 +1616,8 @@ static void mouse_event(mouse_ext *m, int mflag, int dx, int dy)
 			line_y2 = y;
 			repaint_line(old);
 		}
+
+		is_tracking = TRUE;
 	}
 
 	update_sel_bar(FALSE);
@@ -1684,6 +1689,8 @@ static void canvas_enter_leave(main_dd *dt, void **wdata, int what, void **where
 	if (((tool_type == TOOL_POLYGON) && (poly_status == POLY_SELECTING)) ||
 		((tool_type == TOOL_LINE) && (line_status == LINE_LINE)))
 		repaint_line(NULL);
+
+	is_tracking = FALSE;
 }
 
 static int render_background(unsigned char *rgb, int x0, int y0, int wid, int hgt, int fwid)
@@ -3869,6 +3876,13 @@ static void script_click(script_dd *dt, void **wdata, int what, void **where)
 	char txt[64], **rp;
 	int i, idx[SCRIPTS_MAX];
 
+	if (what == op_EVT_DESTROY) // Finalize
+	{
+		cmd_sensitive(menu_slots[MENU_SCRIPT], TRUE);
+		cmd_sensitive(menu_slots[MENU_SCRIPTC], TRUE);
+		return;
+	}
+
 	if (what != op_EVT_CANCEL) update_text(dt);
 
 	if (origin_slot(where) == dt->exec) // Run script
@@ -3954,9 +3968,10 @@ static void script_select_row(script_dd *dt, void **wdata, int what, void **wher
 
 #define WBbase script_dd
 static void *script_code[] = {
-	WINDOWm(_("Script")),
+	WINDOW(_("Script")), // nonmodal
 //	WXYWH("script", 400, 400),
 	DEFSIZE(400, 400),
+	EVENT(DESTROY, script_click),
 	HSEP,
 	XVBOXB,
 	BORDER(SCROLL, 0), BORDER(FRAME, 0), BORDER(ENTRY, 0),
@@ -3986,6 +4001,10 @@ static void pressed_script()
 	script_dd tdata;
 	char txt[64], *ns = SCRIPT1_NAME, *ss = SCRIPT1_CODE;
 	int i;
+
+	// Make sure the user can only open 1 script window
+	cmd_sensitive(menu_slots[MENU_SCRIPT], FALSE);
+	cmd_sensitive(menu_slots[MENU_SCRIPTC], FALSE);
 
 	memset(&tdata, 0, sizeof(tdata));
 	for (i = 0; i < SCRIPTS_MAX; i++)
@@ -4480,6 +4499,29 @@ void script_paste(int centre)
 	update_stuff(UPD_SGEOM);
 }
 
+typedef struct {
+	int n[3];
+} inrange_dd;
+
+#define WBbase inrange_dd
+static void *inrange_code[] = {
+	TOPVBOX, SPINa(n), WSHOW
+};
+#undef WBbase
+
+static int script_inrange(int n0, int nmin, int nmax)
+{
+	if (script_cmds)
+	{
+		inrange_dd tdata = { { n0, nmin, nmax } };
+		void **res = run_create_(inrange_code, &tdata, sizeof(tdata), script_cmds);
+		run_query(res);
+		n0 = ((inrange_dd *)GET_DDATA(res))->n[0];
+		run_destroy(res);
+	}
+	return (n0);
+}
+
 static void do_act_esc()
 {
 	if ((tool_type == TOOL_SELECT) || (tool_type == TOOL_POLYGON))
@@ -4713,7 +4755,9 @@ void action_dispatch(int action, int mode, int state, int kbd)
 	case ACT_LOAD_RECENT:
 		pressed_load_recent(mode); break;
 	case ACT_DO_UNDO:
-		pressed_do_undo(mode); break;
+		pressed_do_undo(mode, script_inrange(1, 1,
+			mode ? mem_undo_redo : mem_undo_done));
+		break;
 	case ACT_COPY:
 		pressed_copy(mode); break;
 	case ACT_PASTE:
@@ -5424,6 +5468,7 @@ static void *main_menu_code[] = {
 	REFv(menu_slots[MENU_SCRIPT10]),
 	MENUITEMs("///10", ACTMOD(ACT_RUN_SCRIPT, 10)),
 	MENUSEP, ///
+	REFv(menu_slots[MENU_SCRIPTC]),
 	MENUITEM(_("///Configure"), ACTMOD(DLG_SCRIPT, 0)),
 	WDONE,
 	MENUSEP, //

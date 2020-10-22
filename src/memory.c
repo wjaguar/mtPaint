@@ -2214,19 +2214,55 @@ void mem_pal_load_def()					// Load default palette
 	mem_cols = mem_pal_def_i;
 }
 
-void mem_mask_init()		// Initialise RGB protection mask array
-{
-	int i;
+#define RGB_PROT_MAX 256
+/* The 16:8 split is optimal for up to 768 colors, then 17:7 etc */
+typedef struct {
+	short nb[0x10000 / 32];
+	uint32_t rg[0x10000 / 32], b[RGB_PROT_MAX * 0x100 / 32];
+} rgb_prot;
 
-	mem_prot = 0;
-	for (i=0; i<mem_cols; i++)
+static rgb_prot mem_prot_map;
+
+void mem_mask_init()		// Initialise RGB protection bitmaps
+{
+	int i, j, n, v, rgb[RGB_PROT_MAX];
+
+	memset(&mem_prot_map, 0, sizeof(mem_prot_map));
+	for (i = n = 0; i < mem_cols; i++)
 	{
-		if (mem_prot_mask[i])
-		{
-			mem_prot_RGB[mem_prot] = PNG_2_INT( mem_pal[i] );
-			mem_prot++;
-		}
+		if (!mem_prot_mask[i]) continue;
+		rgb[n++] = v = PNG_2_INT(mem_pal[i]);
+		v >>= 8;
+		mem_prot_map.rg[v >> 5] |= 1U << (v & 0x1F);
 	}
+	mem_prot = n;
+	if (!n) return;
+	for (i = v = 0; i < 0x10000 / 32 - 1; i++)
+		mem_prot_map.nb[i + 1] = v += bitcount(mem_prot_map.rg[i]);
+	for (i = 0; i < n; i++)
+	{
+		unsigned u;
+		v = rgb[i] >> 8;
+		u = (1U << (v & 0x1F)) - 1;
+		v >>= 5;
+		j = mem_prot_map.nb[v] + bitcount(u & mem_prot_map.rg[v]);
+		v = rgb[i] & 0xFF;
+		mem_prot_map.b[j * (0x100 >> 5) + (v >> 5)] |= 1U << (v & 0x1F);
+	}
+}
+
+static inline int mem_mask_test(int rgb)
+{
+	int v = rgb >> 8;
+	unsigned u = 1U << (v & 0x1F), w = mem_prot_map.rg[v >> 5];
+
+	if (u &= w)
+	{
+		v = mem_prot_map.nb[v >> 5] + bitcount((u - 1) & w);
+		rgb &= 0xFF;
+		u = mem_prot_map.b[v * (0x100 >> 5) + (rgb >> 5)] >> (rgb & 0x1F);
+	}
+	return (u & 1);
 }
 
 void mem_mask_setv(int *what, int n, int state)
@@ -6480,15 +6516,9 @@ int get_pixel_img( int x, int y )	/* RGB or indexed */
 	return (MEM_2_INT(mem_img[CHN_IMAGE], x));
 }
 
-int mem_protected_RGB(int intcol)		// Is this intcol in list?
+int mem_protected_RGB(int intcol)		// Is this intcol in bitmap?
 {
-	int i;
-
-	if (!mem_prot) return (0);
-	for (i = 0; i < mem_prot; i++)
-		if (intcol == mem_prot_RGB[i]) return (255);
-
-	return (0);
+	return (mem_mask_test(intcol) * 255);
 }
 
 int pixel_protected(int x, int y)

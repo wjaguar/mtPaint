@@ -63,10 +63,11 @@ Here is a summary of the main changes in this release (see handbook for full det
 	* Dock area state is now remembered across sessions (unless opened automatically, for multiple files on command line)
 	* Unmaximized window position and size are now remembered across sessions
 	* Alpha values for colours A & B are now displayed on settings toolbar when editing image with alpha in coupled alpha mode
+	* Drawing and fill operations on RGB images with colour protection mask now are up to 20 times faster
 	* Undo system now uses a bit less memory
 	* Initial undo memory size is now 1/4 of available memory
 	* Support for compiling with giflib 5, libpng 1.6, libjpeg 9, OpenJPEG 2.3 added
-	* Compilation now works using gcc-5.5 and GTK+1
+	* Compilation now works using gcc-5.5 or clang and GTK+1
 	* Compilation now works using gcc-10
 	* BUGFIX - Compilation without JPEG and TIFF support now works again
 	* BUGFIX - FreeType text tool now skips directory loops when scanning font directories
@@ -99,6 +100,7 @@ Here is a summary of the main changes in this release (see handbook for full det
 	* BUGFIX - Rare problem of undo system ignoring a changed pixel is now eliminated
 	* BUGFIX - Polygonal selections no longer skip some contour pixels in certain situations
 	* BUGFIX - Canvas window now doesn't lose mouse button press event if dock window has focus
+	* BUGFIX - Tool perimeter now doesn't sometimes disappear when you draw after visiting another window (such as Layers)
 	* BUGFIX - Problem with command line window wrongly reacting to mouse in some cases is now eliminated
 	* BUGFIX - XPM icons now do not in some cases fail to display in compositing WMs
 	* BUGFIX - Escape and Enter keys now work properly in all dialogs in GTK+1

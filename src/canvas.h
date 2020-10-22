@@ -134,7 +134,7 @@ void file_selector_x(int action_type, void **xdata);
 void file_selector(int action_type);
 void set_new_filename(int layer, char *fname);
 
-void pressed_do_undo(int redo);
+void pressed_do_undo(int redo, int cnt);
 
 void line_to_gradient();	// Setup gradient along line tool
 
