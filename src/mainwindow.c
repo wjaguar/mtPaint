@@ -5120,41 +5120,59 @@ static void toggle_dock(int state)
 
 static void pressed_sel_ramp(int vert)
 {
-	unsigned char *c0, *c1, *img, *dest;
-	int i, j, k, l, s1, s2, bpp = MEM_BPP, rect[4];
+	unsigned char *c0, *c1, *img, *dest, *buf, *mask;
+	int i, j, k, a, b, v, w, h, ww, gcor, opacity, bpp = MEM_BPP, rect[4];
 
 	if (marq_status != MARQUEE_DONE) return;
 
 	marquee_at(rect);
+	w = rect[2]; h = rect[3];
+	k = (vert ? h : w) - 1;
+	if (k < 2) return; // Nothing to do
 
-	if (vert)		// Vertical ramp
+	ww = w * bpp;
+	buf = multialloc(MA_ALIGN_DEFAULT, &buf, ww, &mask, w, NULL);
+	if (!buf)
 	{
-		k = rect[3] - 1; l = rect[2];
-		s1 = mem_width * bpp; s2 = bpp;
-	}
-	else			// Horizontal ramp
-	{
-		k = rect[2] - 1; l = rect[3];
-		s1 = bpp; s2 = mem_width * bpp;
+		memory_errors(1);
+		return;
 	}
 
 	spot_undo(UNDO_FILT);
+
+	opacity = IS_INDEXED ? 0 : tool_opacity;
+	gcor = paint_gamma && (bpp == 3);
 	img = mem_img[mem_channel] + (rect[1] * mem_width + rect[0]) * bpp;
-	for (i = 0; i < l; i++)
+	c0 = img;
+	c1 = img + (h - 1) * mem_width * bpp;
+	v = 0x3F; /* Vertical ramp: channel step 1, ramp step 0 */
+	vert = !!vert;
+	/* Horizontal ramp: for 1bpp channel step 0, ramp step 1;
+	 * for 3 bpp channel step (1, 1, -2), ramp step (0, 0, 1) */
+	if (!vert) ww -= bpp , v = bpp == 3 ? 0x0F : 0x2A;
+	/* Render the ramp row by row */
+	for (i = vert; i < h - vert; i++)
 	{
-		c0 = img; c1 = img + k * s1;
-		dest = img;
-		for (j = 1; j < k; j++)
+		dest = img + i * mem_width * bpp;
+		if (vert) j = 0 , b = i;
+		else j = bpp , b = 1 , c0 = dest , c1 = dest + ww;
+		for (a = 0; j < ww; j++)
 		{
-			dest += s1;
-			dest[0] = (c0[0] * (k - j) + c1[0] * j) / k;
-			if (bpp == 1) continue;
-			dest[1] = (c0[1] * (k - j) + c1[1] * j) / k;
-			dest[2] = (c0[2] * (k - j) + c1[2] * j) / k;
+			buf[j] = gcor ? UNGAMMA256((gamma256[c0[a]] * (k - b) +
+				gamma256[c1[a]] * b) / k) :
+				(c0[a] * (k - b) + c1[a] * b) / k;
+			a += (v & 3) - 2; // Step on channels
+			b += 1 - (v & 1); // Step on ramp
+			v = (v + ((v & 3) << 6)) >> 2; // Next step
 		}
-		img += s2;
+		row_protected(rect[0], rect[1] + i, w, mask);
+		if (!vert) mask[0] = mask[k] = 255; // Leave source pixels alone
+		process_mask(0, 1, w, mask, NULL, NULL, NULL, NULL, opacity, 0);
+		process_img(0, 1, w, mask, dest, dest, buf, buf, bpp, 0);
 	}
 
+	free(buf);
+	mem_undo_prepare();
 	update_stuff(UPD_IMG);
 }
 

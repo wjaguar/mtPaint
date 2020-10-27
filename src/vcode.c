@@ -504,7 +504,11 @@ static void fontsel_style(GtkWidget *widget, gpointer user_data)
 	fontsel_data *fd = r[2];
 	int sz, fontsize;
 
-	if (!fd->dpi || !fd->sysdpi) return; // Leave alone
+	if (!fd->dpi || !fd->sysdpi)
+	{
+		fd->lastdpi = 0; // To force an update when DPI is set again
+		return; // Do nothing else
+	}
 	ctx = gtk_widget_get_style_context(widget);
 	gtk_style_context_get(ctx, gtk_style_context_get_state(ctx), "font", &d, NULL);
 	sz = pango_font_description_get_size(d);
@@ -10779,6 +10783,9 @@ void cmd_setv(void **slot, void *res, int idx)
 			gtk_entry_set_text(GTK_ENTRY(e), s);
 			gtk_widget_activate(e);
 			free(s);
+			/* Force style update if not triggered by the above */
+			if (fd->dpi != fd->lastdpi) fontsel_style(
+				gtk_font_selection_get_preview_entry(fs), slot);
 		}
 #else /* #if GTK_MAJOR_VERSION <= 2 */
 		{

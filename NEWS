@@ -27,6 +27,7 @@ Here is a summary of the main changes in this release (see handbook for full det
 	* Colour transform and source selection added to blend mode options
 	* Threshold blend mode added
 	* "Saturate more" blend mode redefined to not ignore source (previous behaviour available with "Image" source selected)
+	* Horizontal and vertical ramps now respect drawing modes, opacity and masking
 	* Lasso tool can be configured to shrink selection based on the selection channel - right click the tool icon
 	* Clone tool is now continuous
 	* Clone tool can be configured to work in unaligned mode - right click the tool icon
@@ -68,7 +69,7 @@ Here is a summary of the main changes in this release (see handbook for full det
 	* Initial undo memory size is now 1/4 of available memory
 	* Support for compiling with giflib 5, libpng 1.6, libjpeg 9, OpenJPEG 2.3 added
 	* Compilation now works using gcc-5.5 or clang and GTK+1
-	* Compilation now works using gcc-10
+	* Compilation now works using gcc-10 or clang-11
 	* BUGFIX - Compilation without JPEG and TIFF support now works again
 	* BUGFIX - FreeType text tool now skips directory loops when scanning font directories
 	* BUGFIX - Geometry info on the status bar now correctly updates after arrow keys or Escape key

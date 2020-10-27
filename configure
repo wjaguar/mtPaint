@@ -4,8 +4,8 @@
 
 echo
 
-MT_V="3.49.31"
-MT_DATE="2020-10-23"
+MT_V="3.49.32"
+MT_DATE="2020-10-27"
 
 MT_VERSION="mtPaint $MT_V"
 MT_LANG=NO
@@ -382,11 +382,9 @@ HAVE_FUNC()
 	CAN_DO "$1()"
 }
 
-HAVE_GCC_VER()
+HAVE_CC_VER()
 {
-	[ "$CCNAME" = gcc ] || return 1
-
-	# First 2 parts of GCC version
+	# First 2 parts of GCC or Clang version
 	MT_VN0=${CCVER%%.*}
 	MT_VN1=${CCVER#$MT_VN0}
 	MT_VN0=${MT_VN0%%[!0-9]*}
@@ -398,9 +396,19 @@ HAVE_GCC_VER()
 		[ ${1%%.*} -lt "$MT_VN0" ]
 }
 
+HAVE_GCC_VER()
+{
+	[ "$CCNAME" = gcc ] && HAVE_CC_VER $1
+}
+
 HAVE_CLANG()
 {
 	[ "$CCNAME" = clang ]
+}
+
+HAVE_CLANG_VER()
+{
+	[ "$CCNAME" = clang ] && HAVE_CC_VER $1
 }
 
 ### Detect libraries and functions
@@ -520,8 +528,8 @@ then
 	CFLAGS="-mms-bitfields $CFLAGS"
 	LDFLAGS="-mwindows $LDFLAGS"
 fi
-# Revert the changed defaults in GCC 10
-HAVE_GCC_VER 10.0 && CFLAGS="$CFLAGS -fcommon"
+# Revert the changed defaults in GCC 10 and Clang 11
+{ HAVE_GCC_VER 10.0 || HAVE_CLANG_VER 11.0; } && CFLAGS="$CFLAGS -fcommon"
 # Enable warnings
 WARN="-Wall $WARN"
 if HAVE_GCC_VER 4.0
@@ -543,6 +551,10 @@ fi
 if HAVE_CLANG
 then # Tell Clang to clang less
 	WARN="$WARN -Wno-pointer-sign -Wno-int-to-pointer-cast -Wno-string-plus-int"
+fi
+if HAVE_CLANG_VER 11.0
+then # Tell Clang 11.x to clang yet less
+	WARN="$WARN -Wno-pointer-to-int-cast -Wno-misleading-indentation"
 fi
 # Deterministic compile
 SET_RANDSEED=
