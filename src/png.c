@@ -3345,7 +3345,7 @@ static int save_tiff(char *file_name, ls_settings *settings, memFILE *mf)
 	unsigned char buf[MAX_WIDTH / 8], *src, *row = NULL;
 	uint16 rgb[256 * 3];
 	unsigned int tflags, sflags, xflags;
-	int i, l, type, bw, af, pf, res = 0;
+	int i, l, type, bw, af, pf, res = 0, pmetric = -1;
 	int w = settings->width, h = settings->height, bpp = settings->bpp;
 	TIFF *tif;
 
@@ -3427,14 +3427,18 @@ static int save_tiff(char *file_name, ls_settings *settings, memFILE *mf)
 	}
 #endif
 	if (xflags & XF_COMPJ)
+	{
 		TIFFSetField(tif, TIFFTAG_JPEGQUALITY, settings->jpeg_quality);
+		TIFFSetField(tif, TIFFTAG_JPEGCOLORMODE, JPEGCOLORMODE_RGB);
+		pmetric = PHOTOMETRIC_YCBCR;
+	}
 	if (pf) TIFFSetField(tif, TIFFTAG_PREDICTOR, PREDICTOR_HORIZONTAL);
 
-	if (bw > 0) TIFFSetField(tif, TIFFTAG_PHOTOMETRIC, get_bw(settings) ?
-		PHOTOMETRIC_MINISWHITE : PHOTOMETRIC_MINISBLACK);
+	if (bw > 0) pmetric = get_bw(settings) ? PHOTOMETRIC_MINISWHITE :
+		PHOTOMETRIC_MINISBLACK;
 	else if (bpp == 1)
 	{
-		TIFFSetField(tif, TIFFTAG_PHOTOMETRIC, PHOTOMETRIC_PALETTE);
+		pmetric = PHOTOMETRIC_PALETTE;
 		memset(rgb, 0, sizeof(rgb));
 		l = bw ? 2 : 256;
 		for (i = 0; i < settings->colors; i++)
@@ -3445,7 +3449,8 @@ static int save_tiff(char *file_name, ls_settings *settings, memFILE *mf)
 		}
 		TIFFSetField(tif, TIFFTAG_COLORMAP, rgb, rgb + l, rgb + l * 2);
 	}
-	else TIFFSetField(tif, TIFFTAG_PHOTOMETRIC, PHOTOMETRIC_RGB);
+	else if (pmetric < 0) pmetric = PHOTOMETRIC_RGB;
+	TIFFSetField(tif, TIFFTAG_PHOTOMETRIC, pmetric);
 	if (af)
 	{
 		rgb[0] = EXTRASAMPLE_UNASSALPHA;
