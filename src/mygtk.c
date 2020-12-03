@@ -1437,6 +1437,7 @@ static GdkFilterReturn win_keys_peek(GdkXEvent *xevent, GdkEvent *event, gpointe
 
 	if ((msg->message == WM_KEYDOWN) || (msg->message == WM_SYSKEYDOWN))
 	{
+		/* No matter that these fields are longer in Win64 */
 		win_last_vk = msg->wParam;
 		win_last_lp = msg->lParam;
 	}

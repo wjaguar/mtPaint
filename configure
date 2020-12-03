@@ -4,8 +4,8 @@
 
 echo
 
-MT_V="3.49.33"
-MT_DATE="2020-10-30"
+MT_V="3.49.34"
+MT_DATE="2020-12-04"
 
 MT_VERSION="mtPaint $MT_V"
 MT_LANG=NO
@@ -63,7 +63,7 @@ do
 	"jpeg" )	NJPEG=YES;;
 	"nojpeg" )	NJPEG=NO;;
 	"staticjpeg" )	STATIC_JPEG=JPEG;;
-	"jp2" )		NJP2=OpenJPEG;;
+	"jp2v1" )	NJP2=OpenJPEG;;
 	"jp2v2" )	NJP2=OpenJPEG2;;
 	"jasper" )	NJP2=JasPer;;
 	"nojp2" )	NJP2=NO;;
@@ -152,6 +152,8 @@ do
 				eval $MT_VAR=\${A#*=}
 				export $MT_VAR
 			fi;;
+	* )		echo "Unrecognized option '$A'"
+			exit;;
 	esac
 done
 
@@ -196,7 +198,7 @@ staticgif ........ Statically link GIF library
 jpeg ............. Use libjpeg
 nojpeg ........... Don't use libjpeg
 staticjpeg ....... Statically link JPEG library
-jp2 .............. Use libopenjpeg
+jp2v1 ............ Use libopenjpeg
 jp2v2 ............ Use libopenjpeg2
 jasper............ Use libjasper
 nojp2 ............ Don't use libopenjpeg and libjasper

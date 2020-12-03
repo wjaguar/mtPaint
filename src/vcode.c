@@ -592,6 +592,7 @@ static void do_render_text(texteng_dd *td)
 #if GTK_MAJOR_VERSION == 3
 	cairo_surface_t *text_pixmap;
 	cairo_t *cr;
+	cairo_matrix_t cm;
 #else
 	GdkPixmap *text_pixmap;
 #endif
@@ -660,8 +661,18 @@ static void do_render_text(texteng_dd *td)
 	text_pixmap = cairo_image_surface_create(CAIRO_FORMAT_RGB24, width, height);
 
 	cr = cairo_create(text_pixmap);
+	cairo_translate(cr, tx - rect.x, ty - rect.y);
+	if (mp)
+	{
+		cm.xx = mp->xx;
+		cm.yx = mp->yx;
+		cm.xy = mp->xy;
+		cm.yy = mp->yy;
+		cm.x0 = mp->x0;
+		cm.y0 = mp->y0;
+		cairo_transform(cr, &cm);
+	}
 	cairo_set_source_rgb(cr, 1, 1, 1);
-	cairo_move_to(cr, tx, ty);
 	pango_cairo_show_layout(cr, layout);
 	cairo_destroy(cr);
 #else

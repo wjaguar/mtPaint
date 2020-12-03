@@ -1006,9 +1006,14 @@ void mem_perlin();
  * alignment; this macro serves as part of a workaround for that problem
  */
 #ifdef WIN32
-/* In Win32, pointers fit into ints */
+/* Do not want to include an extra header everywhere, for INT_PTR or intptr_t ;
+ * instead, choosing the wide enough int type directly */
+#ifndef _WIN64 /* In 32-bit Win32, pointers fit into ints */
 #define ALIGN(p) ((void *)(((int)(p) + sizeof(double) - 1) & (-sizeof(double))))
-#else
+#else /* In 64-bit, into long longs */
+#define ALIGN(p) ((void *)(((long long int)(p) + sizeof(double) - 1) & (-sizeof(double))))
+#endif
+#else /* No Win32, no problem */
 #define ALIGN(p) ((void *)(p))
 #endif
 

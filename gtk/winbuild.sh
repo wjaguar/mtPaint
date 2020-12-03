@@ -1,7 +1,7 @@
 #!/bin/sh
 # winbuild.sh - cross-compile GTK+ and its dependencies for Windows
 
-# Copyright (C) 2010,2011,2017,2019 Dmitry Groshev
+# Copyright (C) 2010,2011,2017,2019,2020 Dmitry Groshev
 
 # This program is free software; you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -344,6 +344,8 @@ BUILD_libwebp ()
 	CPPFLAGS="-isystem $TOPDIR/include" LDFLAGS="-static-libgcc -L$TOPDIR/lib" \
 	./configure --prefix="$WPREFIX" --host=$MTARGET --disable-static \
 		--disable-silent-rules --enable-everything --enable-swap-16bit-csp
+	# !!! As of 1.0.2 libtool eats the LDFLAGS, need to force 'em down its throat
+	sed -i -e 's/-static-libgcc/-XCClinker -static-libgcc/' src/Makefile src/*/Makefile
 	make
 	make install-strip DESTDIR="$DESTDIR"
 	EXPORT

@@ -174,7 +174,7 @@ To replicate it, you need the following source packages:
     https://www.ijg.org/files/jpegsrc.v9c.tar.gz
 - libwebp 1.0.2:
     libwebp-1.0.2.tar.gz
-    https://github.com/webmproject/libwebp/archive/v1.0.2.tar.gz
+    http://downloads.webmproject.org/releases/webp/libwebp-1.0.2.tar.gz
 - LibTIFF 4.0.10:
     tiff-4.0.10.tar.gz
     https://download.osgeo.org/libtiff/tiff-4.0.10.tar.gz
@@ -212,4 +212,4 @@ git clone https://github.com/mxe/mxe.git
 cd mxe && make gcc MXE_TARGETS=i686-w64-mingw32.shared
 
 ---------------------------------
-Copyright (C) 2010,2011,2017,2019 Dmitry Groshev
+Copyright (C) 2010,2011,2017,2019,2020 Dmitry Groshev
