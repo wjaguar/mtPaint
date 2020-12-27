@@ -77,6 +77,7 @@ Here is a summary of the main changes in this release (see handbook for full det
 	* BUGFIX - Preview of Transform Colour no longer ignores area within paste marquee
 	* BUGFIX - Ctrl+left/right/double click now set both colour and alpha from canvas in coupled alpha mode, as they should
 	* BUGFIX - New image creation from system clipboard now respects "Undoable" toggle
+	* BUGFIX - "Fix aspect ratio" now doesn't sometimes adjust both dimensions
 	* BUGFIX - Problem with layers list in inactive dock tab sometimes not updating is now eliminated
 	* BUGFIX - All keyboard shortcuts now work in Image View mode, as they should
 	* BUGFIX - Transparent colour in composite images now works again

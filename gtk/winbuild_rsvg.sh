@@ -1,7 +1,7 @@
 #!/bin/sh
 # winbuild_rsvg.sh - cross-compile static rsvg-convert.exe for Windows
 
-# Copyright (C) 2016,2017 Dmitry Groshev
+# Copyright (C) 2016,2017,2020 Dmitry Groshev
 
 # This program is free software; you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -355,7 +355,7 @@ BUILD_libcroco ()
 	EXPORT
 }
 
-DEP_librsvg="glib libxml2 cairo libcroco gdkpixbuf"
+DEP_librsvg="glib libxml2 cairo pango libcroco gdkpixbuf"
 BUILD_librsvg ()
 {
 	UNPACK "librsvg-*.tar.*" || return 0

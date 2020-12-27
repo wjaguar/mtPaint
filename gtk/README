@@ -4,7 +4,9 @@ The History
 
 For simpler installation and more consistent behaviour, official Windows build of mtPaint is packaged with its own copy of GTK+ runtime environment. Prior to version 3.40, it was GTK+ 2.6.4 - or more accurately, a mix of DLLs from official Windows distributions of GTK+ 2.6.4 and 2.6.9, with libgdk and libgtk being from 2.6.4. This allowed mtPaint to continue to support Windows 98, which became unsupported with GTK+ 2.8.
 
-But since version 2.6.4 had been released in 2005, some improvements in Windows support in GTK+ have been made which are really desirable. Moreover, libraries such as libpng, libjpeg, LibTIFF, FreeType, and even zlib have undergone multiple version changes in the meantime, with bugfixes and other improvements. Still, upgrading the package to a newer official distribution of GTK+ would mean exposing the program to a new set of GTK+ bugs and quirks - which would be hard to detect and counter in time, because I myself do not run Windows. For this reason, mtPaint 3.40 comes with a custom build of GTK+ based on version 2.6.7 with a set of patches backported from the later versions, compiled from source along with all its dependencies.
+But since version 2.6.4 had been released in 2005, some improvements in Windows support in GTK+ had been made which were really desirable. Moreover, libraries such as libpng, libjpeg, LibTIFF, FreeType, and even zlib had undergone multiple version changes in the meantime, with bugfixes and other improvements. Still, upgrading the package to a newer official distribution of GTK+ would have meant exposing the program to a new set of GTK+ bugs and quirks - which would have been hard to detect and counter in time, because I myself do not run Windows. For this reason, mtPaint 3.40 came with a custom build of GTK+ based on version 2.6.7 with a set of patches backported from the later versions, compiled from source along with all its dependencies.
+
+With mtPaint 3.50, an updated version of that build, with updated libraries, comes with 32-bit build of mtPaint intended for old 32-bit Windows systems such as Windows XP, or even now-ancient Windows 98 in case someone somewhere has a reason to run one. On newer 64-bit Windows systems, specifically Windows 7 and later, the 64-bit build of mtPaint is expected to work better; however, the newer GTK+2 build coming with it is near untested (for I still do not run Windows) so if it misbehaves in any major way, this 32-bit build could serve as a fallback.
 
 -------------
 The Specifics
@@ -117,7 +119,9 @@ Original patches from GTK+ tree contained in the cumulative patch:
   Emit changed and notify:text only once. The same fix was applied for
   (BACKPORTED)
 
-In addition, there are couple of my own patches, solving the build problems arising from use of recent MinGW on a Linux box (in GTK+ 2.6.x time, official Windows packages were built with MSVC on Windows).
+In addition, there are couple of my own patches, solving the build problems arising from use of then-recent MinGW on a Linux box (in GTK+ 2.6.x time, official Windows packages were built with MSVC on Windows).
+
+And one my patch that fixes a critical bug afflicting the entire GTK+2 line for whole 20 years, causing random crashes on Windows; namely, mixing up GDI handles from CreateDIBSection() in gdk/win32/gdkpixmap-win32.c with HWND user handles from everywhere else, in one single hash. The two types of handles can clash, and when they do, GDK event dispatch is done for, with "invalid cast from `GdkPixmap' to `GdkWindow'" as its dying gasps. It managed to avoid my notice till now, accruing full benefit from my not using Windows; still, better late than never.
 
 Patch from Pango tree:
 - svn 2489 / git d686e1d4ae80b64390149e7336329c0254479161
@@ -129,76 +133,81 @@ The Build
 ---------
 
 The build was done on a Slackware Linux system using MinGW cross-compiler installation combined of the following parts:
-- TDM-GCC 4.2.4		( http://www.tdragon.net/recentgcc/ )
-- binutils 2.19		( http://mingw.sourceforge.net/ )
-- MinGW runtime 3.15.2	( http://mingw.sourceforge.net/ )
-- Win32 API 3.13	( http://mingw.sourceforge.net/ )
-And CMake 2.8.12 (for building OpenJPEG and zstd).
+- GCC 4.2.4		( https://gcc.gnu.org/pub/gcc/releases/gcc-4.2.4/ )
+- TDM patches to it     ( https://sourceforge.net/projects/tdm-gcc/files/TDM-GCC%20Old%20Releases/TDM-GCC%204.2%20series/4.2.4-tdm-1/ )
+- binutils 2.28		( https://ftp.gnu.org/gnu/binutils/ )
+- MinGW runtime 3.15.2	( https://sourceforge.net/projects/mingw/files/OldFiles/mingwrt-3.15.2/ )
+- Win32 API 3.13	( https://sourceforge.net/projects/mingw/files/OldFiles/w32api-3.13/ )
+And CMake 3.5.2 (for building OpenJPEG and zstd).
+
+The reason for using those old MinGW packages specifically, besides maximal similarity with the build packaged with mtPaint 3.40, is retaining support for old Windows versions, in case it was removed from MinGW (or bitrotten there) sometime later.
 
 To replicate it, you need the following source packages:
 - GTK+ 2.6.7 (this specific version and no other):
     gtk+-2.6.7.tar.bz2
-    http://ftp.gtk.org/pub/gtk/v2.6/gtk+-2.6.7.tar.bz2
+    https://download.gnome.org/sources/gtk+/2.6/gtk+-2.6.7.tar.bz2
 - Wintab development package:
     wtkit126.zip
     https://web.archive.org/web/20070728143618/http://www.wacomeng.com/devsupport/downloads/pc/wtkit126.zip
 - Pango 1.8.2 (this specific version and no other):
     pango-1.8.2.tar.bz2
-    http://ftp.gtk.org/pub/gtk/v2.6/pango-1.8.2.tar.bz2
+    https://download.gnome.org/sources/pango/1.8/pango-1.8.2.tar.bz2
 - ATK 1.9.0:
     atk-1.9.0.tar.bz2
-    http://ftp.gtk.org/pub/gtk/v2.6/atk-1.9.0.tar.bz2
+    https://download.gnome.org/sources/atk/1.9/atk-1.9.0.tar.bz2
 - GLib 2.6.6:
     glib-2.6.6.tar.bz2
-    http://ftp.gtk.org/pub/gtk/v2.6/glib-2.6.6.tar.bz2
+    https://download.gnome.org/sources/glib/2.6/glib-2.6.6.tar.bz2
 - GNU gettext 0.14.5:
     gettext-0.14.5.tar.gz
-    http://ftp.gnu.org/pub/gnu/gettext/gettext-0.14.5.tar.gz
+    https://ftp.gnu.org/pub/gnu/gettext/gettext-0.14.5.tar.gz
 - GNU libiconv 1.9.2:
     libiconv-1.9.2.tar.gz
-    http://ftp.gnu.org/pub/gnu/libiconv/libiconv-1.9.2.tar.gz
+    https://ftp.gnu.org/pub/gnu/libiconv/libiconv-1.9.2.tar.gz
 - zlib 1.2.11:
     zlib-1.2.11.tar.gz
     https://zlib.net/zlib-1.2.11.tar.gz
-- XZ Utils 5.2.4:
-    xz-5.2.4.tar.bz2
-    https://sourceforge.net/projects/lzmautils/files/xz-5.2.4.tar.bz2/download
-- zstd 1.3.8:
-    zstd-1.3.8.tar.gz
-    https://github.com/facebook/zstd/releases/download/v1.3.8/zstd-1.3.8.tar.gz
+- XZ Utils 5.2.5:
+    xz-5.2.5.tar.gz
+    https://tukaani.org/xz/xz-5.2.5.tar.gz
+- zstd 1.4.5:
+    zstd-1.4.5.tar.gz
+    https://github.com/facebook/zstd/releases/download/v1.4.5/zstd-1.4.5.tar.gz
 - libpng 1.2.59 (not version 1.4+):
     libpng-1.2.59.tar.gz
     https://sourceforge.net/projects/libpng/files/libpng12/1.2.59/libpng-1.2.59.tar.gz/download
-- libjpeg 9c:
-    jpegsrc.v9c.tar.gz
-    https://www.ijg.org/files/jpegsrc.v9c.tar.gz
-- libwebp 1.0.2:
-    libwebp-1.0.2.tar.gz
-    http://downloads.webmproject.org/releases/webp/libwebp-1.0.2.tar.gz
-- LibTIFF 4.0.10:
-    tiff-4.0.10.tar.gz
-    https://download.osgeo.org/libtiff/tiff-4.0.10.tar.gz
-- FreeType 2.8.1:
-    freetype-2.8.1.tar.bz2
-    http://download.savannah.gnu.org/releases/freetype/freetype-2.8.1.tar.bz2
+- libjpeg 9d:
+    jpegsrc.v9d.tar.gz
+    https://www.ijg.org/files/jpegsrc.v9d.tar.gz
+- libwebp 1.1.0:
+    libwebp-1.1.0.tar.gz
+    https://storage.googleapis.com/downloads.webmproject.org/releases/webp/libwebp-1.1.0.tar.gz
+- LibTIFF 4.1.0:
+    tiff-4.1.0.tar.gz
+    https://download.osgeo.org/libtiff/tiff-4.1.0.tar.gz
+- FreeType 2.10.4:
+    freetype-2.10.4.tar.xz
+    https://sourceforge.net/projects/freetype/files/freetype2/2.10.4/freetype-2.10.4.tar.xz/download
 - giflib 4.2.3 (not version 5+):
     giflib-4.2.3.tar.bz2
     https://sourceforge.net/projects/giflib/files/giflib-4.x/giflib-4.2.3.tar.bz2/download
 - OpenJPEG 2.3.1:
     openjpeg-2.3.1.tar.gz
     https://github.com/uclouvain/openjpeg/archive/v2.3.1/openjpeg-2.3.1.tar.gz
-- Little CMS 2.9:
-    lcms2-2.9.tar.gz
-    https://sourceforge.net/projects/lcms/files/lcms/2.9/lcms2-2.9.tar.gz/download
-- Gifsicle 1.91:
-    gifsicle-1.91.tar.gz
-    https://www.lcdf.org/gifsicle/gifsicle-1.91.tar.gz
+- Little CMS 2.11:
+    lcms2-2.11.tar.gz
+    https://sourceforge.net/projects/lcms/files/lcms/2.11/lcms2-2.11.tar.gz/download
+- Gifsicle 1.92:
+    gifsicle-1.92.tar.gz
+    https://www.lcdf.org/gifsicle/gifsicle-1.92.tar.gz
 - mtPaint 3.50 (or later):
     mtpaint-3.50.tar.bz2
+- mtPaint handbook 3.50 (same version as mtPaint):
+    mtpaint_handbook-3.50.zip
 
 Also you need the following files from 'gtk' subdirectory of mtPaint source package:
   winbuild.sh
-  gtk267_6wj.patch
+  gtk267_7wj.patch
   gtkrc
   pango182_1wj.patch
   pango.aliases

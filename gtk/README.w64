@@ -1,0 +1,156 @@
+-----------
+The History
+-----------
+
+For simpler installation and more consistent behaviour, official Windows build of mtPaint is packaged with its own copy of GTK+ runtime environment. With version 3.40, it was a 32-bit custom build of GTK+2 based on version 2.6.7 with a set of patches backported from the later versions. That build is still provided with mtPaint 3.50, to support old and ancient 32-bit Windows systems, but to make full use of capabilities of 64-bit CPUs, a 64-bit build for Windows systems of the newer generations is needed. This build is based on GTK+ 2.24, with patches taken from MXE, MSYS2 and mxe-octave.
+
+-------------
+The Specifics
+-------------
+
+Original patch from GTK+ tree reverted by the cumulative patch:
+- svn  7886 / git d73fa807875951d0240dce572398992d395bbe77
+  Use GetDriveType() to recognize removable drives (in order to avoid
+  (REVERTED: was making flash drives inaccessible from file selector)
+
+Other than that, there is a patch from MXE fixing docs generation.
+
+And my own patch that fixes a critical bug afflicting the entire GTK+2 line for whole 20 years, causing random crashes on Windows; namely, mixing up GDI handles from CreateDIBSection() in gdk/win32/gdkpixmap-win32.c with HWND user handles from everywhere else, in one single hash. The two types of handles can clash, and when they do, GDK event dispatch is done for, with "invalid cast from `GdkPixmap' to `GdkWindow'" as its dying gasps. It managed to avoid my notice till now, accruing full benefit from my not using Windows; still, better late than never.
+
+Patches contained in the cumulative patch for gettext, can be found in MSYS2:
+https://github.com/msys2/MINGW-packages/tree/75c080b98100d9ef0f3a5aa9eb55bbb01c12968e/mingw-w64-gettext
+
+---------
+The Build
+---------
+
+The build was done on a Slackware Linux system using MinGW-w64 cross-compiler installation combined of the following parts:
+- GCC 5.5.0		( https://gcc.gnu.org/pub/gcc/releases/gcc-5.5.0/ )
+- isl 0.15		( https://gcc.gnu.org/pub/gcc/infrastructure/ )
+- binutils 2.28		( https://ftp.gnu.org/gnu/binutils/ )
+- MinGW-w64 7.0.0	( http://mingw-w64.org/ )
+And CMake 3.5.2 (for building OpenJPEG and zstd).
+
+To replicate it, you need the following source packages:
+- GTK+ 2.24.29:
+    gtk+-2.24.29.tar.xz
+    https://download.gnome.org/sources/gtk+/2.24/gtk+-2.24.29.tar.xz
+- ATK 2.16.0:
+    atk-2.16.0.tar.xz
+    https://download.gnome.org/sources/atk/2.16/atk-2.16.0.tar.xz
+- Pango 1.42.1:
+    pango-1.42.1.tar.xz
+    https://download.gnome.org/sources/pango/1.42/pango-1.42.1.tar.xz
+- FriBidi 1.0.10:
+    fribidi-1.0.10.tar.xz
+    https://github.com/fribidi/fribidi/releases/download/v1.0.10/fribidi-1.0.10.tar.xz
+- HarfBuzz 2.7.2:
+    harfbuzz-2.7.2.tar.gz
+    https://github.com/harfbuzz/harfbuzz/archive/2.7.2.tar.gz
+- ICU 68.2:
+    icu-release-68-2.tar.gz
+    https://github.com/unicode-org/icu/archive/release-68-2.tar.gz
+- Cairo 1.16.0:
+    cairo-1.16.0.tar.xz
+    http://www.cairographics.org/releases/cairo-1.16.0.tar.xz
+- pixman 0.33.6:
+    pixman-0.33.6.tar.gz
+    https://www.cairographics.org/snapshots/pixman-0.33.6.tar.gz
+- librsvg 2.40.5 (this specific version and no other):
+    librsvg-2.40.5.tar.xz
+    https://download.gnome.org/sources/librsvg/2.40/librsvg-2.40.5.tar.xz
+- gdk-pixbuf 2.32.3:
+    gdk-pixbuf-2.32.3.tar.xz
+    https://download.gnome.org/sources/gdk-pixbuf/2.32/gdk-pixbuf-2.32.3.tar.xz
+- libgsf 1.14.30:
+    libgsf-1.14.30.tar.xz
+    https://download.gnome.org/sources/libgsf/1.14/libgsf-1.14.30.tar.xz
+- libcroco 0.6.2:
+    libcroco-0.6.2.tar.bz2
+    https://download.gnome.org/sources/libcroco/0.6/libcroco-0.6.2.tar.bz2
+- libxml2 2.9.10:
+    libxml2-2.9.10.tar.gz
+    ftp://xmlsoft.org/libxml2/libxml2-2.9.10.tar.gz
+- Fontconfig 2.13.1:
+    fontconfig-2.13.1.tar.bz2
+    https://www.freedesktop.org/software/fontconfig/release/fontconfig-2.13.1.tar.bz2
+- Expat 2.2.10:
+    expat-2.2.10.tar.bz2
+    https://sourceforge.net/projects/expat/files/expat/2.2.10/expat-2.2.10.tar.bz2/download
+- GLib 2.50.2:
+    glib-2.50.2.tar.xz
+    https://download.gnome.org/sources/glib/2.50/glib-2.50.2.tar.xz
+- libffi 3.3:
+    libffi-3.3.tar.gz
+    https://sourceware.org/pub/libffi/libffi-3.3.tar.gz
+- PCRE 8.44:
+    pcre-8.44.tar.bz2
+    https://ftp.pcre.org/pub/pcre/pcre-8.44.tar.bz2
+- GNU gettext 0.19.8.1 (this specific version and no other):
+    gettext-0.19.8.1.tar.xz
+    https://ftp.gnu.org/pub/gnu/gettext/gettext-0.19.8.1.tar.xz
+- GNU libiconv 1.16:
+    libiconv-1.16.tar.gz
+    https://ftp.gnu.org/pub/gnu/libiconv/libiconv-1.16.tar.gz
+- zlib 1.2.11:
+    zlib-1.2.11.tar.gz
+    https://zlib.net/zlib-1.2.11.tar.gz
+- bzip2 1.0.6:
+    bzip2-1.0.6.tar.gz
+    https://ftp.osuosl.org/pub/clfs/conglomeration/bzip2/bzip2-1.0.6.tar.gz
+- XZ Utils 5.2.5:
+    xz-5.2.5.tar.gz
+    https://tukaani.org/xz/xz-5.2.5.tar.gz
+- zstd 1.4.5:
+    zstd-1.4.5.tar.gz
+    https://github.com/facebook/zstd/releases/download/v1.4.5/zstd-1.4.5.tar.gz
+- libpng 1.6.37:
+    libpng-1.6.37.tar.xz
+    https://sourceforge.net/projects/libpng/files/libpng16/1.6.37/libpng-1.6.37.tar.xz/download
+- libjpeg 9d:
+    jpegsrc.v9d.tar.gz
+    https://www.ijg.org/files/jpegsrc.v9d.tar.gz
+- libwebp 1.1.0:
+    libwebp-1.1.0.tar.gz
+    https://storage.googleapis.com/downloads.webmproject.org/releases/webp/libwebp-1.1.0.tar.gz
+- LibTIFF 4.1.0:
+    tiff-4.1.0.tar.gz
+    https://download.osgeo.org/libtiff/tiff-4.1.0.tar.gz
+- FreeType 2.10.4:
+    freetype-2.10.4.tar.xz
+    https://sourceforge.net/projects/freetype/files/freetype2/2.10.4/freetype-2.10.4.tar.xz/download
+- giflib 5.2.1:
+    giflib-5.2.1.tar.gz
+    https://sourceforge.net/projects/giflib/files/giflib-5.2.1.tar.gz/download
+- OpenJPEG 2.3.1:
+    openjpeg-2.3.1.tar.gz
+    https://github.com/uclouvain/openjpeg/archive/v2.3.1.tar.gz
+- Little CMS 2.11:
+    lcms2-2.11.tar.gz
+    https://sourceforge.net/projects/lcms/files/lcms/2.11/lcms2-2.11.tar.gz/download
+- Gifsicle 1.92:
+    gifsicle-1.92.tar.gz
+    https://www.lcdf.org/gifsicle/gifsicle-1.92.tar.gz
+- mtPaint 3.50 (or later):
+    mtpaint-3.50.tar.bz2
+- mtPaint handbook 3.50 (same version as mtPaint):
+    mtpaint_handbook-3.50.zip
+
+Also you need the following files from 'gtk' subdirectory of mtPaint source package:
+  winbuild64.sh
+  gtk22429_1wj.patch
+  gettext1981runtime.patch
+  loaders.cache
+
+To recreate the "loaders.cache" file, you additionally need a working install of Wine64.
+
+To do the build, put all requisite files into same directory, adjust the variables in "CONFIGURATION SETTINGS" section of 'winbuild.sh' if necessary, and run 'winbuild.sh'. Subdirectory 'zad' will be created for use in the build process; if the build succeeds, executables and runtime files will be placed under 'zad/pkg', and development libraries and headers, under 'zad/dev'.
+
+An alternative cross-compiler installation using MXE http://mxe.cc :
+git clone https://github.com/mxe/mxe.git
+cd mxe && make gcc MXE_TARGETS=x86_64-w64-mingw32.shared
+
+Using GCC 10 is not recommended, as a compiler bug was directly observed when compiling Gifsicle with GCC 10.2.0. While a workaround had been found (now commented out in that part of the script), the bug's very presence in optimization level -O2 casts serious doubt on the quality of that compiler branch and the code it generates.
+
+---------------------------------
+Copyright (C) 2010,2011,2017,2019,2020 Dmitry Groshev

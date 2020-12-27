@@ -921,7 +921,9 @@ static void sisca_moved(sisca_dd *dt, void **wdata, int what, void **where)
 		nw = nw < 1 ? 1 : nw > MAX_HEIGHT ? MAX_HEIGHT : nw;
 		if (nw == h) return;
 	}
+	dt->fix = FALSE; // Prevent readjusting the original
 	cmd_set(dt->spin[idx], nw); /* Other coordinate */
+	dt->fix = TRUE;
 }
 
 static void alert_same_geometry()

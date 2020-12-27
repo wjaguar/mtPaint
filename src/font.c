@@ -1,5 +1,5 @@
 /*	font.c
-	Copyright (C) 2007-2019 Mark Tyler and Dmitry Groshev
+	Copyright (C) 2007-2020 Mark Tyler and Dmitry Groshev
 
 	This file is part of mtPaint.
 
@@ -666,7 +666,20 @@ static void font_index_create(char *filename, char **dir_in)
 	{
 		for (i = 0; dir_in[i]; i++)
 		{
+#ifdef WIN32
+			/* With old MinGW, stat() fails if dirname has path
+			 * separator on end, so cut it off before call */
+			char *s;
+			int l = strlen(dir_in[i]);
+			if (!l--) continue;
+			s = strdup(dir_in[i]);
+			if ((s[l] == '\\') || (s[l] == '/')) s[l] = '\0';
+			l = stat(s, &sc.buf);
+			free(s);
+			if (l < 0) continue;
+#else
 			if (stat(dir_in[i], &sc.buf) < 0) continue;
+#endif
 			font_dir_search(&library, i, fp, dir_in[i], &sc);
 		}
 		fclose(fp);

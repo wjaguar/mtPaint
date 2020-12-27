@@ -122,7 +122,7 @@ Mouse shortcuts
   Middle button        Selects the point which will be the centre of the image after the next zoom
   Right button         Commit paste to canvas / Stop drawing current line / Cancel selection
 
-  Scroll Wheel         In GTK+2 the user can have the scroll wheel zoom in or out via the Preferences window
+  Scroll Wheel         In GTK+2/3 the user can have the scroll wheel zoom in or out via the Preferences window
 
   Ctrl+Left button     Choose colour A from under mouse pointer
   Ctrl+Left button     Clone tool - Select source

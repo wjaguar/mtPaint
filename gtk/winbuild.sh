@@ -112,6 +112,8 @@ UNPACK ()
 	case "$FFILE" in
 	*.tar.bz2) FDIR=.tar.bz2 ; FCMD="tar $2 -xf" ;;
 	*.tar.gz)  FDIR=.tar.gz ; FCMD="tar $2 -xf" ;;
+	*.tar.xz)  FDIR=.tar.xz ; FCMD="tar --use-compress-program xz -xf" ;;
+	*.tar.zst) FDIR=.tar.zst ; FCMD="tar --use-compress-program zstd -xf" ;;
 	*.zip)     FDIR=.zip ; FCMD="unzip $2" ;;
 	*)         echo "ERROR: $FNAME unknown archive type" ; exit 1 ;;
 	esac
@@ -249,10 +251,26 @@ BUILD_xz ()
 BUILD_zstd ()
 {
 	UNPACK "zstd-*.tar.*" || return 0
-	sed -i '/^project(/ s/)/ C)/' build/cmake/CMakeLists.txt build/cmake/*/CMakeLists.txt
-	patch -p0 <<- 'UNCXX' # Not attempt to mess with C++ cross-compiler
-	--- build/cmake/CMakeModules/AddZstdCompilationFlags.cmake0	2018-12-27 15:42:44.000000000 +0300
-	+++ build/cmake/CMakeModules/AddZstdCompilationFlags.cmake	2019-04-12 12:38:03.000000000 +0300
+	# Stop dragging C++ in by default
+        sed -i '/^project(/ s/)/ C)/' build/cmake/CMakeLists.txt build/cmake/*/CMakeLists.txt
+	patch -p1 <<- 'UNCXX' # Not attempt to mess with C++ cross-compiler
+	--- zstd-1.4.5_/build/cmake/CMakeLists.txt	2020-05-22 08:04:00.000000000 +0300
+	+++ zstd-1.4.5/build/cmake/CMakeLists.txt	2020-11-08 18:14:22.171222309 +0200
+	@@ -40,12 +40,10 @@
+	   set(PROJECT_VERSION_PATCH ${zstd_VERSION_PATCH})
+	   set(PROJECT_VERSION "${zstd_VERSION_MAJOR}.${zstd_VERSION_MINOR}.${zstd_VERSION_PATCH}")
+	   enable_language(C)   # Main library is in C
+	-  enable_language(CXX) # Testing contributed code also utilizes CXX
+	 else()
+	   project(zstd
+	     VERSION "${zstd_VERSION_MAJOR}.${zstd_VERSION_MINOR}.${zstd_VERSION_PATCH}"
+	     LANGUAGES C   # Main library is in C
+	-              CXX # Testing contributed code also utilizes CXX
+	     )
+	 endif()
+	 message(STATUS "ZSTD VERSION: ${zstd_VERSION}")
+	--- zstd-1.4.5_/build/cmake/CMakeModules/AddZstdCompilationFlags.cmake	2020-05-22 08:04:00.000000000 +0300
+	+++ zstd-1.4.5/build/cmake/CMakeModules/AddZstdCompilationFlags.cmake	2020-11-08 18:17:48.056232126 +0200
 	@@ -1,4 +1,3 @@
 	-include(CheckCXXCompilerFlag)
 	 include(CheckCCompilerFlag)
@@ -278,26 +296,16 @@ BUILD_zstd ()
 	         #Set c99 by default
 	         EnableCompilerFlag("-std=c99" true false)
 	         EnableCompilerFlag("-Wall" true true)
-	@@ -47,9 +38,7 @@
-	 
+	@@ -56,8 +47,7 @@
 	     # Remove duplicates compilation flags
 	     foreach (flag_var CMAKE_C_FLAGS CMAKE_C_FLAGS_DEBUG CMAKE_C_FLAGS_RELEASE
-	-             CMAKE_C_FLAGS_MINSIZEREL CMAKE_C_FLAGS_RELWITHDEBINFO
+	              CMAKE_C_FLAGS_MINSIZEREL CMAKE_C_FLAGS_RELWITHDEBINFO
 	-             CMAKE_CXX_FLAGS CMAKE_CXX_FLAGS_DEBUG CMAKE_CXX_FLAGS_RELEASE
 	-             CMAKE_CXX_FLAGS_MINSIZEREL CMAKE_CXX_FLAGS_RELWITHDEBINFO)
-	+             CMAKE_C_FLAGS_MINSIZEREL CMAKE_C_FLAGS_RELWITHDEBINFO)
-	         separate_arguments(${flag_var})
-	         list(REMOVE_DUPLICATES ${flag_var})
-	         string(REPLACE ";" " " ${flag_var} "${${flag_var}}")
-	@@ -59,7 +48,7 @@
-	         foreach (flag_var CMAKE_C_FLAGS CMAKE_C_FLAGS_DEBUG CMAKE_C_FLAGS_RELEASE
-	                  CMAKE_C_FLAGS_MINSIZEREL CMAKE_C_FLAGS_RELWITHDEBINFO
-	                  CMAKE_CXX_FLAGS CMAKE_CXX_FLAGS_DEBUG CMAKE_CXX_FLAGS_RELEASE
-	-                 CMAKE_CXX_FLAGS_MINSIZEREL CMAKE_CXX_FLAGS_RELWITHDEBINFO)
-	+                 CMAKE_CXX_FLAGS_MINSIZEREL CMAKE_[1;5HCXX_FLAGS_RELWITHDEBINFO)
-	             string(REGEX REPLACE "/MD" "/MT" ${flag_var} "${${flag_var}}")
-	         endforeach ()
-	     endif ()
+	+             )
+	         if( ${flag_var} )
+	             separate_arguments(${flag_var})
+	             list(REMOVE_DUPLICATES ${flag_var})
 	UNCXX
 	patch -p1 <<- 'PKGC' # Install .pc
 	--- a/build/cmake/lib/CMakeLists.txt
@@ -312,6 +320,18 @@ BUILD_zstd ()
 	     set(PREFIX "${CMAKE_INSTALL_PREFIX}")
 	     set(LIBDIR "${CMAKE_INSTALL_PREFIX}/${CMAKE_INSTALL_LIBDIR}")
 	PKGC
+	patch -p1 <<- 'DLLDIR' # Install .dll
+	--- a/build/cmake/lib/CMakeLists.txt
+	+++ b/build/cmake/lib/CMakeLists.txt
+	@@ -163,6 +163,7 @@ install(TARGETS ${library_targets}
+	     INCLUDES DESTINATION "${CMAKE_INSTALL_INCLUDEDIR}"
+	     ARCHIVE DESTINATION "${CMAKE_INSTALL_LIBDIR}"
+	     LIBRARY DESTINATION "${CMAKE_INSTALL_LIBDIR}"
+	+    RUNTIME DESTINATION "${CMAKE_INSTALL_BINDIR}"
+	     )
+	 
+	 # uninstall target
+	DLLDIR
 	PATH="$LONGPATH"
 	mkdir tbuild
 	cd tbuild
@@ -341,11 +361,10 @@ BUILD_libwebp ()
 {
 	UNPACK "libwebp-*.tar.*" || return 0
 	PATH="$LONGPATH"
+	NOCONFIGURE=1 ./autogen.sh
 	CPPFLAGS="-isystem $TOPDIR/include" LDFLAGS="-static-libgcc -L$TOPDIR/lib" \
 	./configure --prefix="$WPREFIX" --host=$MTARGET --disable-static \
 		--disable-silent-rules --enable-everything --enable-swap-16bit-csp
-	# !!! As of 1.0.2 libtool eats the LDFLAGS, need to force 'em down its throat
-	sed -i -e 's/-static-libgcc/-XCClinker -static-libgcc/' src/Makefile src/*/Makefile
 	make
 	make install-strip DESTDIR="$DESTDIR"
 	EXPORT
@@ -821,7 +840,7 @@ BUILD_gtk ()
 	local WTKIT
 	WTKIT="$DEST"
 	UNPACK "gtk+-2.6.7.tar.*" || return 0
-	patch -p1 -i "$SRCDIR/gtk267_6wj.patch"
+	patch -p1 -i "$SRCDIR/gtk267_7wj.patch"
 	# !!! Remove traces of existing install - else confusion will result
 	rm -rf "$TOPDIR/include/gtk-2.0" "$TOPDIR/lib/gtk-2.0"
 	rm -f "$TOPDIR/lib/pkgconfig"/g[dt]k*.pc "$TOPDIR/lib"/libg[dt]k*.dll.a

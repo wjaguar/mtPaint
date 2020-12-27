@@ -1,0 +1,159 @@
+diff -udpr gtk+-2.24.29_/docs/faq/Makefile.am gtk+-2.24.29/docs/faq/Makefile.am
+--- gtk+-2.24.29_/docs/faq/Makefile.am	2014-09-29 23:02:16.000000000 +0300
++++ gtk+-2.24.29/docs/faq/Makefile.am	2020-12-27 16:40:00.428859219 +0200
+@@ -7,7 +7,7 @@ if HAVE_DOCBOOK
+ html:
+ 	if test -w $(srcdir); then \
+ 	  (cd $(srcdir); \
+-	   db2html gtk-faq.sgml; \
++	   db2html -o gtk-faq gtk-faq.sgml; \
+ 	   test -d html && rm -r html; \
+ 	   mv gtk-faq html); \
+ 	fi
+diff -udpr gtk+-2.24.29_/docs/faq/Makefile.in gtk+-2.24.29/docs/faq/Makefile.in
+--- gtk+-2.24.29_/docs/faq/Makefile.in	2015-12-10 22:35:26.000000000 +0200
++++ gtk+-2.24.29/docs/faq/Makefile.in	2020-12-27 16:40:00.428859219 +0200
+@@ -645,7 +645,8 @@ check-local: test-cwd
+ @HAVE_DOCBOOK_TRUE@	  (cd $(srcdir); \
+ @HAVE_DOCBOOK_TRUE@	   db2html gtk-faq.sgml; \
+ @HAVE_DOCBOOK_TRUE@	   test -d html && rm -r html; \
+-@HAVE_DOCBOOK_TRUE@	   mv gtk-faq html); \
++@HAVE_DOCBOOK_TRUE@	   mkdir html; \
++@HAVE_DOCBOOK_TRUE@	   mv *.html html); \
+ @HAVE_DOCBOOK_TRUE@	fi
+ 
+ @HAVE_DOCBOOK_TRUE@pdf:
+diff -udpr gtk+-2.24.29_/docs/tutorial/Makefile.am gtk+-2.24.29/docs/tutorial/Makefile.am
+--- gtk+-2.24.29_/docs/tutorial/Makefile.am	2014-09-29 23:02:16.000000000 +0300
++++ gtk+-2.24.29/docs/tutorial/Makefile.am	2020-12-27 16:40:00.428859219 +0200
+@@ -40,7 +40,7 @@ if HAVE_DOCBOOK
+ html: gtk-tut.sgml
+ 	if test -w $(srcdir); then \
+ 	  (cd $(srcdir); \
+-	   db2html gtk-tut.sgml; \
++	   db2html -o gtk-tut gtk-tut.sgml; \
+ 	   test -d html && rm -r html; \
+ 	   mv gtk-tut html; \
+ 	   mkdir html/images; \
+diff -udpr gtk+-2.24.29_/docs/tutorial/Makefile.in gtk+-2.24.29/docs/tutorial/Makefile.in
+--- gtk+-2.24.29_/docs/tutorial/Makefile.in	2015-12-10 22:35:26.000000000 +0200
++++ gtk+-2.24.29/docs/tutorial/Makefile.in	2020-12-27 16:40:00.428859219 +0200
+@@ -658,7 +658,8 @@ check-local: test-cwd
+ @HAVE_DOCBOOK_TRUE@	  (cd $(srcdir); \
+ @HAVE_DOCBOOK_TRUE@	   db2html gtk-tut.sgml; \
+ @HAVE_DOCBOOK_TRUE@	   test -d html && rm -r html; \
+-@HAVE_DOCBOOK_TRUE@	   mv gtk-tut html; \
++@HAVE_DOCBOOK_TRUE@	   mkdir html; \
++@HAVE_DOCBOOK_TRUE@	   mv *.html html; \
+ @HAVE_DOCBOOK_TRUE@	   mkdir html/images; \
+ @HAVE_DOCBOOK_TRUE@	   cp images/*.png html/images); \
+ @HAVE_DOCBOOK_TRUE@	fi
+diff -udpr gtk+-2.24.29_/gdk/win32/gdkpixmap-win32.c gtk+-2.24.29/gdk/win32/gdkpixmap-win32.c
+--- gtk+-2.24.29_/gdk/win32/gdkpixmap-win32.c	2014-09-29 23:02:16.000000000 +0300
++++ gtk+-2.24.29/gdk/win32/gdkpixmap-win32.c	2020-12-27 16:30:29.275868082 +0200
+@@ -37,6 +37,55 @@
+ #include "gdkprivate-win32.h"
+ #include <cairo-win32.h>
+ 
++static GHashTable *handle_ht = NULL;
++
++static guint
++gdi_handle_hash (HANDLE *handle)
++{
++  return (guint) *handle;
++}
++
++static gint
++gdi_handle_equal (HANDLE *a,
++		 HANDLE *b)
++{
++  return (*a == *b);
++}
++
++static void
++gdi_handle_table_insert (HANDLE  *handle,
++			       gpointer data)
++{
++  g_return_if_fail (handle != NULL);
++
++  if (!handle_ht)
++    handle_ht = g_hash_table_new ((GHashFunc) gdi_handle_hash,
++				  (GEqualFunc) gdi_handle_equal);
++
++  g_hash_table_insert (handle_ht, handle, data);
++}
++
++static void
++gdi_handle_table_remove (HANDLE handle)
++{
++  if (!handle_ht)
++    handle_ht = g_hash_table_new ((GHashFunc) gdi_handle_hash,
++				  (GEqualFunc) gdi_handle_equal);
++
++  g_hash_table_remove (handle_ht, &handle);
++}
++
++static gpointer
++gdi_handle_table_lookup (GdkNativeWindow handle)
++{
++  gpointer data = NULL;
++
++  if (handle_ht)
++    data = g_hash_table_lookup (handle_ht, &handle);
++  
++  return data;
++}
++
+ static void gdk_pixmap_impl_win32_get_size   (GdkDrawable        *drawable,
+ 					      gint               *width,
+ 					      gint               *height);
+@@ -135,7 +184,7 @@ gdk_pixmap_impl_win32_finalize (GObject
+ 
+   _gdk_win32_drawable_finish (GDK_DRAWABLE (object));
+ 
+-  gdk_win32_handle_table_remove (GDK_PIXMAP_HBITMAP (wrapper));
++  gdi_handle_table_remove (GDK_PIXMAP_HBITMAP (wrapper));
+ 
+   G_OBJECT_CLASS (parent_class)->finalize (object);
+ }
+@@ -339,7 +388,7 @@ _gdk_pixmap_new (GdkDrawable *drawable,
+   drawable_impl->handle = hbitmap;
+   pixmap_impl->bits = bits;
+ 
+-  gdk_win32_handle_table_insert (&GDK_PIXMAP_HBITMAP (pixmap), pixmap);
++  gdi_handle_table_insert (&GDK_PIXMAP_HBITMAP (pixmap), pixmap);
+ 
+   return pixmap;
+ }
+@@ -523,7 +572,7 @@ gdk_pixmap_foreign_new (GdkNativeWindow
+   pix_impl->height = size.cy;
+   pix_impl->bits = NULL;
+ 
+-  gdk_win32_handle_table_insert (&GDK_PIXMAP_HBITMAP (pixmap), pixmap);
++  gdi_handle_table_insert (&GDK_PIXMAP_HBITMAP (pixmap), pixmap);
+ 
+   return pixmap;
+ }
+@@ -531,7 +580,7 @@ gdk_pixmap_foreign_new (GdkNativeWindow
+ GdkPixmap*
+ gdk_pixmap_lookup (GdkNativeWindow anid)
+ {
+-  return (GdkPixmap*) gdk_win32_handle_table_lookup (anid);
++  return (GdkPixmap*) gdi_handle_table_lookup (anid);
+ }
+ 
+ GdkPixmap*
+Только в gtk+-2.24.29/gdk/win32: w32pixnap.patch
+diff -udpr gtk+-2.24.29_/gtk/gtkfilesel.c gtk+-2.24.29/gtk/gtkfilesel.c
+--- gtk+-2.24.29_/gtk/gtkfilesel.c	2014-09-29 23:02:17.000000000 +0300
++++ gtk+-2.24.29/gtk/gtkfilesel.c	2020-12-27 14:40:19.926970642 +0200
+@@ -1974,7 +1974,8 @@ win32_gtk_add_drives_to_dir_list (GtkLis
+   while (*textPtr != '\0')
+     {
+       /* Ignore floppies (?) */
+-      if (GetDriveType (textPtr) != DRIVE_REMOVABLE)
++// We need to see flash drives too - WJ
++//      if (GetDriveType (textPtr) != DRIVE_REMOVABLE)
+ 	{
+ 	  /* Build the actual displayable string */
+ 	  g_snprintf (formatBuffer, sizeof (formatBuffer), "%c:\\", toupper (textPtr[0]));
