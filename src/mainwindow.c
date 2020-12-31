@@ -529,8 +529,6 @@ int gui_save(char *filename, ls_settings *settings)
 			mess = g_strdup_printf(__("Unable to save file: %s"), f8);
 			g_free(f8);
 		}
-		else if ((res == WRONG_FORMAT) && (settings->ftype == FT_XPM))
-			mess = g_strdup(_("You are trying to save an XPM file with more than 4096 colours.  Either use another format or posterize the image to 4 bits, or otherwise reduce the number of colours."));
 		if (mess)
 		{
 			alert_box(_("Error"), mess, NULL);

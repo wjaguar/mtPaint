@@ -2492,7 +2492,7 @@ static void grad_evt(grad_dd *dt, void **wdata, int what, void **where)
 
 static char *gtypes_txt[] = {_("Linear"), _("Bilinear"), _("Radial"),
 	_("Square"), _("Angular"), _("Conical")};
-static char *rtypes_txt[] = {_("None"), _("Level"), _("Repeat"), _("Mirror")};
+static char *rtypes_txt[] = {_("None"), _("Level "), _("Repeat"), _("Mirror")};
 static char *gradtypes_txt[NUM_GTYPES] = {_("A to B"), _("A to B (RGB)"),
 	_("A to B (sRGB)"), _("A to B (HSV)"), _("A to B (backward HSV)"),
 	_("A only"), _("Custom")};

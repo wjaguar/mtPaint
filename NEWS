@@ -4,7 +4,10 @@ mtPaint NEWS
 
 Here is a summary of the main changes in this release (see handbook for full details):
 
-3.50	2020-??-??
+3.50	2020-12-31
+	* French translation updated by Victor Copovi
+	* German translation updated by Simon Brixel
+	* Russian translation updated
 	* GTK+3 support - "./configure gtk3"
 	* Scripting added - "Image->Script" to enter or run a script : See handbook chapter 10 for details
 	* Commandline mode added - use "mtpaint --cmd" to run a script without GUI

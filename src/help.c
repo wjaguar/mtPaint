@@ -1,5 +1,5 @@
 /*	help.c
-	Copyright (C) 2004-2016 Mark Tyler and Dmitry Groshev
+	Copyright (C) 2004-2020 Mark Tyler and Dmitry Groshev
 
 	This file is part of mtPaint.
 
@@ -29,11 +29,11 @@ _("Credits"),
 };
 
 static char *help_page0[] = {
-_("mtPaint 3.50 - Copyright (C) 2004-2016 The Authors\n"),
+_("mtPaint 3.50 - Copyright (C) 2004-2020 The Authors\n"),
 _("See 'Credits' section for a list of the authors.\n"),
 _("mtPaint is free software; you can redistribute it and/or modify it under the terms of the GNU General Public License as published by the Free Software Foundation; either version 3 of the License, or (at your option) any later version.\n"),
 _("mtPaint is distributed in the hope that it will be useful, but WITHOUT ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License for more details.\n"),
-_("mtPaint is a simple GTK+1/2 painting program designed for creating icons and pixel based artwork. It can edit indexed palette or 24 bit RGB images and offers basic painting and palette manipulation tools. It also has several other more powerful features such as channels, layers and animation. Due to its simplicity and lack of dependencies it runs well on GNU/Linux, Windows and older PC hardware.\n"),
+_("mtPaint is a simple GTK+1/2/3 painting program designed for creating icons and pixel based artwork. It can edit indexed palette or 24 bit RGB images and offers basic painting and palette manipulation tools. It also has several other more powerful features such as channels, layers and animation. Due to its simplicity and lack of dependencies it runs well on GNU/Linux, Windows and older PC hardware.\n"),
 _("There is full documentation of mtPaint's features contained in a handbook.  If you don't already have this, you can download it from the mtPaint website.\n"),
 _("If you like mtPaint and you want to keep up to date with new releases, or you want to give some feedback, then the mailing lists may be of interest to you:\n"),
 _("http://sourceforge.net/mail/?group_id=155874"),
@@ -132,7 +132,7 @@ static char *help_page2[] = {
 _("  Left button          Paint to canvas using the current tool"),
 _("  Middle button        Selects the point which will be the centre of the image after the next zoom"),
 _("  Right button         Commit paste to canvas / Stop drawing current line / Cancel selection\n"),
-_("  Scroll Wheel         In GTK+2 the user can have the scroll wheel zoom in or out via the Preferences window\n"),
+_("  Scroll Wheel         In GTK+2/3 the user can have the scroll wheel zoom in or out via the Preferences window\n"),
 _("  Ctrl+Left button     Choose colour A from under mouse pointer"),
 _("  Ctrl+Left button     Clone tool - Select source"),
 _("  Ctrl+Middle button   Create colour A/B and pattern based on the RGB colour in A (RGB images only)"),
@@ -177,10 +177,10 @@ _("William Kern\n\n"),
 _("Translations\n"),
 _("Brazilian Portuguese - Paulo Trevizan, Valter Nazianzeno"),
 _("Czech - Pavel Ruzicka, Martin Petricek, Roman Hornik"),
-_("Dutch - Hans Strijards"),
-_("French - Nicolas Velin, Pascal Billard, Sylvain Cresto, Johan Serre, Philippe Etienne"),
+_("Dutch - Hans Strijards, Pjotr"),
+_("French - Nicolas Velin, Pascal Billard, Sylvain Cresto, Johan Serre, Philippe Etienne, Victor Copovi"),
 _("Galician - Miguel Anxo Bouzada"),
-_("German - Oliver Frommel, B. Clausius, Ulrich Ringel"),
+_("German - Oliver Frommel, B. Clausius, Ulrich Ringel, Simon Brixel"),
 _("Hungarian - Ur Balazs"),
 _("Italian - Angelo Gemmi"),
 _("Japanese - Norihiro YONEDA"),
