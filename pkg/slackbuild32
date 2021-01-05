@@ -1,9 +1,12 @@
 #!/bin/bash
 WRKDIR=`pwd`
-VERSION=3.40
+VERSION=3.50
+ARCH=i386
+SLACK=14.2
+. /etc/profile.d/32dev.sh
 tar xf mtpaint-$VERSION.tar.bz2
 cd mtpaint-$VERSION || exit 1
-./configure release intl man --prefix=/usr --mandir=/usr/man/man1 --docdir=/usr/doc --fakeroot=$WRKDIR/slacklibs
+./configure release intl man nowebp --prefix=/usr --mandir=/usr/man --docdir=/usr/doc #--fakeroot=$WRKDIR/slacklibs
 make
 DEST=$WRKDIR/zad
 make install DESTDIR=$DEST
@@ -13,4 +16,4 @@ unzip mtpaint_handbook-$VERSION.zip
 mkdir -p $DEST/usr/doc
 mv mtpaint_handbook-$VERSION/docs $DEST/usr/doc/mtpaint
 cd $DEST || exit 1
-makepkg -l y -c y $WRKDIR/mtpaint-${VERSION}-i386-1_slack13.1.tgz
+makepkg -l y -c y $WRKDIR/mtpaint-${VERSION}-${ARCH}-1_slack${SLACK}.tgz

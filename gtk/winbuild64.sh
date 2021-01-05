@@ -1201,8 +1201,8 @@ BUILD_mtpaint ()
 	done
 	cp -a -t "$DEST" "$SRCDIR/"*.ico
 	ZAD="${DESTDIR##*mtpaint-}" # Version number
-	sed -e "s/%VERSION%/$ZAD/g" "$SRCDIR/mtpaint-setup.iss" \
-		> "$DEST/mtpaint-setup.iss"
+	sed -e "s/%VERSION%/$ZAD/g" "$SRCDIR/mtpaint-setup64.iss" \
+		> "$DEST/mtpaint-setup64.iss"
 	ZAD='[InternetShortcut]\r\nURL=http://mtpaint.sourceforge.net/\r\n'
 	echo -en "$ZAD" > "$DEST/mtpaint.url"
 	echo 'PKG="./"' > "$DESTDIR.install"

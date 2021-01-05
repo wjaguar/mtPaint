@@ -8,7 +8,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: sk\n"
 "Report-Msgid-Bugs-To: \n"
-"POT-Creation-Date: 2020-12-31 16:57+0200\n"
+"POT-Creation-Date: 2021-01-04 21:31+0200\n"
 "PO-Revision-Date: 2007-04-03 20:52+0200\n"
 "Last-Translator: Jozef Riha <jose1711@gmail.com\n"
 "Language-Team: Slovak <sk@li.org>\n"
@@ -45,7 +45,7 @@ msgstr "Zavrieť"
 #: src/layer.c:970 src/mainwindow.c:341 src/mainwindow.c:370
 #: src/mainwindow.c:534 src/mainwindow.c:578 src/mainwindow.c:604
 #: src/mainwindow.c:3797 src/mainwindow.c:4045 src/otherwindow.c:931
-#: src/otherwindow.c:980 src/otherwindow.c:982 src/prefs.c:460 src/spawn.c:924
+#: src/otherwindow.c:980 src/otherwindow.c:982 src/prefs.c:459 src/spawn.c:924
 #: src/spawn.c:978 src/spawn.c:1017 src/thread.c:360 src/vcode.c:9912
 #: src/viewer.c:1161 src/viewer.c:1179
 msgid "Error"
@@ -65,7 +65,7 @@ msgstr "Nie je možné uložiť obrázok"
 
 #: src/ani.c:840 src/canvas.c:1171 src/fpick.c:731 src/layer.c:311
 #: src/layer.c:379 src/layer.c:826 src/layer.c:840 src/mainwindow.c:375
-#: src/mainwindow.c:1026 src/png.c:8794 src/prefs.c:465
+#: src/mainwindow.c:1026 src/png.c:8794 src/prefs.c:464
 msgid "Warning"
 msgstr "Varovanie"
 
@@ -405,7 +405,7 @@ msgid "Could not explode all the frames in the animation."
 msgstr ""
 
 #: src/canvas.c:1481 src/font.c:1556 src/fpick.c:937 src/otherwindow.c:2765
-#: src/prefs.c:322 src/toolbar.c:451
+#: src/prefs.c:321 src/toolbar.c:451
 msgid "Size"
 msgstr "Veľkosť"
 
@@ -423,7 +423,7 @@ msgstr "Výška"
 #: src/otherwindow.c:1058 src/otherwindow.c:1727 src/otherwindow.c:2101
 #: src/otherwindow.c:2336 src/otherwindow.c:2538 src/otherwindow.c:2691
 #: src/otherwindow.c:2776 src/otherwindow.c:2937 src/otherwindow.c:3070
-#: src/otherwindow.c:3169 src/prefs.c:339 src/prefs.c:465 src/prefs.c:539
+#: src/otherwindow.c:3169 src/prefs.c:338 src/prefs.c:464 src/prefs.c:538
 #: src/spawn.c:666 src/viewer.c:1258
 msgid "Cancel"
 msgstr "Zrušiť"
@@ -433,8 +433,8 @@ msgstr "Zrušiť"
 #: src/otherwindow.c:591 src/otherwindow.c:871 src/otherwindow.c:1058
 #: src/otherwindow.c:1729 src/otherwindow.c:2101 src/otherwindow.c:2336
 #: src/otherwindow.c:2538 src/otherwindow.c:2691 src/otherwindow.c:2776
-#: src/otherwindow.c:3072 src/otherwindow.c:3171 src/prefs.c:339
-#: src/prefs.c:539 src/spawn.c:666
+#: src/otherwindow.c:3072 src/otherwindow.c:3171 src/prefs.c:338
+#: src/prefs.c:538 src/spawn.c:666
 msgid "OK"
 msgstr "OK"
 
@@ -481,7 +481,7 @@ msgstr "Nepodarilo sa exportovať do ASCII súboru"
 msgid "Unable to save file: %s"
 msgstr "Nepodarilo sa uložiť súbor: %s"
 
-#: src/canvas.c:2101 src/prefs.c:223
+#: src/canvas.c:2101 src/prefs.c:222
 msgid "Transparency index"
 msgstr "Index priehľadnosti"
 
@@ -489,7 +489,7 @@ msgstr "Index priehľadnosti"
 msgid "TIFF Compression"
 msgstr ""
 
-#: src/canvas.c:2105 src/prefs.c:226
+#: src/canvas.c:2105 src/prefs.c:225
 msgid "JPEG Save Quality (100=High)"
 msgstr "Kvalita ukladania JPEGu (100=Vysoká)"
 
@@ -497,19 +497,19 @@ msgstr "Kvalita ukladania JPEGu (100=Vysoká)"
 msgid "ZIP Compression (0=None)"
 msgstr ""
 
-#: src/canvas.c:2108 src/prefs.c:228
+#: src/canvas.c:2108 src/prefs.c:227
 msgid "PNG Compression (0=None)"
 msgstr ""
 
-#: src/canvas.c:2111 src/prefs.c:250
+#: src/canvas.c:2111 src/prefs.c:249
 msgid "LZMA2 Compression (0=None)"
 msgstr ""
 
-#: src/canvas.c:2113 src/prefs.c:253
+#: src/canvas.c:2113 src/prefs.c:252
 msgid "ZSTD Compression Level"
 msgstr ""
 
-#: src/canvas.c:2115 src/prefs.c:232
+#: src/canvas.c:2115 src/prefs.c:231
 msgid "TGA RLE Compression"
 msgstr ""
 
@@ -517,7 +517,7 @@ msgstr ""
 msgid "LBM PackBits Compression"
 msgstr ""
 
-#: src/canvas.c:2118 src/prefs.c:227
+#: src/canvas.c:2118 src/prefs.c:226
 msgid "JPEG2000 Compression (0=Lossless)"
 msgstr ""
 
@@ -529,11 +529,11 @@ msgstr ""
 msgid "WebP Save Quality (100=High)"
 msgstr ""
 
-#: src/canvas.c:2123 src/prefs.c:264
+#: src/canvas.c:2123 src/prefs.c:263
 msgid "V8 Save Quality (100=High)"
 msgstr ""
 
-#: src/canvas.c:2125 src/prefs.c:265
+#: src/canvas.c:2125 src/prefs.c:264
 msgid "V8L Compression (0=None)"
 msgstr ""
 
@@ -553,7 +553,7 @@ msgstr "Oneskorenie animácie"
 msgid "Undoable"
 msgstr ""
 
-#: src/canvas.c:2138 src/prefs.c:237
+#: src/canvas.c:2138 src/prefs.c:236
 msgid "Apply colour profile"
 msgstr ""
 
@@ -698,7 +698,7 @@ msgstr "Saturácia"
 msgid "Hex"
 msgstr ""
 
-#: src/cpick.c:840 src/layer.c:1109 src/otherwindow.c:2530 src/prefs.c:324
+#: src/cpick.c:840 src/layer.c:1109 src/otherwindow.c:2530 src/prefs.c:323
 #: src/toolbar.c:457
 msgid "Opacity"
 msgstr "Nepriehľadnosť"
@@ -780,11 +780,11 @@ msgstr ""
 msgid "New Directory"
 msgstr ""
 
-#: src/font.c:1644 src/prefs.c:533
+#: src/font.c:1644 src/prefs.c:532
 msgid "Add"
 msgstr ""
 
-#: src/font.c:1645 src/prefs.c:534
+#: src/font.c:1645 src/prefs.c:533
 msgid "Remove"
 msgstr ""
 
@@ -874,7 +874,7 @@ msgstr ""
 msgid "Modified"
 msgstr ""
 
-#: src/help.c:25 src/prefs.c:161
+#: src/help.c:25 src/prefs.c:160
 msgid "General"
 msgstr "Všeobecné"
 
@@ -891,8 +891,8 @@ msgid "Credits"
 msgstr "Poďakovanie"
 
 #: src/help.c:32
-msgid "mtPaint 3.50 - Copyright (C) 2004-2020 The Authors\n"
-msgstr "mtPaint 3.50 - Copyright (C) 2004-2020 Autori\n"
+msgid "mtPaint 3.51 - Copyright (C) 2004-2021 The Authors\n"
+msgstr "mtPaint 3.51 - Copyright (C) 2004-2021 Autori\n"
 
 #: src/help.c:33
 msgid "See 'Credits' section for a list of the authors.\n"
@@ -1598,8 +1598,8 @@ msgid "Brazilian Portuguese - Paulo Trevizan, Valter Nazianzeno"
 msgstr "Brazílska Portugalčina - Paulo Trevizan, Valter Nazianzeno"
 
 #: src/help.c:179
-msgid "Czech - Pavel Ruzicka, Martin Petricek, Roman Hornik"
-msgstr "Čeština - Pavel Ruzicka, Martin Petricek, Roman Hornik"
+msgid "Czech - Pavel Ruzicka, Martin Petricek, Roman Hornik, Pavel Fric"
+msgstr "Čeština - Pavel Ruzicka, Martin Petricek, Roman Hornik, Pavel Fric"
 
 #: src/help.c:180
 msgid "Dutch - Hans Strijards, Pjotr"
@@ -1634,26 +1634,30 @@ msgid "Japanese - Norihiro YONEDA"
 msgstr ""
 
 #: src/help.c:187
+msgid "Kabyle - Yacine Bouklif"
+msgstr ""
+
+#: src/help.c:188
 msgid "Polish - Bartosz Kaszubowski, LucaS"
 msgstr "Poľština - Bartosz Kaszubowski, LucaS"
 
-#: src/help.c:188
+#: src/help.c:189
 msgid "Portuguese - Israel G. Lugo, Tiago Silva"
 msgstr "Portugalčina - Israel G. Lugo, Tiago Silva"
 
-#: src/help.c:189
+#: src/help.c:190
 msgid "Russian - Sergey Irupin, Dmitry Groshev"
 msgstr ""
 
-#: src/help.c:190
+#: src/help.c:191
 msgid "Simplified Chinese - Cecc"
 msgstr ""
 
-#: src/help.c:191
+#: src/help.c:192
 msgid "Slovak - Jozef Riha"
 msgstr ""
 
-#: src/help.c:192
+#: src/help.c:193
 msgid ""
 "Spanish - Guadalinex Team (Junta de Andalucia), Antonio Sanchez Leon, Miguel "
 "Anxo Bouzada, Francisco Jose Rey, Adolfo Jayme"
@@ -1661,19 +1665,19 @@ msgstr ""
 "Španielčina - Guadalinex Team (Junta de Andalucia), Antonio Sanchez Leon, "
 "Miguel Anxo Bouzada, Francisco Jose Rey, Adolfo Jayme"
 
-#: src/help.c:193
+#: src/help.c:194
 msgid "Swedish - Daniel Nylander, Daniel Eriksson"
 msgstr ""
 
-#: src/help.c:194
+#: src/help.c:195
 msgid "Tagalog - Anjelo delCarmen"
 msgstr ""
 
-#: src/help.c:195
+#: src/help.c:196
 msgid "Taiwanese Chinese - Wei-Lun Chao"
 msgstr "Taiwanská Čínština - Wei-Lun Chao"
 
-#: src/help.c:196
+#: src/help.c:197
 msgid "Turkish - Muhammet Kara, Tutku Dalmaz"
 msgstr "Turečtina - Muhammet Kara, Tutku Dalmaz"
 
@@ -2915,7 +2919,7 @@ msgstr "Nastaviť počet farieb"
 
 #: src/otherwindow.c:517 src/otherwindow.c:591 src/otherwindow.c:870
 #: src/otherwindow.c:2538 src/otherwindow.c:2776 src/otherwindow.c:2939
-#: src/prefs.c:339 src/prefs.c:539
+#: src/prefs.c:338 src/prefs.c:538
 msgid "Apply"
 msgstr "Použiť"
 
@@ -3235,7 +3239,7 @@ msgid "Max-Min Quantize (best for small palettes and dithering)"
 msgstr ""
 
 #: src/otherwindow.c:2049 src/otherwindow.c:2495 src/otherwindow.c:2756
-#: src/png.c:2794 src/prefs.c:378
+#: src/png.c:2794 src/prefs.c:377
 msgid "None"
 msgstr "Žiadny"
 
@@ -3615,155 +3619,159 @@ msgstr ""
 msgid "Explode frames"
 msgstr ""
 
-#: src/prefs.c:57
+#: src/prefs.c:56
 msgid "Default System Language"
 msgstr "Východzí jazyk systému"
 
-#: src/prefs.c:58
+#: src/prefs.c:57
 msgid "Chinese (Simplified)"
 msgstr ""
 
-#: src/prefs.c:58
+#: src/prefs.c:57
 msgid "Chinese (Taiwanese)"
 msgstr "Čínsky (Taiwansky)"
 
-#: src/prefs.c:58
+#: src/prefs.c:57
 msgid "Czech"
 msgstr "Česky"
 
-#: src/prefs.c:59
+#: src/prefs.c:58
 msgid "Dutch"
 msgstr ""
 
-#: src/prefs.c:59
+#: src/prefs.c:58
 msgid "English (UK)"
 msgstr "Anglicky (UK)"
 
-#: src/prefs.c:59
+#: src/prefs.c:58
 msgid "French"
 msgstr "Francúzsky"
 
-#: src/prefs.c:59
+#: src/prefs.c:58
 msgid "Galician"
 msgstr ""
 
-#: src/prefs.c:59
+#: src/prefs.c:58
 msgid "German"
 msgstr "Nemecky"
 
-#: src/prefs.c:60
+#: src/prefs.c:59
 msgid "Hungarian"
 msgstr ""
 
-#: src/prefs.c:60
+#: src/prefs.c:59
 msgid "Italian"
 msgstr ""
 
-#: src/prefs.c:60
+#: src/prefs.c:59
 msgid "Japanese"
 msgstr ""
 
-#: src/prefs.c:60
+#: src/prefs.c:59
+msgid "Kabyle"
+msgstr ""
+
+#: src/prefs.c:59
 msgid "Polish"
 msgstr "Poľsky"
 
-#: src/prefs.c:61
+#: src/prefs.c:60
 msgid "Portuguese"
 msgstr "Portugalsky"
 
-#: src/prefs.c:61
+#: src/prefs.c:60
 msgid "Portuguese (Brazilian)"
 msgstr "Portugalsky (Brazília)"
 
-#: src/prefs.c:61
+#: src/prefs.c:60
 msgid "Russian"
 msgstr ""
 
-#: src/prefs.c:61
+#: src/prefs.c:60
 msgid "Slovak"
 msgstr "Slovensky"
 
-#: src/prefs.c:62
+#: src/prefs.c:61
 msgid "Spanish"
 msgstr "Španielsky"
 
-#: src/prefs.c:62
+#: src/prefs.c:61
 msgid "Swedish"
 msgstr ""
 
-#: src/prefs.c:62
+#: src/prefs.c:61
 msgid "Tagalog"
 msgstr ""
 
-#: src/prefs.c:62
+#: src/prefs.c:61
 msgid "Turkish"
 msgstr "Turecky"
 
-#: src/prefs.c:82
+#: src/prefs.c:81
 msgid "Current Device"
 msgstr "Aktuálne zariadenie"
 
-#: src/prefs.c:136
+#: src/prefs.c:135
 msgid "Pressure"
 msgstr "Tlak"
 
-#: src/prefs.c:150
+#: src/prefs.c:149
 msgid "Preferences"
 msgstr "Voľby"
 
-#: src/prefs.c:164
+#: src/prefs.c:163
 msgid "Max threads (0 to autodetect)"
 msgstr ""
 
-#: src/prefs.c:165
+#: src/prefs.c:164
 msgid "Min kpixels per render thread"
 msgstr ""
 
-#: src/prefs.c:172
+#: src/prefs.c:171
 msgid "Max memory used for undo (MB)"
 msgstr "Max pamäť použitá pre históriu (MB)"
 
-#: src/prefs.c:173
+#: src/prefs.c:172
 msgid "Max undo levels"
 msgstr ""
 
-#: src/prefs.c:174
+#: src/prefs.c:173
 msgid "Communal layer undo space (%)"
 msgstr ""
 
-#: src/prefs.c:176
+#: src/prefs.c:175
 msgid "Bayer master pattern"
 msgstr ""
 
-#: src/prefs.c:179
+#: src/prefs.c:178
 msgid "Use gamma correction by default"
 msgstr "Použiť gamma korekciu ako východziu"
 
-#: src/prefs.c:180
+#: src/prefs.c:179
 msgid "Use gamma correction when painting"
 msgstr ""
 
-#: src/prefs.c:181
+#: src/prefs.c:180
 msgid "Separate patterns for A & B"
 msgstr ""
 
-#: src/prefs.c:184
+#: src/prefs.c:183
 msgid "Optimize alpha chequers"
 msgstr "Optimalizovať šachovnicu alfa kanálu"
 
-#: src/prefs.c:185
+#: src/prefs.c:184
 msgid "Disable view window transparencies"
 msgstr "Vypnúť priehľadnosť v okne zobrazenia"
 
-#: src/prefs.c:186
+#: src/prefs.c:185
 msgid "Enable overlays by layer"
 msgstr ""
 
-#: src/prefs.c:190
+#: src/prefs.c:189
 msgid "Language"
 msgstr "Jazyk"
 
-#: src/prefs.c:192
+#: src/prefs.c:191
 msgid ""
 "Select preferred language translation\n"
 "\n"
@@ -3775,262 +3783,262 @@ msgstr ""
 "Aby se prejavili všetky zmeny,\n"
 "je treba mtPaint reštartovať."
 
-#: src/prefs.c:199
+#: src/prefs.c:198
 msgid "Interface"
 msgstr ""
 
-#: src/prefs.c:201
+#: src/prefs.c:200
 msgid "Greyscale backdrop"
 msgstr "Odtieň šedého pozadia"
 
-#: src/prefs.c:202
+#: src/prefs.c:201
 msgid "Selection nudge pixels"
 msgstr "Posun pixelov výberu"
 
-#: src/prefs.c:203
+#: src/prefs.c:202
 msgid "Max Pan Window Size"
 msgstr "Veľkosť prehľadového okna"
 
-#: src/prefs.c:205
+#: src/prefs.c:204
 msgid "Display clipboard while pasting"
 msgstr "Zobrazovať schránku pri vkladaní"
 
-#: src/prefs.c:206
+#: src/prefs.c:205
 msgid "Mouse cursor = Tool"
 msgstr "Kurzor myši = Nástroj"
 
-#: src/prefs.c:207
+#: src/prefs.c:206
 msgid "Confirm Exit"
 msgstr "Potvrdiť koniec"
 
-#: src/prefs.c:208
+#: src/prefs.c:207
 msgid "Q key quits mtPaint"
 msgstr "Kláves Q ukončí mtPaint"
 
-#: src/prefs.c:209
+#: src/prefs.c:208
 msgid "Arrow keys scroll canvas"
 msgstr ""
 
-#: src/prefs.c:210
+#: src/prefs.c:209
 msgid "Changing tool commits paste"
 msgstr "Zmena nástroja potvrdí vloženie"
 
-#: src/prefs.c:211
+#: src/prefs.c:210
 msgid "Centre tool settings dialogs"
 msgstr "Centrovať dialógy nastavenia nástrojov"
 
-#: src/prefs.c:212
+#: src/prefs.c:211
 msgid "New image sets zoom to 100%"
 msgstr "Nový obrázok nastaví zoom na 100%"
 
-#: src/prefs.c:213
+#: src/prefs.c:212
 msgid "Zoom on cursor position"
 msgstr ""
 
-#: src/prefs.c:215
+#: src/prefs.c:214
 msgid "Mouse Scroll Wheel = Zoom"
 msgstr "Koliečko myši = Zoom"
 
-#: src/prefs.c:216
+#: src/prefs.c:215
 msgid "Use menu icons"
 msgstr ""
 
-#: src/prefs.c:221
+#: src/prefs.c:220
 msgid "Files"
 msgstr "Súbory"
 
-#: src/prefs.c:224
+#: src/prefs.c:223
 msgid "XBM X hotspot"
 msgstr "XBM X aktívny bod"
 
-#: src/prefs.c:225
+#: src/prefs.c:224
 msgid "XBM Y hotspot"
 msgstr "XBM Y aktívny bod"
 
-#: src/prefs.c:229
+#: src/prefs.c:228
 msgid "Recently Used Files"
 msgstr "Naposledy použité súbory"
 
-#: src/prefs.c:230
+#: src/prefs.c:229
 msgid "Progress bar silence limit"
 msgstr "Tichý limit ukazateľa priebehu"
 
-#: src/prefs.c:233
+#: src/prefs.c:232
 msgid "Read 16-bit TGAs as 5:6:5 BGR"
 msgstr ""
 
-#: src/prefs.c:234
+#: src/prefs.c:233
 msgid "Write TGAs in bottom-up row order"
 msgstr ""
 
-#: src/prefs.c:235
+#: src/prefs.c:234
 msgid "Undoable image loading"
 msgstr ""
 
-#: src/prefs.c:246
+#: src/prefs.c:245
 msgid "Compression (RGB)"
 msgstr ""
 
-#: src/prefs.c:247
+#: src/prefs.c:246
 msgid "Compression (indexed)"
 msgstr ""
 
-#: src/prefs.c:248
+#: src/prefs.c:247
 msgid "Compression (monochrome)"
 msgstr ""
 
-#: src/prefs.c:256
+#: src/prefs.c:255
 msgid "Enable predictor"
 msgstr ""
 
-#: src/prefs.c:263
+#: src/prefs.c:262
 msgid "Compression mode"
 msgstr ""
 
-#: src/prefs.c:272
+#: src/prefs.c:271
 msgid "Channel for Mask Plane"
 msgstr ""
 
-#: src/prefs.c:274
+#: src/prefs.c:273
 msgid "Ignore Transparent Colour"
 msgstr ""
 
-#: src/prefs.c:275
+#: src/prefs.c:274
 msgid "PackBits Compression"
 msgstr ""
 
-#: src/prefs.c:276
+#: src/prefs.c:275
 msgid "Write Indexed as Planar Bitmap (PBM)"
 msgstr ""
 
-#: src/prefs.c:281
+#: src/prefs.c:280
 msgid "Paths"
 msgstr ""
 
-#: src/prefs.c:282
+#: src/prefs.c:281
 msgid "Clipboard Files"
 msgstr "Súbory schránky"
 
-#: src/prefs.c:282
+#: src/prefs.c:281
 msgid "Select Clipboard File"
 msgstr "Výber súboru schránky"
 
-#: src/prefs.c:284
+#: src/prefs.c:283
 msgid "HTML Browser Program"
 msgstr "HTML Prehliadač"
 
-#: src/prefs.c:284
+#: src/prefs.c:283
 msgid "Select Browser Program"
 msgstr "Vyberte webový prehliadač"
 
-#: src/prefs.c:286
+#: src/prefs.c:285
 msgid "Location of Handbook index"
 msgstr "Umiestnenie indexu príručky"
 
-#: src/prefs.c:286
+#: src/prefs.c:285
 msgid "Select Handbook Index File"
 msgstr "Vyberte index súboru príručky"
 
-#: src/prefs.c:288
+#: src/prefs.c:287
 msgid "Default Palette"
 msgstr ""
 
-#: src/prefs.c:288
+#: src/prefs.c:287
 msgid "Select Default Palette"
 msgstr ""
 
-#: src/prefs.c:290
+#: src/prefs.c:289
 msgid "Default Patterns"
 msgstr ""
 
-#: src/prefs.c:290
+#: src/prefs.c:289
 msgid "Select Default Patterns File"
 msgstr ""
 
-#: src/prefs.c:293
+#: src/prefs.c:292
 msgid "Default CSS"
 msgstr ""
 
-#: src/prefs.c:293
+#: src/prefs.c:292
 msgid "Select Default CSS File"
 msgstr ""
 
-#: src/prefs.c:296
+#: src/prefs.c:295
 msgid "Default Theme"
 msgstr ""
 
-#: src/prefs.c:296
+#: src/prefs.c:295
 msgid "Select Default Theme File"
 msgstr ""
 
-#: src/prefs.c:301
+#: src/prefs.c:300
 msgid "Status Bar"
 msgstr "Stavová lišta"
 
-#: src/prefs.c:302
+#: src/prefs.c:301
 msgid "Canvas Geometry"
 msgstr "Geometria plátna"
 
-#: src/prefs.c:303
+#: src/prefs.c:302
 msgid "Cursor X,Y"
 msgstr "Kurzor X,Y"
 
-#: src/prefs.c:304
+#: src/prefs.c:303
 msgid "Pixel [I] {RGB}"
 msgstr "Pixel [I] {RGB}"
 
-#: src/prefs.c:305
+#: src/prefs.c:304
 msgid "Selection Geometry"
 msgstr "Geometria Výberu"
 
-#: src/prefs.c:306
+#: src/prefs.c:305
 msgid "Undo / Redo"
 msgstr "Späť / Vpred"
 
-#: src/prefs.c:309
+#: src/prefs.c:308
 msgid "Tablet"
 msgstr "Tablet"
 
-#: src/prefs.c:310
+#: src/prefs.c:309
 msgid "Device Settings"
 msgstr "Nastavenia zariadenia"
 
-#: src/prefs.c:314
+#: src/prefs.c:313
 msgid "Configure Device"
 msgstr "Konfigurácia zariadenia"
 
-#: src/prefs.c:320
+#: src/prefs.c:319
 msgid "Tool Variable"
 msgstr "Variabilita nástroja"
 
-#: src/prefs.c:323 src/toolbar.c:454
+#: src/prefs.c:322 src/toolbar.c:454
 msgid "Flow"
 msgstr "Tok"
 
-#: src/prefs.c:331
+#: src/prefs.c:330
 msgid "Test Area"
 msgstr "Testovacia plocha"
 
-#: src/prefs.c:374
+#: src/prefs.c:373
 msgid "Factor"
 msgstr "Faktor"
 
-#: src/prefs.c:460
+#: src/prefs.c:459
 msgid "This key is builtin"
 msgstr ""
 
-#: src/prefs.c:463
+#: src/prefs.c:462
 #, c-format
 msgid ""
 "This key is mapped to:\n"
 "\"%s\""
 msgstr ""
 
-#: src/prefs.c:466
+#: src/prefs.c:465
 msgid "Remap"
 msgstr ""
 
-#: src/prefs.c:511
+#: src/prefs.c:510
 msgid "Keyboard Shortcuts"
 msgstr ""
 

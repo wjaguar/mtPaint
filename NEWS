@@ -4,7 +4,15 @@ mtPaint NEWS
 
 Here is a summary of the main changes in this release (see handbook for full details):
 
+3.51	2021-??-??
+	* Kabyle translation added by Yacine Bouklif
+	* Czech translation updated by Pavel Fric
+	* Spanish translation updated by Adolfo Jayme
+	* Tagalog translation updated by Anjelo delCarmen
+	* Support for compiling with libtiff 3 restored
+
 3.50	2020-12-31
+	* Dutch translation updated by Pjotr
 	* French translation updated by Victor Copovi
 	* German translation updated by Simon Brixel
 	* Russian translation updated

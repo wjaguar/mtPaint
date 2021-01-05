@@ -1,5 +1,5 @@
 /*	png.c
-	Copyright (C) 2004-2020 Mark Tyler and Dmitry Groshev
+	Copyright (C) 2004-2021 Mark Tyler and Dmitry Groshev
 
 	This file is part of mtPaint.
 
@@ -3283,6 +3283,10 @@ static int load_tiff_frames(char *file_name, ani_settings *ani)
 fail:	TIFFClose(tif);
 	return (res);
 }
+
+#ifndef TIFF_VERSION_BIG /* The ONLY useful way to detect libtiff 4.x vs 3.x */
+#define tmsize_t tsize_t
+#endif
 
 static tmsize_t mTIFFread(thandle_t fd, void* buf, tmsize_t size)
 {

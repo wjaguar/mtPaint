@@ -10,16 +10,16 @@ msgid ""
 msgstr ""
 "Project-Id-Version: cs\n"
 "Report-Msgid-Bugs-To: \n"
-"POT-Creation-Date: 2020-12-31 16:57+0200\n"
-"PO-Revision-Date: 2010-04-06 23:55+0000\n"
-"Last-Translator: Roman Horník <roman.hornik@gmail.com>\n"
+"POT-Creation-Date: 2021-01-04 21:31+0200\n"
+"PO-Revision-Date: 2014-01-01 19:48+0000\n"
+"Last-Translator: fri <pavelfric@seznam.cz>\n"
 "Language-Team: Czech <en@li.org>\n"
 "Language: cs\n"
 "MIME-Version: 1.0\n"
 "Content-Type: text/plain; charset=UTF-8\n"
 "Content-Transfer-Encoding: 8bit\n"
-"X-Launchpad-Export-Date: 2011-09-03 18:36+0000\n"
-"X-Generator: Launchpad (build 13830)\n"
+"X-Launchpad-Export-Date: 2020-04-05 23:36+0000\n"
+"X-Generator: Launchpad (build a296f04231dee355be5db73cc878b9e21689a253)\n"
 
 #: src/ani.c:647
 msgid "Animation Preview"
@@ -46,7 +46,7 @@ msgstr "Zavřít"
 #: src/layer.c:970 src/mainwindow.c:341 src/mainwindow.c:370
 #: src/mainwindow.c:534 src/mainwindow.c:578 src/mainwindow.c:604
 #: src/mainwindow.c:3797 src/mainwindow.c:4045 src/otherwindow.c:931
-#: src/otherwindow.c:980 src/otherwindow.c:982 src/prefs.c:460 src/spawn.c:924
+#: src/otherwindow.c:980 src/otherwindow.c:982 src/prefs.c:459 src/spawn.c:924
 #: src/spawn.c:978 src/spawn.c:1017 src/thread.c:360 src/vcode.c:9912
 #: src/viewer.c:1161 src/viewer.c:1179
 msgid "Error"
@@ -58,7 +58,7 @@ msgstr "Nelze vytvořit výstupní adresář"
 
 #: src/ani.c:759
 msgid "Creating Animation Frames"
-msgstr "Vytvářím snímky animace"
+msgstr "Vytváří se snímky animace"
 
 #: src/ani.c:812
 msgid "Unable to save image"
@@ -66,7 +66,7 @@ msgstr "Nelze uložit obrázek"
 
 #: src/ani.c:840 src/canvas.c:1171 src/fpick.c:731 src/layer.c:311
 #: src/layer.c:379 src/layer.c:826 src/layer.c:840 src/mainwindow.c:375
-#: src/mainwindow.c:1026 src/png.c:8794 src/prefs.c:465
+#: src/mainwindow.c:1026 src/png.c:8794 src/prefs.c:464
 msgid "Warning"
 msgstr "Varování"
 
@@ -294,7 +294,7 @@ msgstr "Rozdíl gausiánů"
 
 #: src/canvas.c:636
 msgid "Protect details"
-msgstr ""
+msgstr "Chránit podrobnosti"
 
 #: src/canvas.c:645
 msgid "Kuwahara-Nagao Blur"
@@ -324,7 +324,7 @@ msgstr ""
 
 #: src/canvas.c:1353
 msgid "Invalid palette file"
-msgstr ""
+msgstr "Neplatný soubor palety"
 
 #: src/canvas.c:1383
 msgid "Invalid channel file."
@@ -332,31 +332,31 @@ msgstr "Neplatný soubor kanálů."
 
 #: src/canvas.c:1401
 msgid "Raw frames"
-msgstr ""
+msgstr "Nezpracované snímky"
 
 #: src/canvas.c:1401
 msgid "Composited frames"
-msgstr ""
+msgstr "Složené snímky"
 
 #: src/canvas.c:1402
 msgid "Composited frames with nonzero delay"
-msgstr ""
+msgstr "Složené snímky s nenulovým zpožděním"
 
 #: src/canvas.c:1406
 msgid "Load Frames"
-msgstr ""
+msgstr "Nahrát snímky"
 
 #: src/canvas.c:1409
 msgid "Load into Layers"
-msgstr ""
+msgstr "Nahrát do vrstev"
 
 #: src/canvas.c:1415
 msgid "Load First Frame"
-msgstr ""
+msgstr "Nahrát první snímek"
 
 #: src/canvas.c:1416
 msgid "Explode Frames"
-msgstr ""
+msgstr "Rozbalit snímky"
 
 #: src/canvas.c:1418
 msgid "View Animation"
@@ -370,7 +370,7 @@ msgstr "Toto je animovaný %s."
 #: src/canvas.c:1435
 #, c-format
 msgid "This is a multipage %s file."
-msgstr ""
+msgstr "Toto je vícestránkový %s soubor."
 
 #: src/canvas.c:1459
 #, c-format
@@ -379,7 +379,7 @@ msgstr "Soubor je příliš velký, musí být <= šířka=%i výška=%i"
 
 #: src/canvas.c:1461
 msgid "Unable to explode frames"
-msgstr ""
+msgstr "Nelze rozbalit snímky"
 
 #: src/canvas.c:1463
 msgid "Unable to load file"
@@ -400,13 +400,14 @@ msgstr ""
 #: src/canvas.c:1467
 msgid "The animation is too long to load all of it into layers."
 msgstr ""
+"Animace je příliš dlouhá na to, aby vše z ní mohlo být nahráno do vrstev."
 
 #: src/canvas.c:1469
 msgid "Could not explode all the frames in the animation."
-msgstr ""
+msgstr "Nelze rozbalit všechny snímky v animaci."
 
 #: src/canvas.c:1481 src/font.c:1556 src/fpick.c:937 src/otherwindow.c:2765
-#: src/prefs.c:322 src/toolbar.c:451
+#: src/prefs.c:321 src/toolbar.c:451
 msgid "Size"
 msgstr "Velikost"
 
@@ -424,7 +425,7 @@ msgstr "Výška"
 #: src/otherwindow.c:1058 src/otherwindow.c:1727 src/otherwindow.c:2101
 #: src/otherwindow.c:2336 src/otherwindow.c:2538 src/otherwindow.c:2691
 #: src/otherwindow.c:2776 src/otherwindow.c:2937 src/otherwindow.c:3070
-#: src/otherwindow.c:3169 src/prefs.c:339 src/prefs.c:465 src/prefs.c:539
+#: src/otherwindow.c:3169 src/prefs.c:338 src/prefs.c:464 src/prefs.c:538
 #: src/spawn.c:666 src/viewer.c:1258
 msgid "Cancel"
 msgstr "Storno"
@@ -434,8 +435,8 @@ msgstr "Storno"
 #: src/otherwindow.c:591 src/otherwindow.c:871 src/otherwindow.c:1058
 #: src/otherwindow.c:1729 src/otherwindow.c:2101 src/otherwindow.c:2336
 #: src/otherwindow.c:2538 src/otherwindow.c:2691 src/otherwindow.c:2776
-#: src/otherwindow.c:3072 src/otherwindow.c:3171 src/prefs.c:339
-#: src/prefs.c:539 src/spawn.c:666
+#: src/otherwindow.c:3072 src/otherwindow.c:3171 src/prefs.c:338
+#: src/prefs.c:538 src/spawn.c:666
 msgid "OK"
 msgstr "OK"
 
@@ -482,7 +483,7 @@ msgstr "Nelze exportovat do ASCII souboru"
 msgid "Unable to save file: %s"
 msgstr "Nelze uložit soubor: %s"
 
-#: src/canvas.c:2101 src/prefs.c:223
+#: src/canvas.c:2101 src/prefs.c:222
 msgid "Transparency index"
 msgstr "Index průhlednosti"
 
@@ -490,7 +491,7 @@ msgstr "Index průhlednosti"
 msgid "TIFF Compression"
 msgstr ""
 
-#: src/canvas.c:2105 src/prefs.c:226
+#: src/canvas.c:2105 src/prefs.c:225
 msgid "JPEG Save Quality (100=High)"
 msgstr "Kvalita ukládání JPEGu (100=Vysoká)"
 
@@ -498,19 +499,19 @@ msgstr "Kvalita ukládání JPEGu (100=Vysoká)"
 msgid "ZIP Compression (0=None)"
 msgstr ""
 
-#: src/canvas.c:2108 src/prefs.c:228
+#: src/canvas.c:2108 src/prefs.c:227
 msgid "PNG Compression (0=None)"
 msgstr "PNG komprese (0=žádná)"
 
-#: src/canvas.c:2111 src/prefs.c:250
+#: src/canvas.c:2111 src/prefs.c:249
 msgid "LZMA2 Compression (0=None)"
 msgstr ""
 
-#: src/canvas.c:2113 src/prefs.c:253
+#: src/canvas.c:2113 src/prefs.c:252
 msgid "ZSTD Compression Level"
 msgstr ""
 
-#: src/canvas.c:2115 src/prefs.c:232
+#: src/canvas.c:2115 src/prefs.c:231
 msgid "TGA RLE Compression"
 msgstr "TGA RLE komprese"
 
@@ -518,7 +519,7 @@ msgstr "TGA RLE komprese"
 msgid "LBM PackBits Compression"
 msgstr ""
 
-#: src/canvas.c:2118 src/prefs.c:227
+#: src/canvas.c:2118 src/prefs.c:226
 msgid "JPEG2000 Compression (0=Lossless)"
 msgstr "JPEG2000  komprese (0=bezeztrátová)"
 
@@ -530,11 +531,11 @@ msgstr ""
 msgid "WebP Save Quality (100=High)"
 msgstr ""
 
-#: src/canvas.c:2123 src/prefs.c:264
+#: src/canvas.c:2123 src/prefs.c:263
 msgid "V8 Save Quality (100=High)"
 msgstr ""
 
-#: src/canvas.c:2125 src/prefs.c:265
+#: src/canvas.c:2125 src/prefs.c:264
 msgid "V8L Compression (0=None)"
 msgstr ""
 
@@ -554,9 +555,9 @@ msgstr "Zpoždění animace"
 msgid "Undoable"
 msgstr "Vratitelné"
 
-#: src/canvas.c:2138 src/prefs.c:237
+#: src/canvas.c:2138 src/prefs.c:236
 msgid "Apply colour profile"
-msgstr ""
+msgstr "Použít barevný profil"
 
 #: src/canvas.c:2176 src/toolbar.c:543
 msgid "Load Image File"
@@ -699,14 +700,14 @@ msgstr "Saturace"
 msgid "Hex"
 msgstr ""
 
-#: src/cpick.c:840 src/layer.c:1109 src/otherwindow.c:2530 src/prefs.c:324
+#: src/cpick.c:840 src/layer.c:1109 src/otherwindow.c:2530 src/prefs.c:323
 #: src/toolbar.c:457
 msgid "Opacity"
 msgstr "Neprůsvitnost"
 
 #: src/font.c:982
 msgid "Creating Font Index"
-msgstr "Vytvářím seznam písem"
+msgstr "Vytváří se seznam písem"
 
 #: src/font.c:1353
 msgid "You must select at least one directory to search for fonts."
@@ -781,11 +782,11 @@ msgstr "Adresář"
 msgid "New Directory"
 msgstr "Nový adresář"
 
-#: src/font.c:1644 src/prefs.c:533
+#: src/font.c:1644 src/prefs.c:532
 msgid "Add"
 msgstr "Přidat"
 
-#: src/font.c:1645 src/prefs.c:534
+#: src/font.c:1645 src/prefs.c:533
 msgid "Remove"
 msgstr "Odstranit"
 
@@ -875,7 +876,7 @@ msgstr "Typ"
 msgid "Modified"
 msgstr "Změněno"
 
-#: src/help.c:25 src/prefs.c:161
+#: src/help.c:25 src/prefs.c:160
 msgid "General"
 msgstr "Obecné"
 
@@ -892,8 +893,8 @@ msgid "Credits"
 msgstr "Poděkování"
 
 #: src/help.c:32
-msgid "mtPaint 3.50 - Copyright (C) 2004-2020 The Authors\n"
-msgstr "mtPaint 3.50 - Copyright (C) 2004-2020 Autoři\n"
+msgid "mtPaint 3.51 - Copyright (C) 2004-2021 The Authors\n"
+msgstr "mtPaint 3.51 - Copyright (C) 2004-2021 Autoři\n"
 
 #: src/help.c:33
 msgid "See 'Credits' section for a list of the authors.\n"
@@ -953,7 +954,7 @@ msgid ""
 "you:\n"
 msgstr ""
 "Pokud se vám mtPaint líbí a chcete mít vždy nejnovější verzi, nebo chcete "
-"sdělit nějaké názory, může být pro vás zajímavá tato mailová konference:\n"
+"sdělit nějaké názory, může být pro vás zajímavá tato poštovní konference:\n"
 
 #: src/help.c:39
 msgid "http://sourceforge.net/mail/?group_id=155874"
@@ -973,7 +974,7 @@ msgstr "  Ctrl-S            Uložit obrázek"
 
 #: src/help.c:45
 msgid "  Ctrl-Shift-S      Save layers file"
-msgstr ""
+msgstr "  Ctrl-Shift-S      Uložit soubor s vrstvami"
 
 #: src/help.c:46
 msgid "  Ctrl-Q            Quit program\n"
@@ -989,7 +990,7 @@ msgstr "  Escape            Zrušit výběr, vkládání"
 
 #: src/help.c:49
 msgid "  J                 Lasso selection\n"
-msgstr ""
+msgstr "  J                 Výběr lasa\n"
 
 #: src/help.c:50
 msgid "  Ctrl-C            Copy selection to clipboard"
@@ -1013,7 +1014,7 @@ msgstr "  Ctrl-K            Vložit schránku do míst, odkud byla kopírována"
 
 #: src/help.c:54
 msgid "  Ctrl-Shift-V      Paste clipboard to new layer"
-msgstr ""
+msgstr "  Ctrl-Shift-V      Vložit obsah schránky do nové vrstvy"
 
 #: src/help.c:55
 msgid "  Enter/Return      Commit paste to canvas"
@@ -1021,7 +1022,7 @@ msgstr "  Enter/Return      Potvrdit vložení na plátno"
 
 #: src/help.c:56
 msgid "  Shift+Enter/Return  Commit paste and swap canvas into the clipboard\n"
-msgstr ""
+msgstr "  Shift+Enter/Return  Odeslat vložit a vyměnit plátno do schránky\n"
 
 #: src/help.c:57
 msgid "  Arrow keys        Paint Mode - Move the mouse pointer"
@@ -1046,19 +1047,24 @@ msgstr ""
 #: src/help.c:60
 msgid "  Ctrl+Arrows       Move layer or resize selection box"
 msgstr ""
-"  Ctrl+šipky       Přesunout vrstvu, nebo změnit velikost výběrového boxu"
+"  Ctrl+šipky       Přesunout vrstvu, nebo změnit velikost oblasti výběru"
 
 #: src/help.c:61
 msgid "  Ctrl+Shift+Arrows  Move layer or resize selection box by x pixels\n"
 msgstr ""
+"  Ctrl+Shift+šipky  Posunout vrstvu nebo změnit velikost oblasti výběru o x "
+"obrazových bodů\n"
 
 #: src/help.c:62
 msgid "  Enter/Return      Paint Mode - Simulate left click"
 msgstr ""
+"  Enter/Return      Režim kreslení - napodobit klepnutí levým tlačítkem myši"
 
 #: src/help.c:63
 msgid "  Backspace         Paint Mode - Simulate right click\n"
 msgstr ""
+"  Backspace         Režim kreslení - napodobit klepnutí pravým tlačítkem "
+"myši\n"
 
 #: src/help.c:64
 msgid ""
@@ -1094,11 +1100,11 @@ msgstr "  Shift-Ctrl-G       Převést na škálu šedi (S Gamma korekcí)"
 
 #: src/help.c:70
 msgid "  Ctrl+M            Mirror the image"
-msgstr ""
+msgstr "  Ctrl+M            Zrcadlit obrázek"
 
 #: src/help.c:71
 msgid "  Shift-Ctrl-I      Invert the image\n"
-msgstr ""
+msgstr "  Shift-Ctrl-I      Obrátit obrázek\n"
 
 #: src/help.c:72
 msgid ""
@@ -1145,11 +1151,11 @@ msgstr "  Ctrl-R            Znovu provést vrácenou akci\n"
 
 #: src/help.c:82
 msgid "  Shift-T           Text Tool (GTK+)"
-msgstr ""
+msgstr "  Shift-T           Textový nástroj (GTK+)"
 
 #: src/help.c:83
 msgid "  T                 Text Tool (FreeType)\n"
-msgstr ""
+msgstr "  T                 Textový nástro (FreeType)\n"
 
 #: src/help.c:84
 msgid "  V                 View Window"
@@ -1165,35 +1171,39 @@ msgstr ""
 
 #: src/help.c:87
 msgid "  B                 Toggle Snap to Tile Grid mode\n"
-msgstr ""
+msgstr "  B                 Přepnout režim Přichytit k mřížce\n"
 
 #: src/help.c:88
 msgid "  X                 Swap Colours A & B"
-msgstr ""
+msgstr "  X                 Vyměnit barvy A & B"
 
 #: src/help.c:89
 msgid "  E                 Choose Colour\n"
-msgstr ""
+msgstr "  E                 Vybrat barvu\n"
 
 #: src/help.c:90
 msgid ""
 "  A                 Draw open arrow head when using the line tool (size set "
 "by flow setting)"
 msgstr ""
+"  A                 Kreslit otevřenou hlavičku šipky při používání nástroje "
+"čáry (velikost nastavena pomocí nastavení toku)"
 
 #: src/help.c:91
 msgid ""
 "  S                 Draw closed arrow head when using the line tool (size "
 "set by flow setting)\n"
 msgstr ""
+"  S                 Kreslit zavřenou hlavičku šipky při používání nástroje "
+"čáry (velikost nastavena pomocí nastavení toku)\n"
 
 #: src/help.c:92
 msgid "  D                 Line Tool"
-msgstr ""
+msgstr "  D                 Nástroj čáry"
 
 #: src/help.c:93
 msgid "  F                 Flood Fill Tool\n"
-msgstr ""
+msgstr "  F                 Nástroj pro vyplnění barvou\n"
 
 #: src/help.c:94
 msgid "  +,=               Main edit window - Zoom in"
@@ -1310,7 +1320,7 @@ msgstr "  F9                 Nástroj výběru"
 
 #: src/help.c:120
 msgid "  F12               Toggle Dock Area\n"
-msgstr ""
+msgstr "  F12               Přepnout oblast ukotvení\n"
 
 #: src/help.c:121
 msgid "  Ctrl + F1 - F12   Save current clipboard to file 1-12"
@@ -1380,8 +1390,8 @@ msgid ""
 "  Scroll Wheel         In GTK+2/3 the user can have the scroll wheel zoom in "
 "or out via the Preferences window\n"
 msgstr ""
-"  Kolečko myši         V GTK+2/3 může mít uživatel kolečko ke změně "
-"přiblížení nastavením v okně voleb\n"
+"  Kolečko myši         V GTK+2/3 může mít uživatel kolečko pro přiblížení "
+"nebo oddálení nastavením v okně voleb\n"
 
 #: src/help.c:136
 msgid "  Ctrl+Left button     Choose colour A from under mouse pointer"
@@ -1458,7 +1468,7 @@ msgid ""
 "generosity and hard work:\n"
 "\n"
 msgstr ""
-"Následující lidé (v abecedním pořadí) se přímo podílejí na projektu a proto "
+"Následující lidé (v abecedním pořadí) se přímo podílejí na projektu, a proto "
 "jim patří velké díky za jejich velkorysost a těžkou práci:\n"
 "\n"
 
@@ -1596,8 +1606,8 @@ msgid "Brazilian Portuguese - Paulo Trevizan, Valter Nazianzeno"
 msgstr "Brazilská Portugalština - Paulo Trevizan, Valter Nazianzeno"
 
 #: src/help.c:179
-msgid "Czech - Pavel Ruzicka, Martin Petricek, Roman Hornik"
-msgstr "Čeština - Pavel Ruzicka, Martin Petricek, Roman Horník"
+msgid "Czech - Pavel Ruzicka, Martin Petricek, Roman Hornik, Pavel Fric"
+msgstr "Čeština - Pavel Ruzicka, Martin Petricek, Roman Horník, Pavel Fric"
 
 #: src/help.c:180
 msgid "Dutch - Hans Strijards, Pjotr"
@@ -1621,7 +1631,7 @@ msgstr "Němčina - Oliver Frommel, B. Clausius, Ulrich Ringel, Simon Brixel"
 
 #: src/help.c:184
 msgid "Hungarian - Ur Balazs"
-msgstr ""
+msgstr "Maďarština - Ur Balazs"
 
 #: src/help.c:185
 msgid "Italian - Angelo Gemmi"
@@ -1632,26 +1642,30 @@ msgid "Japanese - Norihiro YONEDA"
 msgstr "Japonština - Norihiro YONEDA"
 
 #: src/help.c:187
+msgid "Kabyle - Yacine Bouklif"
+msgstr ""
+
+#: src/help.c:188
 msgid "Polish - Bartosz Kaszubowski, LucaS"
 msgstr "Polština - Bartosz Kaszubowski, LucaS"
 
-#: src/help.c:188
+#: src/help.c:189
 msgid "Portuguese - Israel G. Lugo, Tiago Silva"
 msgstr "Portugalština - Israel G. Lugo, Tiago Silva"
 
-#: src/help.c:189
+#: src/help.c:190
 msgid "Russian - Sergey Irupin, Dmitry Groshev"
 msgstr "Ruština - Sergey Irupin, Dmitry Groshev"
 
-#: src/help.c:190
+#: src/help.c:191
 msgid "Simplified Chinese - Cecc"
 msgstr "Zjednodušená čínština - Cecc"
 
-#: src/help.c:191
+#: src/help.c:192
 msgid "Slovak - Jozef Riha"
 msgstr "Slovenština - Jozef Riha"
 
-#: src/help.c:192
+#: src/help.c:193
 msgid ""
 "Spanish - Guadalinex Team (Junta de Andalucia), Antonio Sanchez Leon, Miguel "
 "Anxo Bouzada, Francisco Jose Rey, Adolfo Jayme"
@@ -1659,19 +1673,19 @@ msgstr ""
 "Španělština - Guadalinex Team (Junta de Andalucia), Antonio Sanchez Leon, "
 "Miguel Anxo Bouzada, Francisco Jose Rey, Adolfo Jayme"
 
-#: src/help.c:193
+#: src/help.c:194
 msgid "Swedish - Daniel Nylander, Daniel Eriksson"
 msgstr "Švédsky - Daniel Nylander, Daniel Eriksson"
 
-#: src/help.c:194
-msgid "Tagalog - Anjelo delCarmen"
-msgstr ""
-
 #: src/help.c:195
+msgid "Tagalog - Anjelo delCarmen"
+msgstr "Filipínština - Anjelo delCarmen"
+
+#: src/help.c:196
 msgid "Taiwanese Chinese - Wei-Lun Chao"
 msgstr "Taiwanská Čínština - Wei-Lun Chao"
 
-#: src/help.c:196
+#: src/help.c:197
 msgid "Turkish - Muhammet Kara, Tutku Dalmaz"
 msgstr "Turečtina - Muhammet Kara, Tutku Dalmaz"
 
@@ -2180,11 +2194,11 @@ msgstr "//Exportovat jako animovaný GIF ..."
 
 #: src/mainwindow.c:5201
 msgid "//Actions"
-msgstr ""
+msgstr "//Činnosti"
 
 #: src/mainwindow.c:5235 src/mainwindow.c:5488
 msgid "///Configure"
-msgstr ""
+msgstr "///Nastavit"
 
 #: src/mainwindow.c:5290
 msgid "//Quit"
@@ -2212,7 +2226,7 @@ msgstr "//Kopírovat"
 
 #: src/mainwindow.c:5304
 msgid "//Copy To Palette"
-msgstr ""
+msgstr "//Kopírovat do palety"
 
 #: src/mainwindow.c:5306
 msgid "//Paste To Centre"
@@ -2232,11 +2246,11 @@ msgstr "//Vložit text"
 
 #: src/mainwindow.c:5318
 msgid "//Paste Text (FreeType)"
-msgstr ""
+msgstr "//Vložit text (FreeType)"
 
 #: src/mainwindow.c:5321
 msgid "//Paste Palette"
-msgstr ""
+msgstr "//Vložit paletu"
 
 #: src/mainwindow.c:5323
 msgid "//Load Clipboard"
@@ -2248,11 +2262,11 @@ msgstr "//Uložit schránku"
 
 #: src/mainwindow.c:5377
 msgid "//Import Clipboard from System"
-msgstr ""
+msgstr "//Zavést schránku ze systému"
 
 #: src/mainwindow.c:5378
 msgid "//Export Clipboard to System"
-msgstr ""
+msgstr "//Vyvést schránku do systému"
 
 #: src/mainwindow.c:5381
 msgid "//Choose Pattern ..."
@@ -2264,7 +2278,7 @@ msgstr "//Vybrat štětec ..."
 
 #: src/mainwindow.c:5385
 msgid "//Choose Colour ..."
-msgstr ""
+msgstr "//Vybrat barvu..."
 
 #: src/mainwindow.c:5392
 msgid "/_View"
@@ -2284,7 +2298,7 @@ msgstr "//Lišta nastavení"
 
 #: src/mainwindow.c:5402
 msgid "//Show Dock"
-msgstr ""
+msgstr "//Ukázat panel"
 
 #: src/mainwindow.c:5404
 msgid "//Show Palette"
@@ -2308,15 +2322,15 @@ msgstr "//Rastr při zvětšení"
 
 #: src/mainwindow.c:5415
 msgid "//Snap To Tile Grid"
-msgstr ""
+msgstr "//Přichytit k mřížce dlaždic"
 
 #: src/mainwindow.c:5417
 msgid "//Configure Grid ..."
-msgstr ""
+msgstr "//Nastavit mřížku..."
 
 #: src/mainwindow.c:5418
 msgid "//Tracing Image ..."
-msgstr ""
+msgstr "//Obkreslit obrázek..."
 
 #: src/mainwindow.c:5421
 msgid "//View Window"
@@ -2384,11 +2398,11 @@ msgstr "//Otočit libovolně ..."
 
 #: src/mainwindow.c:5455
 msgid "//Skew ..."
-msgstr ""
+msgstr "//Zkreslit..."
 
 #: src/mainwindow.c:5458
 msgid "//Segment ..."
-msgstr ""
+msgstr "//Rozdělit na části..."
 
 #: src/mainwindow.c:5462
 msgid "//Script ..."
@@ -2444,11 +2458,11 @@ msgstr "//Vyplnit elipsu"
 
 #: src/mainwindow.c:5526
 msgid "//Horizontal Ramp"
-msgstr ""
+msgstr "//Vodorovná rampa"
 
 #: src/mainwindow.c:5528
 msgid "//Vertical Ramp"
-msgstr ""
+msgstr "//Svislá rampa"
 
 #: src/mainwindow.c:5531
 msgid "//Alpha Blend A,B"
@@ -2504,7 +2518,7 @@ msgstr "//Upravit barvy A a B ..."
 
 #: src/mainwindow.c:5559
 msgid "//Dither A"
-msgstr ""
+msgstr "//Rastr A"
 
 #: src/mainwindow.c:5561
 msgid "//Palette Editor ..."
@@ -2536,7 +2550,7 @@ msgstr "//Posunovač palety ..."
 
 #: src/mainwindow.c:5574
 msgid "//Pick Gradient ..."
-msgstr ""
+msgstr "//Zvolit přechod..."
 
 #: src/mainwindow.c:5576
 msgid "/Effe_cts"
@@ -2596,7 +2610,7 @@ msgstr "//Detekce hran ..."
 
 #: src/mainwindow.c:5600
 msgid "//Difference of Gaussians ..."
-msgstr ""
+msgstr "//Gaussův rozdíl..."
 
 #: src/mainwindow.c:5602
 msgid "//Sharpen ..."
@@ -2616,7 +2630,7 @@ msgstr "//Gaussovo rozmazání ..."
 
 #: src/mainwindow.c:5610
 msgid "//Kuwahara-Nagao Blur ..."
-msgstr ""
+msgstr "//Rozmazání Kuwahara-Nagao..."
 
 #: src/mainwindow.c:5612
 msgid "//Emboss"
@@ -2624,11 +2638,11 @@ msgstr "//Reliéfy"
 
 #: src/mainwindow.c:5614
 msgid "//Dilate"
-msgstr ""
+msgstr "//Roztáhnout"
 
 #: src/mainwindow.c:5616
 msgid "//Erode"
-msgstr ""
+msgstr "//Rozrušit"
 
 #: src/mainwindow.c:5619
 msgid "//Solid Noise ..."
@@ -2688,7 +2702,7 @@ msgstr "//Párovat RGBA operace"
 
 #: src/mainwindow.c:5659
 msgid "//Unassociate Alpha"
-msgstr ""
+msgstr "//Nespojitá alfa"
 
 #: src/mainwindow.c:5663
 msgid "//View Alpha as an Overlay"
@@ -2704,7 +2718,7 @@ msgstr "/Vrstvy"
 
 #: src/mainwindow.c:5668
 msgid "//New Layer"
-msgstr ""
+msgstr "//Nová vrstva"
 
 #: src/mainwindow.c:5672
 msgid "//Save Composite Image ..."
@@ -2712,7 +2726,7 @@ msgstr "//Uložit kompozitní obrázek ..."
 
 #: src/mainwindow.c:5673
 msgid "//Composite to New Layer"
-msgstr ""
+msgstr "//Spojit do nové vrstvy"
 
 #: src/mainwindow.c:5674
 msgid "//Remove All Layers"
@@ -2764,7 +2778,7 @@ msgstr ""
 
 #: src/memory.c:2854
 msgid "Quantize Pass 2"
-msgstr ""
+msgstr "Průchod kvantizace 2"
 
 #: src/memory.c:3073 src/memory.c:3458
 msgid "Converting to Indexed Palette"
@@ -2804,11 +2818,11 @@ msgstr "Zešikmit"
 
 #: src/memory.c:10630
 msgid "Segmentation Pass 1"
-msgstr ""
+msgstr "Průchod rozdělení na části 1"
 
 #: src/memory.c:10757
 msgid "Segmentation Pass 2"
-msgstr ""
+msgstr "Průchod rozdělení na části 2"
 
 #: src/memory.c:11019 src/otherwindow.c:3156
 msgid "Solid Noise"
@@ -2916,7 +2930,7 @@ msgstr "Nastavit počet barev"
 
 #: src/otherwindow.c:517 src/otherwindow.c:591 src/otherwindow.c:870
 #: src/otherwindow.c:2538 src/otherwindow.c:2776 src/otherwindow.c:2939
-#: src/prefs.c:339 src/prefs.c:539
+#: src/prefs.c:338 src/prefs.c:538
 msgid "Apply"
 msgstr "Provést"
 
@@ -2962,11 +2976,11 @@ msgstr ""
 
 #: src/otherwindow.c:805
 msgid "Truncated"
-msgstr ""
+msgstr "Zkrácený"
 
 #: src/otherwindow.c:805
 msgid "Rounded"
-msgstr ""
+msgstr "Zakulacený"
 
 #: src/otherwindow.c:809 src/toolbar.c:311 src/toolbar.c:558
 msgid "Transform Colour"
@@ -2990,7 +3004,7 @@ msgstr "Zobrazit detaily"
 
 #: src/otherwindow.c:836
 msgid "Posterize type"
-msgstr ""
+msgstr "Typ posterizace"
 
 #: src/otherwindow.c:857
 msgid "Auto-Preview"
@@ -3024,7 +3038,7 @@ msgstr "Dlaždice"
 
 #: src/otherwindow.c:993
 msgid "Void"
-msgstr ""
+msgstr "Prázdný"
 
 #: src/otherwindow.c:994 src/shifter.c:283
 msgid "Clear"
@@ -3105,11 +3119,11 @@ msgstr "Nastavení"
 
 #: src/otherwindow.c:1046
 msgid "Sharper image reduction"
-msgstr ""
+msgstr "Čisté zmenšení obrázku"
 
 #: src/otherwindow.c:1047
 msgid "Boundary extension"
-msgstr ""
+msgstr "Rozšíření hranic"
 
 #: src/otherwindow.c:1613 src/otherwindow.c:2302
 msgid "HSV"
@@ -3153,7 +3167,7 @@ msgstr "Název "
 
 #: src/otherwindow.c:1618
 msgid "Segment"
-msgstr ""
+msgstr "Rozdělit na části"
 
 #: src/otherwindow.c:1656
 msgid "Scale"
@@ -3189,11 +3203,11 @@ msgstr "Rastr při zoomu alespoň"
 
 #: src/otherwindow.c:1717
 msgid "Tile width"
-msgstr "Šířka mřížky"
+msgstr "Šířka dlaždice"
 
 #: src/otherwindow.c:1720
 msgid "Tile height"
-msgstr "Výška mřížky"
+msgstr "Výška dlaždice"
 
 #: src/otherwindow.c:1744
 msgid "Palette Editor"
@@ -3237,7 +3251,7 @@ msgstr ""
 "Max-Min kvantizace (nejlepší pro palety s malým počtem barev a dithering)"
 
 #: src/otherwindow.c:2049 src/otherwindow.c:2495 src/otherwindow.c:2756
-#: src/png.c:2794 src/prefs.c:378
+#: src/png.c:2794 src/prefs.c:377
 msgid "None"
 msgstr "Žádný"
 
@@ -3319,11 +3333,11 @@ msgstr "Počet indexovaných barev"
 
 #: src/otherwindow.c:2078
 msgid "Truncate palette"
-msgstr ""
+msgstr "Zkrácená paleta"
 
 #: src/otherwindow.c:2079
 msgid "Diameter based weighting"
-msgstr ""
+msgstr "Váha založená na průměru"
 
 #: src/otherwindow.c:2084
 msgid "Dither"
@@ -3355,7 +3369,7 @@ msgstr "Selektivní chyba propagace"
 
 #: src/otherwindow.c:2097
 msgid "Full error precision"
-msgstr ""
+msgstr "Plná chybová přesnost"
 
 #: src/otherwindow.c:2302
 msgid "Backward HSV"
@@ -3415,7 +3429,7 @@ msgstr "A do B (RGB)"
 
 #: src/otherwindow.c:2497
 msgid "A to B (sRGB)"
-msgstr ""
+msgstr "A do B (sRGB)"
 
 #: src/otherwindow.c:2497
 msgid "A to B (HSV)"
@@ -3483,7 +3497,7 @@ msgstr "Upravit Vlastní"
 
 #: src/otherwindow.c:2592
 msgid "Pick Gradient"
-msgstr ""
+msgstr "Zvolit přechod"
 
 #: src/otherwindow.c:2668
 msgid "Horizontal "
@@ -3503,7 +3517,7 @@ msgstr "Nepozměněno"
 
 #: src/otherwindow.c:2761
 msgid "Tracing Image"
-msgstr ""
+msgstr "Obkreslit obrázek"
 
 #: src/otherwindow.c:2763 src/toolbar.c:315
 msgid "Source"
@@ -3523,11 +3537,11 @@ msgstr "Zobrazit"
 
 #: src/otherwindow.c:2926
 msgid "Segment Image"
-msgstr ""
+msgstr "Rozdělit obrázek na části"
 
 #: src/otherwindow.c:2931 src/toolbar.c:304
 msgid "Threshold"
-msgstr ""
+msgstr "Práh"
 
 #: src/otherwindow.c:2933
 msgid "Level"
@@ -3535,7 +3549,7 @@ msgstr "Úroveň"
 
 #: src/otherwindow.c:2934
 msgid "Minimum size"
-msgstr ""
+msgstr "Nejmenší velikost"
 
 #: src/otherwindow.c:3053
 msgid "Max"
@@ -3605,7 +3619,7 @@ msgstr ""
 
 #: src/png.c:8370
 msgid "Applying colour profile"
-msgstr ""
+msgstr "Používá se barevný profil"
 
 #: src/png.c:8792
 #, c-format
@@ -3615,157 +3629,161 @@ msgstr ""
 
 #: src/png.c:8809
 msgid "Explode frames"
-msgstr ""
+msgstr "Rozbalit snímky"
 
-#: src/prefs.c:57
+#: src/prefs.c:56
 msgid "Default System Language"
 msgstr "Výchozí jazyk systému"
 
-#: src/prefs.c:58
+#: src/prefs.c:57
 msgid "Chinese (Simplified)"
 msgstr "Čínština (zjednodušená)"
 
-#: src/prefs.c:58
+#: src/prefs.c:57
 msgid "Chinese (Taiwanese)"
 msgstr "Čínsky (Taiwansky)"
 
-#: src/prefs.c:58
+#: src/prefs.c:57
 msgid "Czech"
 msgstr "Česky"
 
-#: src/prefs.c:59
+#: src/prefs.c:58
 msgid "Dutch"
 msgstr "Holandsky"
 
-#: src/prefs.c:59
+#: src/prefs.c:58
 msgid "English (UK)"
 msgstr "Anglicky (UK)"
 
-#: src/prefs.c:59
+#: src/prefs.c:58
 msgid "French"
 msgstr "Francouzsky"
 
-#: src/prefs.c:59
+#: src/prefs.c:58
 msgid "Galician"
 msgstr "Galicijsky"
 
-#: src/prefs.c:59
+#: src/prefs.c:58
 msgid "German"
 msgstr "Německy"
 
-#: src/prefs.c:60
+#: src/prefs.c:59
 msgid "Hungarian"
-msgstr ""
+msgstr "Maďarština"
 
-#: src/prefs.c:60
+#: src/prefs.c:59
 msgid "Italian"
 msgstr "Italsky"
 
-#: src/prefs.c:60
+#: src/prefs.c:59
 msgid "Japanese"
 msgstr "Japonsky"
 
-#: src/prefs.c:60
+#: src/prefs.c:59
+msgid "Kabyle"
+msgstr ""
+
+#: src/prefs.c:59
 msgid "Polish"
 msgstr "Polsky"
 
-#: src/prefs.c:61
+#: src/prefs.c:60
 msgid "Portuguese"
 msgstr "Portugalsky"
 
-#: src/prefs.c:61
+#: src/prefs.c:60
 msgid "Portuguese (Brazilian)"
 msgstr "Portugalsky (Brazílie)"
 
-#: src/prefs.c:61
+#: src/prefs.c:60
 msgid "Russian"
 msgstr "Rusky"
 
-#: src/prefs.c:61
+#: src/prefs.c:60
 msgid "Slovak"
 msgstr "Slovensky"
 
-#: src/prefs.c:62
+#: src/prefs.c:61
 msgid "Spanish"
 msgstr "Španělsky"
 
-#: src/prefs.c:62
+#: src/prefs.c:61
 msgid "Swedish"
 msgstr "Švédsky"
 
-#: src/prefs.c:62
+#: src/prefs.c:61
 msgid "Tagalog"
-msgstr ""
+msgstr "Filipínština"
 
-#: src/prefs.c:62
+#: src/prefs.c:61
 msgid "Turkish"
 msgstr "Turecky"
 
-#: src/prefs.c:82
+#: src/prefs.c:81
 msgid "Current Device"
 msgstr "Aktuální zařízení"
 
-#: src/prefs.c:136
+#: src/prefs.c:135
 msgid "Pressure"
 msgstr "Tlak"
 
-#: src/prefs.c:150
+#: src/prefs.c:149
 msgid "Preferences"
 msgstr "Volby"
 
-#: src/prefs.c:164
+#: src/prefs.c:163
 msgid "Max threads (0 to autodetect)"
-msgstr ""
+msgstr "Největší počet vláken (0 pro automatické zjištění)"
 
-#: src/prefs.c:165
+#: src/prefs.c:164
 msgid "Min kpixels per render thread"
 msgstr ""
 
-#: src/prefs.c:172
+#: src/prefs.c:171
 msgid "Max memory used for undo (MB)"
 msgstr "Max paměti použité pro historii (MB)"
 
-#: src/prefs.c:173
+#: src/prefs.c:172
 msgid "Max undo levels"
-msgstr "Maximální počet vracení zpět"
+msgstr "Největší počet kroků zpět"
 
-#: src/prefs.c:174
+#: src/prefs.c:173
 msgid "Communal layer undo space (%)"
-msgstr ""
+msgstr "Vrátitelný prostor společné vrstvy (%)"
 
-#: src/prefs.c:176
+#: src/prefs.c:175
 msgid "Bayer master pattern"
 msgstr ""
 
-#: src/prefs.c:179
+#: src/prefs.c:178
 msgid "Use gamma correction by default"
 msgstr "Použít gamma korekci jako výchozí"
 
-#: src/prefs.c:180
+#: src/prefs.c:179
 msgid "Use gamma correction when painting"
 msgstr ""
 
-#: src/prefs.c:181
+#: src/prefs.c:180
 msgid "Separate patterns for A & B"
 msgstr ""
 
-#: src/prefs.c:184
+#: src/prefs.c:183
 msgid "Optimize alpha chequers"
 msgstr "Optimalizovat šachovnici alfa kanálu"
 
-#: src/prefs.c:185
+#: src/prefs.c:184
 msgid "Disable view window transparencies"
 msgstr "Vypnout průhlednost v okně zobrazení"
 
-#: src/prefs.c:186
+#: src/prefs.c:185
 msgid "Enable overlays by layer"
 msgstr ""
 
-#: src/prefs.c:190
+#: src/prefs.c:189
 msgid "Language"
 msgstr "Jazyk"
 
-#: src/prefs.c:192
+#: src/prefs.c:191
 msgid ""
 "Select preferred language translation\n"
 "\n"
@@ -3777,262 +3795,262 @@ msgstr ""
 "Aby se projevily všechny změny,\n"
 "je třeba mtPaint restartovat."
 
-#: src/prefs.c:199
+#: src/prefs.c:198
 msgid "Interface"
 msgstr "Rozhraní"
 
-#: src/prefs.c:201
+#: src/prefs.c:200
 msgid "Greyscale backdrop"
 msgstr "Odstín šedivého pozadí"
 
-#: src/prefs.c:202
+#: src/prefs.c:201
 msgid "Selection nudge pixels"
 msgstr "Posun pixelů výběru"
 
-#: src/prefs.c:203
+#: src/prefs.c:202
 msgid "Max Pan Window Size"
 msgstr "Velikost přehledového okna"
 
-#: src/prefs.c:205
+#: src/prefs.c:204
 msgid "Display clipboard while pasting"
 msgstr "Zobrazovat schránku při vkládání"
 
-#: src/prefs.c:206
+#: src/prefs.c:205
 msgid "Mouse cursor = Tool"
 msgstr "Kurzor myši = Nástroj"
 
-#: src/prefs.c:207
+#: src/prefs.c:206
 msgid "Confirm Exit"
 msgstr "Potvrdit konec"
 
-#: src/prefs.c:208
+#: src/prefs.c:207
 msgid "Q key quits mtPaint"
 msgstr "Klávesa Q ukončí mtPaint"
 
-#: src/prefs.c:209
+#: src/prefs.c:208
 msgid "Arrow keys scroll canvas"
 msgstr ""
 
-#: src/prefs.c:210
+#: src/prefs.c:209
 msgid "Changing tool commits paste"
 msgstr "Změna nástroje potvrdí vložení"
 
-#: src/prefs.c:211
+#: src/prefs.c:210
 msgid "Centre tool settings dialogs"
 msgstr "Centrovat dialogy nastavení nástrojů"
 
-#: src/prefs.c:212
+#: src/prefs.c:211
 msgid "New image sets zoom to 100%"
 msgstr "Nový obrázek nastaví zoom na 100%"
 
-#: src/prefs.c:213
+#: src/prefs.c:212
 msgid "Zoom on cursor position"
 msgstr ""
 
-#: src/prefs.c:215
+#: src/prefs.c:214
 msgid "Mouse Scroll Wheel = Zoom"
 msgstr "Kolečko na myši = Zoom"
 
-#: src/prefs.c:216
+#: src/prefs.c:215
 msgid "Use menu icons"
 msgstr "Použít ikony menu"
 
-#: src/prefs.c:221
+#: src/prefs.c:220
 msgid "Files"
 msgstr "Soubory"
 
-#: src/prefs.c:224
+#: src/prefs.c:223
 msgid "XBM X hotspot"
 msgstr "XBM X aktivní bod"
 
-#: src/prefs.c:225
+#: src/prefs.c:224
 msgid "XBM Y hotspot"
 msgstr "XBM Y aktivní bod"
 
-#: src/prefs.c:229
+#: src/prefs.c:228
 msgid "Recently Used Files"
 msgstr "Naposledy použité soubory"
 
-#: src/prefs.c:230
+#: src/prefs.c:229
 msgid "Progress bar silence limit"
 msgstr "Tichý limit ukazatele postupu"
 
-#: src/prefs.c:233
+#: src/prefs.c:232
 msgid "Read 16-bit TGAs as 5:6:5 BGR"
 msgstr "Načíst 16-bitové obrázky TGA jako 5:6:5 BGR"
 
-#: src/prefs.c:234
+#: src/prefs.c:233
 msgid "Write TGAs in bottom-up row order"
 msgstr "Zapsat TGA s řádkováním odspoda nahoru"
 
-#: src/prefs.c:235
+#: src/prefs.c:234
 msgid "Undoable image loading"
-msgstr ""
+msgstr "Vrátitelné nahrávání obrázku"
 
-#: src/prefs.c:246
+#: src/prefs.c:245
 msgid "Compression (RGB)"
 msgstr ""
 
-#: src/prefs.c:247
+#: src/prefs.c:246
 msgid "Compression (indexed)"
 msgstr ""
 
-#: src/prefs.c:248
+#: src/prefs.c:247
 msgid "Compression (monochrome)"
 msgstr ""
 
-#: src/prefs.c:256
+#: src/prefs.c:255
 msgid "Enable predictor"
 msgstr ""
 
-#: src/prefs.c:263
+#: src/prefs.c:262
 msgid "Compression mode"
 msgstr ""
 
-#: src/prefs.c:272
+#: src/prefs.c:271
 msgid "Channel for Mask Plane"
 msgstr ""
 
-#: src/prefs.c:274
+#: src/prefs.c:273
 msgid "Ignore Transparent Colour"
 msgstr ""
 
-#: src/prefs.c:275
+#: src/prefs.c:274
 msgid "PackBits Compression"
 msgstr ""
 
-#: src/prefs.c:276
+#: src/prefs.c:275
 msgid "Write Indexed as Planar Bitmap (PBM)"
 msgstr ""
 
-#: src/prefs.c:281
+#: src/prefs.c:280
 msgid "Paths"
 msgstr "Cesty"
 
-#: src/prefs.c:282
+#: src/prefs.c:281
 msgid "Clipboard Files"
 msgstr "Soubory schránky"
 
-#: src/prefs.c:282
+#: src/prefs.c:281
 msgid "Select Clipboard File"
 msgstr "Výběr souboru schránky"
 
-#: src/prefs.c:284
+#: src/prefs.c:283
 msgid "HTML Browser Program"
 msgstr "HTML Prohlížeč"
 
-#: src/prefs.c:284
+#: src/prefs.c:283
 msgid "Select Browser Program"
 msgstr "Vyberte webový prohlížeč"
 
-#: src/prefs.c:286
+#: src/prefs.c:285
 msgid "Location of Handbook index"
 msgstr "Umístění indexu příručky"
 
-#: src/prefs.c:286
+#: src/prefs.c:285
 msgid "Select Handbook Index File"
 msgstr "Vyberte Index soubor příručky"
 
-#: src/prefs.c:288
+#: src/prefs.c:287
 msgid "Default Palette"
 msgstr "Výchozí paleta"
 
-#: src/prefs.c:288
+#: src/prefs.c:287
 msgid "Select Default Palette"
 msgstr "Vybrat výchozí paletu"
 
-#: src/prefs.c:290
+#: src/prefs.c:289
 msgid "Default Patterns"
 msgstr "Výchozí vzory"
 
-#: src/prefs.c:290
+#: src/prefs.c:289
 msgid "Select Default Patterns File"
-msgstr ""
+msgstr "Vybrat soubor s výchozími vzory"
 
-#: src/prefs.c:293
+#: src/prefs.c:292
 msgid "Default CSS"
 msgstr ""
 
-#: src/prefs.c:293
+#: src/prefs.c:292
 msgid "Select Default CSS File"
 msgstr ""
 
-#: src/prefs.c:296
+#: src/prefs.c:295
 msgid "Default Theme"
-msgstr ""
+msgstr "Výchozí téma"
 
-#: src/prefs.c:296
+#: src/prefs.c:295
 msgid "Select Default Theme File"
-msgstr ""
+msgstr "Vybrat soubor s výchozím tématem"
 
-#: src/prefs.c:301
+#: src/prefs.c:300
 msgid "Status Bar"
 msgstr "Stavová lišta"
 
-#: src/prefs.c:302
+#: src/prefs.c:301
 msgid "Canvas Geometry"
 msgstr "Geometrie plátna"
 
-#: src/prefs.c:303
+#: src/prefs.c:302
 msgid "Cursor X,Y"
 msgstr "Kurzor X,Y"
 
-#: src/prefs.c:304
+#: src/prefs.c:303
 msgid "Pixel [I] {RGB}"
 msgstr "Pixel [I] {RGB}"
 
-#: src/prefs.c:305
+#: src/prefs.c:304
 msgid "Selection Geometry"
 msgstr "Geometrie Výběru"
 
-#: src/prefs.c:306
+#: src/prefs.c:305
 msgid "Undo / Redo"
-msgstr "Zpět / Vpřed"
+msgstr "Zpět / Znovu"
 
-#: src/prefs.c:309
+#: src/prefs.c:308
 msgid "Tablet"
 msgstr "Tablet"
 
-#: src/prefs.c:310
+#: src/prefs.c:309
 msgid "Device Settings"
 msgstr "Nastavení zařízení"
 
-#: src/prefs.c:314
+#: src/prefs.c:313
 msgid "Configure Device"
 msgstr "Konfigurace zařízení"
 
-#: src/prefs.c:320
+#: src/prefs.c:319
 msgid "Tool Variable"
 msgstr "Variabilita nástroje"
 
-#: src/prefs.c:323 src/toolbar.c:454
+#: src/prefs.c:322 src/toolbar.c:454
 msgid "Flow"
-msgstr "Bohatost"
+msgstr "Tok"
 
-#: src/prefs.c:331
+#: src/prefs.c:330
 msgid "Test Area"
 msgstr "Testovací plocha"
 
-#: src/prefs.c:374
+#: src/prefs.c:373
 msgid "Factor"
 msgstr "Faktor"
 
-#: src/prefs.c:460
+#: src/prefs.c:459
 msgid "This key is builtin"
 msgstr ""
 
-#: src/prefs.c:463
+#: src/prefs.c:462
 #, c-format
 msgid ""
 "This key is mapped to:\n"
 "\"%s\""
 msgstr ""
 
-#: src/prefs.c:466
+#: src/prefs.c:465
 msgid "Remap"
 msgstr ""
 
-#: src/prefs.c:511
+#: src/prefs.c:510
 msgid "Keyboard Shortcuts"
 msgstr ""
 
@@ -4058,7 +4076,7 @@ msgstr "Upravit paletu"
 
 #: src/spawn.c:651
 msgid "Configure File Actions"
-msgstr ""
+msgstr "Nastavit činnosti pro práci se souborem"
 
 #: src/spawn.c:657 src/spawn.c:663
 msgid "Command"
@@ -4088,7 +4106,7 @@ msgstr ""
 
 #: src/thread.c:361
 msgid "Helper thread is not responding. Save your work and exit the program."
-msgstr ""
+msgstr "Vlákno pomocníka neodpovídá. Uložte práci a ukončete program."
 
 #: src/toolbar.c:147
 msgid "RGB Cube"

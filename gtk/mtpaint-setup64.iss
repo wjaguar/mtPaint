@@ -13,10 +13,15 @@ DefaultGroupName=mtPaint
 AllowNoIcons=yes
 LicenseFile=.\COPYING.txt
 OutputDir=C:\
-OutputBaseFilename=mtpaint-%VERSION%-w32-setup
+OutputBaseFilename=mtpaint-%VERSION%-w64-setup
 ;SetupIconFile=C:\Program Files\mtPaint\mtpaint.ico
 Compression=lzma
 SolidCompression=yes
+PrivilegesRequired=lowest
+PrivilegesRequiredOverridesAllowed=dialog
+MinVersion=6.1
+ArchitecturesAllowed=x64
+ArchitecturesInstallIn64BitMode=x64
 
 [Languages]
 Name: "english"; MessagesFile: "compiler:Default.isl"
@@ -42,13 +47,13 @@ Name: "{group}\mtPaint"; Filename: "{app}\bin\mtpaint.exe"; IconFilename: "{app}
 Name: "{group}\mtPaint Handbook"; Filename: "{app}\docs\index.html"; WorkingDir: "{app}\docs"
 Name: "{group}\{cm:ProgramOnTheWeb,mtPaint}"; Filename: "{app}\mtpaint.url";
 Name: "{group}\{cm:UninstallProgram,mtPaint}"; Filename: "{uninstallexe}";
-Name: "{userdesktop}\mtPaint"; Filename: "{app}\bin\mtpaint.exe"; Tasks: desktopicon; IconFilename: "{app}\mtpaint.ico"; WorkingDir: "{app}\bin"
-Name: "{userdesktop}\mtPaint Screenshot"; Filename: "{app}\bin\mtpaint.exe"; Parameters: "-s"; Tasks: dscreenicon; IconFilename: "{app}\screenshot.ico"; WorkingDir: "{app}\bin"
-;Name: "{userdesktop}\mtPaint Handbook"; Filename: "{app}\docs\index.html"; Tasks: dhandbook; WorkingDir: "{app}\docs"
-Name: "{userappdata}\Microsoft\Internet Explorer\Quick Launch\mtPaint"; Filename: "{app}\bin\mtpaint.exe"; Tasks: quicklaunchicon; IconFilename: "{app}\mtpaint.ico"; WorkingDir: "{app}\bin"
-Name: "{userappdata}\Microsoft\Internet Explorer\Quick Launch\mtPaint Screenshot"; Filename: "{app}\bin\mtpaint.exe"; Parameters: "-s"; Tasks: qlscreenicon; IconFilename: "{app}\screenshot.ico"; WorkingDir: "{app}\bin"
-;Name: "{userappdata}\Microsoft\Internet Explorer\Quick Launch\mtPaint Handbook"; Filename: "{app}\docs\index.html"; Tasks: qlhandbook; WorkingDir: "{app}\docs"
-Name: "{sendto}\mtPaint"; Filename: "{app}\bin\mtpaint.exe"; Tasks: sendtoicon; IconFilename: "{app}\mtpaint.ico"; WorkingDir: "{app}\bin"
+Name: "{autodesktop}\mtPaint"; Filename: "{app}\bin\mtpaint.exe"; Tasks: desktopicon; IconFilename: "{app}\mtpaint.ico"; WorkingDir: "{app}\bin"
+Name: "{autodesktop}\mtPaint Screenshot"; Filename: "{app}\bin\mtpaint.exe"; Parameters: "-s"; Tasks: dscreenicon; IconFilename: "{app}\screenshot.ico"; WorkingDir: "{app}\bin"
+;Name: "{autodesktop}\mtPaint Handbook"; Filename: "{app}\docs\index.html"; Tasks: dhandbook; WorkingDir: "{app}\docs"
+Name: "{autoappdata}\Microsoft\Internet Explorer\Quick Launch\mtPaint"; Filename: "{app}\bin\mtpaint.exe"; Tasks: quicklaunchicon; IconFilename: "{app}\mtpaint.ico"; WorkingDir: "{app}\bin"
+Name: "{autoappdata}\Microsoft\Internet Explorer\Quick Launch\mtPaint Screenshot"; Filename: "{app}\bin\mtpaint.exe"; Parameters: "-s"; Tasks: qlscreenicon; IconFilename: "{app}\screenshot.ico"; WorkingDir: "{app}\bin"
+;Name: "{autoappdata}\Microsoft\Internet Explorer\Quick Launch\mtPaint Handbook"; Filename: "{app}\docs\index.html"; Tasks: qlhandbook; WorkingDir: "{app}\docs"
+Name: "{usersendto}\mtPaint"; Filename: "{app}\bin\mtpaint.exe"; Tasks: sendtoicon; IconFilename: "{app}\mtpaint.ico"; WorkingDir: "{app}\bin"
 
 [Run]
 Filename: "{app}\bin\mtpaint.exe"; Description: "{cm:LaunchProgram,mtPaint}"; Flags: nowait postinstall skipifsilent

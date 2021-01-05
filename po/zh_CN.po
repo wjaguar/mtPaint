@@ -4,9 +4,9 @@
 #
 msgid ""
 msgstr ""
-"Project-Id-Version: mtpaint 3.50\n"
+"Project-Id-Version: mtpaint 3.51\n"
 "Report-Msgid-Bugs-To: \n"
-"POT-Creation-Date: 2020-12-31 16:57+0200\n"
+"POT-Creation-Date: 2021-01-04 21:31+0200\n"
 "PO-Revision-Date: 2011-10-02 04:53+0000\n"
 "Last-Translator: Cecc <puppylinux.cn@gmail.com>\n"
 "Language-Team: Chinese (simplified) <puppylinux@sohu.com>\n"
@@ -43,7 +43,7 @@ msgstr "关闭"
 #: src/layer.c:970 src/mainwindow.c:341 src/mainwindow.c:370
 #: src/mainwindow.c:534 src/mainwindow.c:578 src/mainwindow.c:604
 #: src/mainwindow.c:3797 src/mainwindow.c:4045 src/otherwindow.c:931
-#: src/otherwindow.c:980 src/otherwindow.c:982 src/prefs.c:460 src/spawn.c:924
+#: src/otherwindow.c:980 src/otherwindow.c:982 src/prefs.c:459 src/spawn.c:924
 #: src/spawn.c:978 src/spawn.c:1017 src/thread.c:360 src/vcode.c:9912
 #: src/viewer.c:1161 src/viewer.c:1179
 msgid "Error"
@@ -63,7 +63,7 @@ msgstr "无法保存图像"
 
 #: src/ani.c:840 src/canvas.c:1171 src/fpick.c:731 src/layer.c:311
 #: src/layer.c:379 src/layer.c:826 src/layer.c:840 src/mainwindow.c:375
-#: src/mainwindow.c:1026 src/png.c:8794 src/prefs.c:465
+#: src/mainwindow.c:1026 src/png.c:8794 src/prefs.c:464
 msgid "Warning"
 msgstr "警告"
 
@@ -401,7 +401,7 @@ msgid "Could not explode all the frames in the animation."
 msgstr ""
 
 #: src/canvas.c:1481 src/font.c:1556 src/fpick.c:937 src/otherwindow.c:2765
-#: src/prefs.c:322 src/toolbar.c:451
+#: src/prefs.c:321 src/toolbar.c:451
 msgid "Size"
 msgstr "大小"
 
@@ -419,7 +419,7 @@ msgstr "高度"
 #: src/otherwindow.c:1058 src/otherwindow.c:1727 src/otherwindow.c:2101
 #: src/otherwindow.c:2336 src/otherwindow.c:2538 src/otherwindow.c:2691
 #: src/otherwindow.c:2776 src/otherwindow.c:2937 src/otherwindow.c:3070
-#: src/otherwindow.c:3169 src/prefs.c:339 src/prefs.c:465 src/prefs.c:539
+#: src/otherwindow.c:3169 src/prefs.c:338 src/prefs.c:464 src/prefs.c:538
 #: src/spawn.c:666 src/viewer.c:1258
 msgid "Cancel"
 msgstr "取消"
@@ -429,8 +429,8 @@ msgstr "取消"
 #: src/otherwindow.c:591 src/otherwindow.c:871 src/otherwindow.c:1058
 #: src/otherwindow.c:1729 src/otherwindow.c:2101 src/otherwindow.c:2336
 #: src/otherwindow.c:2538 src/otherwindow.c:2691 src/otherwindow.c:2776
-#: src/otherwindow.c:3072 src/otherwindow.c:3171 src/prefs.c:339
-#: src/prefs.c:539 src/spawn.c:666
+#: src/otherwindow.c:3072 src/otherwindow.c:3171 src/prefs.c:338
+#: src/prefs.c:538 src/spawn.c:666
 msgid "OK"
 msgstr "确定"
 
@@ -477,7 +477,7 @@ msgstr "无法导出 ASCII 文件"
 msgid "Unable to save file: %s"
 msgstr "无法保存文件：%s"
 
-#: src/canvas.c:2101 src/prefs.c:223
+#: src/canvas.c:2101 src/prefs.c:222
 msgid "Transparency index"
 msgstr "透明索引"
 
@@ -485,7 +485,7 @@ msgstr "透明索引"
 msgid "TIFF Compression"
 msgstr ""
 
-#: src/canvas.c:2105 src/prefs.c:226
+#: src/canvas.c:2105 src/prefs.c:225
 msgid "JPEG Save Quality (100=High)"
 msgstr "JPEG 保存质量(100 = 高)"
 
@@ -493,19 +493,19 @@ msgstr "JPEG 保存质量(100 = 高)"
 msgid "ZIP Compression (0=None)"
 msgstr ""
 
-#: src/canvas.c:2108 src/prefs.c:228
+#: src/canvas.c:2108 src/prefs.c:227
 msgid "PNG Compression (0=None)"
 msgstr "PNG 压缩 (0 = 无)"
 
-#: src/canvas.c:2111 src/prefs.c:250
+#: src/canvas.c:2111 src/prefs.c:249
 msgid "LZMA2 Compression (0=None)"
 msgstr ""
 
-#: src/canvas.c:2113 src/prefs.c:253
+#: src/canvas.c:2113 src/prefs.c:252
 msgid "ZSTD Compression Level"
 msgstr ""
 
-#: src/canvas.c:2115 src/prefs.c:232
+#: src/canvas.c:2115 src/prefs.c:231
 msgid "TGA RLE Compression"
 msgstr "TGA RLE 压缩"
 
@@ -513,7 +513,7 @@ msgstr "TGA RLE 压缩"
 msgid "LBM PackBits Compression"
 msgstr ""
 
-#: src/canvas.c:2118 src/prefs.c:227
+#: src/canvas.c:2118 src/prefs.c:226
 msgid "JPEG2000 Compression (0=Lossless)"
 msgstr "JPEG2000 压缩 (0 = 无损)"
 
@@ -525,11 +525,11 @@ msgstr ""
 msgid "WebP Save Quality (100=High)"
 msgstr ""
 
-#: src/canvas.c:2123 src/prefs.c:264
+#: src/canvas.c:2123 src/prefs.c:263
 msgid "V8 Save Quality (100=High)"
 msgstr ""
 
-#: src/canvas.c:2125 src/prefs.c:265
+#: src/canvas.c:2125 src/prefs.c:264
 msgid "V8L Compression (0=None)"
 msgstr ""
 
@@ -549,7 +549,7 @@ msgstr "动画延迟"
 msgid "Undoable"
 msgstr "可逆的"
 
-#: src/canvas.c:2138 src/prefs.c:237
+#: src/canvas.c:2138 src/prefs.c:236
 msgid "Apply colour profile"
 msgstr ""
 
@@ -694,7 +694,7 @@ msgstr "饱和度"
 msgid "Hex"
 msgstr "十六进制"
 
-#: src/cpick.c:840 src/layer.c:1109 src/otherwindow.c:2530 src/prefs.c:324
+#: src/cpick.c:840 src/layer.c:1109 src/otherwindow.c:2530 src/prefs.c:323
 #: src/toolbar.c:457
 msgid "Opacity"
 msgstr "不透明"
@@ -776,11 +776,11 @@ msgstr "目录"
 msgid "New Directory"
 msgstr "新建目录"
 
-#: src/font.c:1644 src/prefs.c:533
+#: src/font.c:1644 src/prefs.c:532
 msgid "Add"
 msgstr "添加"
 
-#: src/font.c:1645 src/prefs.c:534
+#: src/font.c:1645 src/prefs.c:533
 msgid "Remove"
 msgstr "移除"
 
@@ -870,7 +870,7 @@ msgstr "类型"
 msgid "Modified"
 msgstr "修改日期"
 
-#: src/help.c:25 src/prefs.c:161
+#: src/help.c:25 src/prefs.c:160
 msgid "General"
 msgstr "常规"
 
@@ -887,8 +887,8 @@ msgid "Credits"
 msgstr "致谢"
 
 #: src/help.c:32
-msgid "mtPaint 3.50 - Copyright (C) 2004-2020 The Authors\n"
-msgstr "mtPaint 3.50 - 版权 (C) 2004-2020 作者群\n"
+msgid "mtPaint 3.51 - Copyright (C) 2004-2021 The Authors\n"
+msgstr "mtPaint 3.51 - 版权 (C) 2004-2021 作者群\n"
 
 #: src/help.c:33
 msgid "See 'Credits' section for a list of the authors.\n"
@@ -1567,8 +1567,8 @@ msgid "Brazilian Portuguese - Paulo Trevizan, Valter Nazianzeno"
 msgstr "巴西葡萄牙语 - Paulo Trevizan, Valter Nazianzeno"
 
 #: src/help.c:179
-msgid "Czech - Pavel Ruzicka, Martin Petricek, Roman Hornik"
-msgstr "捷克语 - Pavel Ruzicka, Martin Petricek, Roman Hornik"
+msgid "Czech - Pavel Ruzicka, Martin Petricek, Roman Hornik, Pavel Fric"
+msgstr "捷克语 - Pavel Ruzicka, Martin Petricek, Roman Hornik, Pavel Fric"
 
 #: src/help.c:180
 msgid "Dutch - Hans Strijards, Pjotr"
@@ -1603,26 +1603,30 @@ msgid "Japanese - Norihiro YONEDA"
 msgstr "日语 - Norihiro YONEDA"
 
 #: src/help.c:187
+msgid "Kabyle - Yacine Bouklif"
+msgstr ""
+
+#: src/help.c:188
 msgid "Polish - Bartosz Kaszubowski, LucaS"
 msgstr "波兰语 - Bartosz Kaszubowski, LucaS"
 
-#: src/help.c:188
+#: src/help.c:189
 msgid "Portuguese - Israel G. Lugo, Tiago Silva"
 msgstr "葡萄牙语 - Israel G. Lugo, Tiago Silva"
 
-#: src/help.c:189
+#: src/help.c:190
 msgid "Russian - Sergey Irupin, Dmitry Groshev"
 msgstr "俄语 - Sergey Irupin, Dmitry Groshev"
 
-#: src/help.c:190
+#: src/help.c:191
 msgid "Simplified Chinese - Cecc"
 msgstr "简体中文 - Cecc"
 
-#: src/help.c:191
+#: src/help.c:192
 msgid "Slovak - Jozef Riha"
 msgstr "斯洛伐克语 - Jozef Riha"
 
-#: src/help.c:192
+#: src/help.c:193
 msgid ""
 "Spanish - Guadalinex Team (Junta de Andalucia), Antonio Sanchez Leon, Miguel "
 "Anxo Bouzada, Francisco Jose Rey, Adolfo Jayme"
@@ -1630,19 +1634,19 @@ msgstr ""
 "西班牙语 - Guadalinex Team (Junta de Andalucia), Antonio Sanchez Leon, "
 "Miguel Anxo Bouzada, Francisco Jose Rey, Adolfo Jayme"
 
-#: src/help.c:193
+#: src/help.c:194
 msgid "Swedish - Daniel Nylander, Daniel Eriksson"
 msgstr "瑞典语 - Daniel Nylander, Daniel Eriksson"
 
-#: src/help.c:194
+#: src/help.c:195
 msgid "Tagalog - Anjelo delCarmen"
 msgstr ""
 
-#: src/help.c:195
+#: src/help.c:196
 msgid "Taiwanese Chinese - Wei-Lun Chao"
 msgstr "繁体中文 - Wei-Lun Chao"
 
-#: src/help.c:196
+#: src/help.c:197
 msgid "Turkish - Muhammet Kara, Tutku Dalmaz"
 msgstr "土耳其语 - Muhammet Kara, Tutku Dalmaz"
 
@@ -2884,7 +2888,7 @@ msgstr "设置调色板大小"
 
 #: src/otherwindow.c:517 src/otherwindow.c:591 src/otherwindow.c:870
 #: src/otherwindow.c:2538 src/otherwindow.c:2776 src/otherwindow.c:2939
-#: src/prefs.c:339 src/prefs.c:539
+#: src/prefs.c:338 src/prefs.c:538
 msgid "Apply"
 msgstr "应用"
 
@@ -3204,7 +3208,7 @@ msgid "Max-Min Quantize (best for small palettes and dithering)"
 msgstr "最大 - 最小量化（适合小调色盘和抖动）"
 
 #: src/otherwindow.c:2049 src/otherwindow.c:2495 src/otherwindow.c:2756
-#: src/png.c:2794 src/prefs.c:378
+#: src/png.c:2794 src/prefs.c:377
 msgid "None"
 msgstr "无"
 
@@ -3583,155 +3587,159 @@ msgstr "%d/%d 的帧不能保存为%s，改为以 PNG 格式保存"
 msgid "Explode frames"
 msgstr ""
 
-#: src/prefs.c:57
+#: src/prefs.c:56
 msgid "Default System Language"
 msgstr "系统默认语言"
 
-#: src/prefs.c:58
+#: src/prefs.c:57
 msgid "Chinese (Simplified)"
 msgstr "简体中文"
 
-#: src/prefs.c:58
+#: src/prefs.c:57
 msgid "Chinese (Taiwanese)"
 msgstr "繁体中文"
 
-#: src/prefs.c:58
+#: src/prefs.c:57
 msgid "Czech"
 msgstr "捷克语"
 
-#: src/prefs.c:59
+#: src/prefs.c:58
 msgid "Dutch"
 msgstr "荷兰语"
 
-#: src/prefs.c:59
+#: src/prefs.c:58
 msgid "English (UK)"
 msgstr "英语(英国)"
 
-#: src/prefs.c:59
+#: src/prefs.c:58
 msgid "French"
 msgstr "法语"
 
-#: src/prefs.c:59
+#: src/prefs.c:58
 msgid "Galician"
 msgstr "加利西亚语"
 
-#: src/prefs.c:59
+#: src/prefs.c:58
 msgid "German"
 msgstr "德语"
 
-#: src/prefs.c:60
+#: src/prefs.c:59
 msgid "Hungarian"
 msgstr ""
 
-#: src/prefs.c:60
+#: src/prefs.c:59
 msgid "Italian"
 msgstr "意大利语"
 
-#: src/prefs.c:60
+#: src/prefs.c:59
 msgid "Japanese"
 msgstr "日语"
 
-#: src/prefs.c:60
+#: src/prefs.c:59
+msgid "Kabyle"
+msgstr ""
+
+#: src/prefs.c:59
 msgid "Polish"
 msgstr "波兰语"
 
-#: src/prefs.c:61
+#: src/prefs.c:60
 msgid "Portuguese"
 msgstr "葡萄牙语"
 
-#: src/prefs.c:61
+#: src/prefs.c:60
 msgid "Portuguese (Brazilian)"
 msgstr "葡萄牙语(巴西)"
 
-#: src/prefs.c:61
+#: src/prefs.c:60
 msgid "Russian"
 msgstr "俄语"
 
-#: src/prefs.c:61
+#: src/prefs.c:60
 msgid "Slovak"
 msgstr "斯洛伐克语"
 
-#: src/prefs.c:62
+#: src/prefs.c:61
 msgid "Spanish"
 msgstr "西班牙语"
 
-#: src/prefs.c:62
+#: src/prefs.c:61
 msgid "Swedish"
 msgstr "瑞典语"
 
-#: src/prefs.c:62
+#: src/prefs.c:61
 msgid "Tagalog"
 msgstr ""
 
-#: src/prefs.c:62
+#: src/prefs.c:61
 msgid "Turkish"
 msgstr "土耳其语"
 
-#: src/prefs.c:82
+#: src/prefs.c:81
 msgid "Current Device"
 msgstr "当前设备"
 
-#: src/prefs.c:136
+#: src/prefs.c:135
 msgid "Pressure"
 msgstr "压力"
 
-#: src/prefs.c:150
+#: src/prefs.c:149
 msgid "Preferences"
 msgstr "首选项"
 
-#: src/prefs.c:164
+#: src/prefs.c:163
 msgid "Max threads (0 to autodetect)"
 msgstr ""
 
-#: src/prefs.c:165
+#: src/prefs.c:164
 msgid "Min kpixels per render thread"
 msgstr ""
 
-#: src/prefs.c:172
+#: src/prefs.c:171
 msgid "Max memory used for undo (MB)"
 msgstr "用于还原的最大内存(MB)"
 
-#: src/prefs.c:173
+#: src/prefs.c:172
 msgid "Max undo levels"
 msgstr "最大撤销次数"
 
-#: src/prefs.c:174
+#: src/prefs.c:173
 msgid "Communal layer undo space (%)"
 msgstr "图层共享还原内存(%)"
 
-#: src/prefs.c:176
+#: src/prefs.c:175
 msgid "Bayer master pattern"
 msgstr ""
 
-#: src/prefs.c:179
+#: src/prefs.c:178
 msgid "Use gamma correction by default"
 msgstr "默认使用伽马修正"
 
-#: src/prefs.c:180
+#: src/prefs.c:179
 msgid "Use gamma correction when painting"
 msgstr ""
 
-#: src/prefs.c:181
+#: src/prefs.c:180
 msgid "Separate patterns for A & B"
 msgstr ""
 
-#: src/prefs.c:184
+#: src/prefs.c:183
 msgid "Optimize alpha chequers"
 msgstr "优化透明方格"
 
-#: src/prefs.c:185
+#: src/prefs.c:184
 msgid "Disable view window transparencies"
 msgstr "停用查看窗口透明"
 
-#: src/prefs.c:186
+#: src/prefs.c:185
 msgid "Enable overlays by layer"
 msgstr ""
 
-#: src/prefs.c:190
+#: src/prefs.c:189
 msgid "Language"
 msgstr "语言"
 
-#: src/prefs.c:192
+#: src/prefs.c:191
 msgid ""
 "Select preferred language translation\n"
 "\n"
@@ -3743,262 +3751,262 @@ msgstr ""
 "您需要重启mtPaint\n"
 "让其完全生效"
 
-#: src/prefs.c:199
+#: src/prefs.c:198
 msgid "Interface"
 msgstr "界面"
 
-#: src/prefs.c:201
+#: src/prefs.c:200
 msgid "Greyscale backdrop"
 msgstr "灰度背景"
 
-#: src/prefs.c:202
+#: src/prefs.c:201
 msgid "Selection nudge pixels"
 msgstr "选框跳越像素设置"
 
-#: src/prefs.c:203
+#: src/prefs.c:202
 msgid "Max Pan Window Size"
 msgstr "最大全景窗口大小"
 
-#: src/prefs.c:205
+#: src/prefs.c:204
 msgid "Display clipboard while pasting"
 msgstr "粘贴时显示剪贴板图像"
 
-#: src/prefs.c:206
+#: src/prefs.c:205
 msgid "Mouse cursor = Tool"
 msgstr "鼠标光标 = 工具"
 
-#: src/prefs.c:207
+#: src/prefs.c:206
 msgid "Confirm Exit"
 msgstr "确认退出"
 
-#: src/prefs.c:208
+#: src/prefs.c:207
 msgid "Q key quits mtPaint"
 msgstr "Q 键退出 mtPaint"
 
-#: src/prefs.c:209
+#: src/prefs.c:208
 msgid "Arrow keys scroll canvas"
 msgstr ""
 
-#: src/prefs.c:210
+#: src/prefs.c:209
 msgid "Changing tool commits paste"
 msgstr "改换工具时粘贴"
 
-#: src/prefs.c:211
+#: src/prefs.c:210
 msgid "Centre tool settings dialogs"
 msgstr "工具配置对话框居中"
 
-#: src/prefs.c:212
+#: src/prefs.c:211
 msgid "New image sets zoom to 100%"
 msgstr "新图像缩放设置为100%"
 
-#: src/prefs.c:213
+#: src/prefs.c:212
 msgid "Zoom on cursor position"
 msgstr ""
 
-#: src/prefs.c:215
+#: src/prefs.c:214
 msgid "Mouse Scroll Wheel = Zoom"
 msgstr "鼠标滚轮 = 缩放"
 
-#: src/prefs.c:216
+#: src/prefs.c:215
 msgid "Use menu icons"
 msgstr "使用菜单图标"
 
-#: src/prefs.c:221
+#: src/prefs.c:220
 msgid "Files"
 msgstr "文件"
 
-#: src/prefs.c:224
+#: src/prefs.c:223
 msgid "XBM X hotspot"
 msgstr "XBM X 热点"
 
-#: src/prefs.c:225
+#: src/prefs.c:224
 msgid "XBM Y hotspot"
 msgstr "XBM Y 热点"
 
-#: src/prefs.c:229
+#: src/prefs.c:228
 msgid "Recently Used Files"
 msgstr "最近使用的文件"
 
-#: src/prefs.c:230
+#: src/prefs.c:229
 msgid "Progress bar silence limit"
 msgstr "进度条沉默限制"
 
-#: src/prefs.c:233
+#: src/prefs.c:232
 msgid "Read 16-bit TGAs as 5:6:5 BGR"
 msgstr "读取16 位 TGA 为5:6:5 BGR"
 
-#: src/prefs.c:234
+#: src/prefs.c:233
 msgid "Write TGAs in bottom-up row order"
 msgstr "以自下而上的行序写 TGA"
 
-#: src/prefs.c:235
+#: src/prefs.c:234
 msgid "Undoable image loading"
 msgstr "可逆图像加载中"
 
-#: src/prefs.c:246
+#: src/prefs.c:245
 msgid "Compression (RGB)"
 msgstr ""
 
-#: src/prefs.c:247
+#: src/prefs.c:246
 msgid "Compression (indexed)"
 msgstr ""
 
-#: src/prefs.c:248
+#: src/prefs.c:247
 msgid "Compression (monochrome)"
 msgstr ""
 
-#: src/prefs.c:256
+#: src/prefs.c:255
 msgid "Enable predictor"
 msgstr ""
 
-#: src/prefs.c:263
+#: src/prefs.c:262
 msgid "Compression mode"
 msgstr ""
 
-#: src/prefs.c:272
+#: src/prefs.c:271
 msgid "Channel for Mask Plane"
 msgstr ""
 
-#: src/prefs.c:274
+#: src/prefs.c:273
 msgid "Ignore Transparent Colour"
 msgstr ""
 
-#: src/prefs.c:275
+#: src/prefs.c:274
 msgid "PackBits Compression"
 msgstr ""
 
-#: src/prefs.c:276
+#: src/prefs.c:275
 msgid "Write Indexed as Planar Bitmap (PBM)"
 msgstr ""
 
-#: src/prefs.c:281
+#: src/prefs.c:280
 msgid "Paths"
 msgstr "路径"
 
-#: src/prefs.c:282
+#: src/prefs.c:281
 msgid "Clipboard Files"
 msgstr "剪贴板文件"
 
-#: src/prefs.c:282
+#: src/prefs.c:281
 msgid "Select Clipboard File"
 msgstr "选取剪贴板文件"
 
-#: src/prefs.c:284
+#: src/prefs.c:283
 msgid "HTML Browser Program"
 msgstr "HTML 浏览程序"
 
-#: src/prefs.c:284
+#: src/prefs.c:283
 msgid "Select Browser Program"
 msgstr "选择浏览程序"
 
-#: src/prefs.c:286
+#: src/prefs.c:285
 msgid "Location of Handbook index"
 msgstr "索引手册位置"
 
-#: src/prefs.c:286
+#: src/prefs.c:285
 msgid "Select Handbook Index File"
 msgstr "选择索引手册文件"
 
-#: src/prefs.c:288
+#: src/prefs.c:287
 msgid "Default Palette"
 msgstr "默认调色板"
 
-#: src/prefs.c:288
+#: src/prefs.c:287
 msgid "Select Default Palette"
 msgstr "选择默认调色板"
 
-#: src/prefs.c:290
+#: src/prefs.c:289
 msgid "Default Patterns"
 msgstr "默认图案"
 
-#: src/prefs.c:290
+#: src/prefs.c:289
 msgid "Select Default Patterns File"
 msgstr "选择默认图案"
 
-#: src/prefs.c:293
+#: src/prefs.c:292
 msgid "Default CSS"
 msgstr ""
 
-#: src/prefs.c:293
+#: src/prefs.c:292
 msgid "Select Default CSS File"
 msgstr ""
 
-#: src/prefs.c:296
+#: src/prefs.c:295
 msgid "Default Theme"
 msgstr ""
 
-#: src/prefs.c:296
+#: src/prefs.c:295
 msgid "Select Default Theme File"
 msgstr ""
 
-#: src/prefs.c:301
+#: src/prefs.c:300
 msgid "Status Bar"
 msgstr "状态栏"
 
-#: src/prefs.c:302
+#: src/prefs.c:301
 msgid "Canvas Geometry"
 msgstr "画布宽度和高度"
 
-#: src/prefs.c:303
+#: src/prefs.c:302
 msgid "Cursor X,Y"
 msgstr "光标 X,Y"
 
-#: src/prefs.c:304
+#: src/prefs.c:303
 msgid "Pixel [I] {RGB}"
 msgstr "像素[I] {RGB}"
 
-#: src/prefs.c:305
+#: src/prefs.c:304
 msgid "Selection Geometry"
 msgstr "矩形选择区宽度和高度"
 
-#: src/prefs.c:306
+#: src/prefs.c:305
 msgid "Undo / Redo"
 msgstr "撤销/重做"
 
-#: src/prefs.c:309
+#: src/prefs.c:308
 msgid "Tablet"
 msgstr "绘图板"
 
-#: src/prefs.c:310
+#: src/prefs.c:309
 msgid "Device Settings"
 msgstr "设备设置"
 
-#: src/prefs.c:314
+#: src/prefs.c:313
 msgid "Configure Device"
 msgstr "配置设备"
 
-#: src/prefs.c:320
+#: src/prefs.c:319
 msgid "Tool Variable"
 msgstr "工具变量"
 
-#: src/prefs.c:323 src/toolbar.c:454
+#: src/prefs.c:322 src/toolbar.c:454
 msgid "Flow"
 msgstr "流畅"
 
-#: src/prefs.c:331
+#: src/prefs.c:330
 msgid "Test Area"
 msgstr "测试区域"
 
-#: src/prefs.c:374
+#: src/prefs.c:373
 msgid "Factor"
 msgstr "系数"
 
-#: src/prefs.c:460
+#: src/prefs.c:459
 msgid "This key is builtin"
 msgstr ""
 
-#: src/prefs.c:463
+#: src/prefs.c:462
 #, c-format
 msgid ""
 "This key is mapped to:\n"
 "\"%s\""
 msgstr ""
 
-#: src/prefs.c:466
+#: src/prefs.c:465
 msgid "Remap"
 msgstr ""
 
-#: src/prefs.c:511
+#: src/prefs.c:510
 msgid "Keyboard Shortcuts"
 msgstr ""
 

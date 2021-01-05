@@ -1,5 +1,5 @@
 --------------------------------------------------
-mtPaint 3.50 - Copyright (C) 2004-2020 The Authors
+mtPaint 3.51 - Copyright (C) 2004-2021 The Authors
 --------------------------------------------------
 
 See 'Credits' section for a list of the authors.
@@ -152,7 +152,7 @@ William Kern
 Translations
 
 Brazilian Portuguese - Paulo Trevizan, Valter Nazianzeno
-Czech - Pavel Ruzicka, Martin Petricek, Roman Hornik
+Czech - Pavel Ruzicka, Martin Petricek, Roman Hornik, Pavel Fric
 Dutch - Hans Strijards, Pjotr
 French - Nicolas Velin, Pascal Billard, Sylvain Cresto, Johan Serre, Philippe Etienne, Victor Copovi
 Galician - Miguel Anxo Bouzada
@@ -160,6 +160,7 @@ German - Oliver Frommel, B. Clausius, Ulrich Ringel, Simon Brixel
 Hungarian - Ur Balazs
 Italian - Angelo Gemmi
 Japanese - Norihiro YONEDA
+Kabyle - Yacine Bouklif
 Polish - Bartosz Kaszubowski, LucaS
 Portuguese - Israel G. Lugo, Tiago Silva
 Russian - Sergey Irupin, Dmitry Groshev

@@ -1,39 +1,39 @@
-# Tagalog translation for mtpaint
-# Copyright (c) 2009 Rosetta Contributors and Canonical Ltd 2009
+# kabyle translation for mtpaint
+# Copyright (c) 2020 Rosetta Contributors and Canonical Ltd 2020
 # This file is distributed under the same license as the mtpaint package.
-# FIRST AUTHOR <EMAIL@ADDRESS>, 2009.
+# FIRST AUTHOR <EMAIL@ADDRESS>, 2020.
 #
 msgid ""
 msgstr ""
 "Project-Id-Version: mtpaint\n"
 "Report-Msgid-Bugs-To: \n"
 "POT-Creation-Date: 2021-01-04 21:31+0200\n"
-"PO-Revision-Date: 2016-05-23 19:03+0000\n"
-"Last-Translator: yavinfour <anjelo.passionist@gmail.com>\n"
-"Language-Team: Tagalog <tl@li.org>\n"
-"Language: tl\n"
+"PO-Revision-Date: 2020-11-06 10:11+0000\n"
+"Last-Translator: Yacine Bouklif <yacinebouklif@gmail.com>\n"
+"Language-Team: Kabyle <kab@li.org>\n"
+"Language: kab\n"
 "MIME-Version: 1.0\n"
 "Content-Type: text/plain; charset=UTF-8\n"
 "Content-Transfer-Encoding: 8bit\n"
-"X-Launchpad-Export-Date: 2020-04-05 23:36+0000\n"
-"X-Generator: Launchpad (build a296f04231dee355be5db73cc878b9e21689a253)\n"
+"X-Launchpad-Export-Date: 2021-01-04 08:36+0000\n"
+"X-Generator: Launchpad (build 34b3ffd45c9543b7f7aa5aa313925241e9e7ca3f)\n"
 
 #: src/ani.c:647
 msgid "Animation Preview"
-msgstr "Silipin ang Animation"
+msgstr "Tamuɣli n usmussu"
 
 #: src/ani.c:650 src/shifter.c:275
 msgid "Play"
-msgstr "Paganahin"
+msgstr "Urar"
 
 #: src/ani.c:654
 msgid "Fix"
-msgstr "Ayusin"
+msgstr "Seggem"
 
 #: src/ani.c:655 src/ani.c:1005 src/font.c:1624 src/font.c:1643
 #: src/shifter.c:286 src/viewer.c:97
 msgid "Close"
-msgstr "Isara"
+msgstr "Mdel"
 
 #: src/ani.c:709 src/ani.c:812 src/ani.c:1022 src/ani.c:1028 src/canvas.c:356
 #: src/canvas.c:708 src/canvas.c:989 src/canvas.c:1353 src/canvas.c:1383
@@ -47,151 +47,149 @@ msgstr "Isara"
 #: src/spawn.c:978 src/spawn.c:1017 src/thread.c:360 src/vcode.c:9912
 #: src/viewer.c:1161 src/viewer.c:1179
 msgid "Error"
-msgstr "Error"
+msgstr "Tuccḍa"
 
 #: src/ani.c:709
 msgid "Unable to create output directory"
-msgstr "Hindi makagawa ng output directory"
+msgstr "D awezɣi asnulfu n ukaram n tuffɣa"
 
 #: src/ani.c:759
 msgid "Creating Animation Frames"
-msgstr "Gumagawa na ng Animation Frames"
+msgstr "Asnulfu n yikataren n usmussu"
 
 #: src/ani.c:812
 msgid "Unable to save image"
-msgstr "Hindi Mai-save ang Imahe"
+msgstr "D awezɣi asekles n tugna"
 
 #: src/ani.c:840 src/canvas.c:1171 src/fpick.c:731 src/layer.c:311
 #: src/layer.c:379 src/layer.c:826 src/layer.c:840 src/mainwindow.c:375
 #: src/mainwindow.c:1026 src/png.c:8794 src/prefs.c:464
 msgid "Warning"
-msgstr "Babala"
+msgstr "Alɣu"
 
 #: src/ani.c:840
 msgid ""
 "Do you really want to clear all of the position and cycle data for all of "
 "the layers?"
-msgstr ""
-"Gusto mo ba talagang burahin ang lahat ng datos para sa posisyon at cycle ng "
-"layers?"
+msgstr "D tidet tebɣiḍ ad tsefḍeḍ akk isefka n usmusu n tissiyin meṛṛ ?"
 
 #: src/ani.c:841 src/fpick.c:731 src/layer.c:311 src/layer.c:842
 #: src/mainwindow.c:375
 msgid "No"
-msgstr "Hindi"
+msgstr "Ala"
 
 #: src/ani.c:841 src/fpick.c:731 src/layer.c:311 src/layer.c:842
 #: src/mainwindow.c:375
 msgid "Yes"
-msgstr "Oo"
+msgstr "Ih"
 
 #: src/ani.c:954
 msgid "Set Key Frame"
-msgstr "Mag-set ng Key Frame"
+msgstr "Sbadu uḍḍun n ukatar"
 
 #: src/ani.c:961
 msgid "Configure Animation"
-msgstr "Isaayos ang Animation"
+msgstr "Swel asmussu"
 
 #: src/ani.c:964
 msgid "Output Files"
-msgstr "Output Files"
+msgstr "Ifuyla n tuffɣa"
 
 #: src/ani.c:967
 msgid "Start frame"
-msgstr "Panimulang frame"
+msgstr "Akatar n tazwara"
 
 #: src/ani.c:969
 msgid "End frame"
-msgstr "Katapusang Frame"
+msgstr "Akatar n taggara"
 
 #: src/ani.c:971 src/shifter.c:267
 msgid "Delay"
-msgstr "Pabagal"
+msgstr "Amenḍar"
 
 #: src/ani.c:973
 msgid "Output path"
-msgstr ""
+msgstr "Abrid n tuffɣa"
 
 #: src/ani.c:973 src/font.c:1637 src/spawn.c:664
 msgid "Select Directory"
-msgstr "Piliin ang Directory"
+msgstr "Fren akaram"
 
 #: src/ani.c:976
 msgid "File prefix"
-msgstr ""
+msgstr "Azwir n yifuyla"
 
 #: src/ani.c:978 src/canvas.c:2096
 msgid "File Format"
-msgstr "Format ng File"
+msgstr "Amasal n ufylu"
 
 #: src/ani.c:982
 msgid "Positions"
-msgstr "Mga Posisyon"
+msgstr "Idegan"
 
 #: src/ani.c:997
 msgid "Cycling"
-msgstr "Pag-ikot"
+msgstr "Allus"
 
 #: src/ani.c:1006
 msgid "Save"
-msgstr "I-save"
+msgstr "Sekles"
 
 #: src/ani.c:1007 src/font.c:1577 src/otherwindow.c:868 src/otherwindow.c:1615
 #: src/otherwindow.c:1728 src/otherwindow.c:2938 src/otherwindow.c:3071
 #: src/otherwindow.c:3170
 msgid "Preview"
-msgstr "Tignan"
+msgstr "Tamuɣli"
 
 #: src/ani.c:1008 src/shifter.c:285
 msgid "Create Frames"
-msgstr "Gumawa ng Frames"
+msgstr "Snulfu-d ikataren"
 
 #: src/ani.c:1022
 msgid "You must have at least 2 layers to create an animation"
-msgstr "Dapat ay meron kang 2 layers kahit papaano para makabuo ng animation"
+msgstr "Isefk ad ilin ma drus snat n tissiyin akken ad d-tesnulfuḍ asmussu"
 
 #: src/ani.c:1028
 msgid "You must save your layers file before creating an animation"
-msgstr "Dapay ma-save ang mga layers file mo bago bumuo ng animation"
+msgstr "Isefk ad teskelseḍ qbel tissiyin akken ad d-tesnulfuḍ asmussu"
 
 #: src/canvas.c:357
 msgid "The image is too large to transform."
-msgstr "Masyadong malaki ang imahe para ma-transform."
+msgstr "Tugna temqqer aṭas akken ad tettwabedel."
 
 #: src/canvas.c:393 src/canvas.c:430 src/otherwindow.c:1613
 #: src/otherwindow.c:2524 src/otherwindow.c:2583 src/otherwindow.c:3179
 msgid "Gradient"
-msgstr ""
+msgstr "Afesnaw"
 
 #: src/canvas.c:393 src/otherwindow.c:840 src/otherwindow.c:842
 #: src/otherwindow.c:2074 src/otherwindow.c:3180
 msgid "Palette"
-msgstr "Palette"
+msgstr "Tapaliḍt"
 
 #: src/canvas.c:393 src/info.c:265 src/otherwindow.c:847 src/otherwindow.c:2757
 #: src/otherwindow.c:3180 src/png.c:781 src/png.c:995
 msgid "Clipboard"
-msgstr "Clipboard"
+msgstr "Tacfawit"
 
 #: src/canvas.c:394 src/cpick.c:831 src/toolbar.c:299
 msgid "Value"
-msgstr "Halaga"
+msgstr "Azal"
 
 #: src/canvas.c:394 src/cpick.c:811 src/otherwindow.c:575 src/otherwindow.c:859
 #: src/otherwindow.c:3053 src/toolbar.c:318
 msgid "Red"
-msgstr "Pula"
+msgstr "Azeggaɣ"
 
 #: src/canvas.c:394 src/cpick.c:815 src/otherwindow.c:575 src/otherwindow.c:860
 #: src/otherwindow.c:3053 src/toolbar.c:319
 msgid "Green"
-msgstr "Berde"
+msgstr "Azegzaw"
 
 #: src/canvas.c:394 src/cpick.c:819 src/otherwindow.c:575 src/otherwindow.c:861
 #: src/otherwindow.c:3053 src/toolbar.c:320
 msgid "Blue"
-msgstr "Asul"
+msgstr "Anili"
 
 #: src/canvas.c:399
 msgid "From "
@@ -235,40 +233,40 @@ msgstr ""
 
 #: src/canvas.c:442
 msgid "Edge Detect"
-msgstr ""
+msgstr "Tifin n yiran"
 
 #: src/canvas.c:464
 msgid "Edge Sharpen"
-msgstr "Palinawin ang mga Singit"
+msgstr "Asemsed n yiran"
 
 #: src/canvas.c:472
 msgid "Edge Soften"
-msgstr "Palambutin ang Edge"
+msgstr "Silwiɣ iran"
 
 #: src/canvas.c:521
 msgid "Different X/Y"
-msgstr "Magkaibang X/Y"
+msgstr ""
 
 #: src/canvas.c:522 src/canvas.c:562 src/canvas.c:603 src/canvas.c:637
 #: src/canvas.c:722 src/otherwindow.c:1037 src/otherwindow.c:2685
 msgid "Gamma corrected"
-msgstr "Inayos ng Gama"
+msgstr "Aseɣti gama"
 
 #: src/canvas.c:530 src/memory.c:8219
 msgid "Gaussian Blur"
-msgstr "Blur na Gaussian"
+msgstr "Aluɣu n Gauss"
 
 #: src/canvas.c:558
 msgid "Radius"
-msgstr "Radius"
+msgstr "Aqqar"
 
 #: src/canvas.c:559
 msgid "Amount"
-msgstr "Dami"
+msgstr "Tasmekta"
 
 #: src/canvas.c:560
 msgid "Threshold "
-msgstr ""
+msgstr "Amnar: "
 
 #: src/canvas.c:570 src/memory.c:8360
 msgid "Unsharp Mask"
@@ -276,43 +274,43 @@ msgstr ""
 
 #: src/canvas.c:599
 msgid "Outer radius"
-msgstr "Panlabas na Radius"
+msgstr "Aqqar n beṛṛa"
 
 #: src/canvas.c:600
 msgid "Inner radius"
-msgstr "Panloob na Radius"
+msgstr "Aqqar n daxel"
 
 #: src/canvas.c:602 src/info.c:280
 msgid "Normalize"
-msgstr "Gawing normal"
+msgstr "Normaliser"
 
 #: src/canvas.c:611 src/memory.c:8512
 msgid "Difference of Gaussians"
-msgstr "Pagkakaiba ng mga Gaussians"
+msgstr ""
 
 #: src/canvas.c:636
 msgid "Protect details"
-msgstr ""
+msgstr "Talqayt n umesten"
 
 #: src/canvas.c:645
 msgid "Kuwahara-Nagao Blur"
-msgstr ""
+msgstr "Aluɣu n Kuwahara-Nagao"
 
 #: src/canvas.c:709
 msgid "The image is too large for this rotation."
-msgstr "Masyadong malaki ang imahe para sa pag-ikot na ito"
+msgstr "Tugna temeqqer aṭas i tuzzya-agi."
 
 #: src/canvas.c:723
 msgid "Smooth"
-msgstr "Malambot"
+msgstr "Silwiɣ"
 
 #: src/canvas.c:732
 msgid "Free Rotate"
-msgstr "Ikutin"
+msgstr "Tuzzya tilellit"
 
 #: src/canvas.c:989 src/viewer.c:1161
 msgid "Not enough memory to create clipboard"
-msgstr "Hindi sapat ang memory para makabuo ng clipboard"
+msgstr "Ulac ddeqs n tkatut i wesnulfu n tecfawit"
 
 #: src/canvas.c:1172
 msgid ""
@@ -322,15 +320,15 @@ msgstr ""
 
 #: src/canvas.c:1353
 msgid "Invalid palette file"
-msgstr "Maling palette file"
+msgstr "Afaylu n tpaliḍt armeɣtu"
 
 #: src/canvas.c:1383
 msgid "Invalid channel file."
-msgstr "Maling channel file"
+msgstr "Afaylu n ubadu d armeɣtu."
 
 #: src/canvas.c:1401
 msgid "Raw frames"
-msgstr ""
+msgstr "Ikataren n wadur"
 
 #: src/canvas.c:1401
 msgid "Composited frames"
@@ -342,15 +340,15 @@ msgstr ""
 
 #: src/canvas.c:1406
 msgid "Load Frames"
-msgstr ""
+msgstr "Sali-d ikataren"
 
 #: src/canvas.c:1409
 msgid "Load into Layers"
-msgstr "Ikarga sa mga Layers"
+msgstr "Sali-d daxel n tissiyin"
 
 #: src/canvas.c:1415
 msgid "Load First Frame"
-msgstr ""
+msgstr "Sali-d akatar amezwaru"
 
 #: src/canvas.c:1416
 msgid "Explode Frames"
@@ -358,12 +356,12 @@ msgstr ""
 
 #: src/canvas.c:1418
 msgid "View Animation"
-msgstr "Ipakita ang Animasyon"
+msgstr "Tamuɣli n usmussu"
 
 #: src/canvas.c:1434
 #, c-format
 msgid "This is an animated %s file."
-msgstr "Ito ay isang gumagalaw na %s file."
+msgstr "Tagi d tugna %s tasmussant."
 
 #: src/canvas.c:1435
 #, c-format
@@ -373,7 +371,7 @@ msgstr ""
 #: src/canvas.c:1459
 #, c-format
 msgid "File is too big, must be <= to width=%i height=%i"
-msgstr "Masyadong malaki ang file, dapat ay <= %i na haba at %i na taas"
+msgstr "Afaylu meqqr aṭas, isefk ad yili <= largeur=%i hauteur=%i"
 
 #: src/canvas.c:1461
 msgid "Unable to explode frames"
@@ -381,7 +379,7 @@ msgstr ""
 
 #: src/canvas.c:1463
 msgid "Unable to load file"
-msgstr "Hindi maikarga ang file"
+msgstr "D awezɣi asali n ufaylu"
 
 #: src/canvas.c:1465
 msgid ""
@@ -393,8 +391,7 @@ msgstr ""
 
 #: src/canvas.c:1467
 msgid "The animation is too long to load all of it into layers."
-msgstr ""
-"Masyadong malaki ang animation para iload ang kabuuan nito sa mga layers"
+msgstr "Asmussu meqqeṛ aṭas akken ad d-yali akk di tissiyin."
 
 #: src/canvas.c:1469
 msgid "Could not explode all the frames in the animation."
@@ -403,15 +400,15 @@ msgstr ""
 #: src/canvas.c:1481 src/font.c:1556 src/fpick.c:937 src/otherwindow.c:2765
 #: src/prefs.c:321 src/toolbar.c:451
 msgid "Size"
-msgstr "Sukat"
+msgstr "Tiddi"
 
 #: src/canvas.c:1484 src/otherwindow.c:244
 msgid "Width"
-msgstr "Lapad"
+msgstr "Tehri"
 
 #: src/canvas.c:1485 src/otherwindow.c:245
 msgid "Height"
-msgstr "Taas"
+msgstr "Teɣzi"
 
 #: src/canvas.c:1489 src/channels.c:253 src/channels.c:317 src/fpick.c:666
 #: src/fpick.c:957 src/mainwindow.c:3990 src/otherwindow.c:255
@@ -422,7 +419,7 @@ msgstr "Taas"
 #: src/otherwindow.c:3169 src/prefs.c:338 src/prefs.c:464 src/prefs.c:538
 #: src/spawn.c:666 src/viewer.c:1258
 msgid "Cancel"
-msgstr "Huwag Ituloy"
+msgstr "Sefsex"
 
 #: src/canvas.c:1490 src/channels.c:253 src/channels.c:317 src/fpick.c:956
 #: src/info.c:297 src/mainwindow.c:3992 src/mygtk.c:233 src/mygtk.c:535
@@ -432,7 +429,7 @@ msgstr "Huwag Ituloy"
 #: src/otherwindow.c:3072 src/otherwindow.c:3171 src/prefs.c:338
 #: src/prefs.c:538 src/spawn.c:666
 msgid "OK"
-msgstr "OK"
+msgstr "Ih"
 
 #: src/canvas.c:1504
 #, c-format
@@ -441,45 +438,45 @@ msgstr ""
 
 #: src/canvas.c:1545
 msgid "Cannot open file"
-msgstr "Hindi mabuksan ang file"
+msgstr "Ulamek aldau n ufaylu"
 
 #: src/canvas.c:1546
 msgid "Unsupported file format"
-msgstr "Hindi suportadong file format"
+msgstr "Amasal n ufaylu ur yettwadhel ara"
 
 #: src/canvas.c:1673
 #, c-format
 msgid "File: %s already exists. Do you want to overwrite it?"
-msgstr "Meron nang file na: %s gusto mo ba siyang mapalitan?"
+msgstr "Afaylu %s yella yakan. Tebɣiḍ ad t-tesemselsiḍ ?"
 
 #: src/canvas.c:1674
 msgid "File Found"
-msgstr "Nakita ang file"
+msgstr "Afaylu yettwaf"
 
 #: src/canvas.c:1674 src/mainwindow.c:1095
 msgid "NO"
-msgstr "HINDI"
+msgstr "ALA"
 
 #: src/canvas.c:1674 src/mainwindow.c:1095
 msgid "YES"
-msgstr "OO"
+msgstr "IH"
 
 #: src/canvas.c:1988
 msgid "Unable to export undo images"
-msgstr "Hindi mai-export ang mga undo image"
+msgstr ""
 
 #: src/canvas.c:1994
 msgid "Unable to export ASCII file"
-msgstr "Hindi mai-export ang ASCII file"
+msgstr "Tuccḍa deg usifeḍ n ufaylu ASCII"
 
 #: src/canvas.c:2076 src/layer.c:814 src/mainwindow.c:529
 #, c-format
 msgid "Unable to save file: %s"
-msgstr "Hindi mai-save ang file: %s"
+msgstr "D awezɣi asekles n ufaylu: %s"
 
 #: src/canvas.c:2101 src/prefs.c:222
 msgid "Transparency index"
-msgstr "Index sa transparency"
+msgstr "Amatar n tefrawant"
 
 #: src/canvas.c:2103
 msgid "TIFF Compression"
@@ -487,7 +484,7 @@ msgstr ""
 
 #: src/canvas.c:2105 src/prefs.c:225
 msgid "JPEG Save Quality (100=High)"
-msgstr "Save Quality para sa JPEG (100=mataas)"
+msgstr "Taɣara n tugna JPEG (100=Afellay)"
 
 #: src/canvas.c:2107
 msgid "ZIP Compression (0=None)"
@@ -495,7 +492,7 @@ msgstr ""
 
 #: src/canvas.c:2108 src/prefs.c:227
 msgid "PNG Compression (0=None)"
-msgstr "Kompresiyon ng PNG (0=Kung Wala)"
+msgstr "Asekkusem PNG (0=Ulac)"
 
 #: src/canvas.c:2111 src/prefs.c:249
 msgid "LZMA2 Compression (0=None)"
@@ -507,7 +504,7 @@ msgstr ""
 
 #: src/canvas.c:2115 src/prefs.c:231
 msgid "TGA RLE Compression"
-msgstr "Kompresiyon ng TGA RLE"
+msgstr "Asekkussem TGA RLE"
 
 #: src/canvas.c:2117
 msgid "LBM PackBits Compression"
@@ -515,7 +512,7 @@ msgstr ""
 
 #: src/canvas.c:2118 src/prefs.c:226
 msgid "JPEG2000 Compression (0=Lossless)"
-msgstr "Kompresiyon ng JPEG2000 (0=Lossless)"
+msgstr "Asekkussem JPEG2000 (0= war asṛuḥu)"
 
 #: src/canvas.c:2120
 msgid "WebP Compression"
@@ -535,7 +532,7 @@ msgstr ""
 
 #: src/canvas.c:2127
 msgid "Hotspot at X ="
-msgstr "Hotspot sa X ="
+msgstr ""
 
 #: src/canvas.c:2129
 msgid "Y ="
@@ -543,156 +540,154 @@ msgstr "Y ="
 
 #: src/canvas.c:2133
 msgid "Animation delay"
-msgstr "Delay sa Animation"
+msgstr "Amenḍar n usmussu"
 
 #: src/canvas.c:2136 src/otherwindow.c:253
 msgid "Undoable"
-msgstr "Hindi Maa-undo"
+msgstr ""
 
 #: src/canvas.c:2138 src/prefs.c:236
 msgid "Apply colour profile"
-msgstr ""
+msgstr "Snes amaɣnu n yini"
 
 #: src/canvas.c:2176 src/toolbar.c:543
 msgid "Load Image File"
-msgstr "Ikarga ang Image File"
+msgstr "Sali-d afaylu n tugna"
 
 #: src/canvas.c:2191 src/toolbar.c:544
 msgid "Save Image File"
-msgstr "I-save ang Image File"
+msgstr "Sekles afaylu n tugna"
 
 #: src/canvas.c:2196
 msgid "Load Palette File"
-msgstr "Ikarga ng Palette File"
+msgstr "Sali-d afaylu n tpaliḍt"
 
 #: src/canvas.c:2202
 msgid "Save Palette File"
-msgstr "I-save ang Palette File"
+msgstr "Sekles afaylu n tpaliḍt"
 
 #: src/canvas.c:2207
 msgid "Export Undo Images"
-msgstr "I-export"
+msgstr ""
 
 #: src/canvas.c:2212
 msgid "Export Undo Images (reversed)"
-msgstr "I-export ang mga Undo Image (nakabaligtad)"
+msgstr ""
 
 #: src/canvas.c:2217
 msgid "You must have 16 or fewer palette colours to export ASCII art."
 msgstr ""
-"Dapat 16 o mas kakaunti pa dito ang bilang ng mga kulay mo sa palette para "
-"maiexort ito bilang ASCII art."
+"Isefk ad tesɛuḍ 16 n yinitenn tpaliḍt neɣ drus akken ad tsifḍeḍ taẓuri ASCII."
 
 #: src/canvas.c:2220
 msgid "Export ASCII Art"
-msgstr "I-export ang ASCII Art"
+msgstr "Sifeḍ s umasal n tẓuri ASCII"
 
 #: src/canvas.c:2224
 msgid "Save Layer Files"
-msgstr "I-save ang mga Layer Files"
+msgstr "Sekles ifuyla n tissi"
 
 #: src/canvas.c:2234
 msgid "Choose frames directory"
-msgstr "Pumili ng frames directory"
+msgstr "Fren akaram n yikataren"
 
 #: src/canvas.c:2240
 msgid "You must save at least one frame to create an animated GIF."
 msgstr ""
-"Dapat ay meron kang kahit isang frame para makagawa ng GIF na animated "
-"(gumagalaw)."
+"Akken ad d-tesnulfuḍ asmussu n GIF isefk ad teskelseḍ ma drus yiwen n ukatar."
 
 #: src/canvas.c:2243
 msgid "Export GIF animation"
-msgstr "I-export ang GIF animation"
+msgstr "Sifeḍ asmussu GIF"
 
 #: src/canvas.c:2247
 msgid "Load Channel"
-msgstr "Ikarga ang Tsanel"
+msgstr "Sali-d abadu"
 
 #: src/canvas.c:2255
 msgid "Save Channel"
-msgstr "I-save ang Tsanel"
+msgstr "Sekles abadu"
 
 #: src/canvas.c:2260
 msgid "Save Composite Image"
-msgstr "I-save ang Composite na Imahe"
+msgstr "Sekles tugna tuddist"
 
 #: src/channels.c:243
 msgid "Create Channel"
-msgstr "Gumawa ng Tsanel"
+msgstr "Snulfu-d abadu"
 
 #: src/channels.c:244
 msgid "Channel Type"
-msgstr "Uri ng Tsanel"
+msgstr "Anaw b ubadu"
 
 #: src/channels.c:247
 msgid "Initial Channel State"
-msgstr ""
+msgstr "Addad n tazwara n ubadu"
 
 #: src/channels.c:251
 msgid "Inverted"
-msgstr "Binaligtad"
+msgstr "Yetti"
 
 #: src/channels.c:265
 msgid "Cleared"
-msgstr "Nilinis"
+msgstr "Yettwasfeḍ"
 
 #: src/channels.c:266
 msgid "Set"
-msgstr "Itakda"
+msgstr "Wennez"
 
 #: src/channels.c:267
 msgid "Set colour A radius B"
-msgstr "Itakda ang kulay A radius B"
+msgstr "Sbadu ini A aqqar B"
 
 #: src/channels.c:268
 msgid "Set blend A to B"
-msgstr "Itakta ang blend A hanggang B"
+msgstr "Sbadu amyezdi n A akked B"
 
 #: src/channels.c:269
 msgid "Image Red"
-msgstr "Pulang Imahe"
+msgstr "Azeggaɣ"
 
 #: src/channels.c:270
 msgid "Image Green"
-msgstr "Berdeng Imahe"
+msgstr "Azegzaw"
 
 #: src/channels.c:271
 msgid "Image Blue"
-msgstr "Asul na Imahe"
+msgstr "Anili"
 
 #: src/channels.c:273 src/channels.c:313 src/mainwindow.c:67
 #: src/otherwindow.c:1679
 msgid "Alpha"
-msgstr "Alpa"
+msgstr "Alfa"
 
 #: src/channels.c:274 src/channels.c:314 src/mainwindow.c:67
 #: src/otherwindow.c:1683
 msgid "Selection"
-msgstr "Seleksyon"
+msgstr "Tafrayt"
 
 #: src/channels.c:275 src/channels.c:315 src/mainwindow.c:67
 #: src/otherwindow.c:1687
 msgid "Mask"
-msgstr "Maskara"
+msgstr "Tagelmust"
 
 #: src/channels.c:312
 msgid "Delete Channels"
-msgstr "Burahin ang mga Tsanel"
+msgstr "Kkes ibuda"
 
 #: src/channels.c:367
 msgid "Threshold Channel"
-msgstr ""
+msgstr "Amnaṛ n ubadu"
 
 #: src/cpick.c:823 src/otherwindow.c:573 src/otherwindow.c:820
 #: src/toolbar.c:299
 msgid "Hue"
-msgstr "Hue"
+msgstr "Tiɣmi"
 
 #: src/cpick.c:827 src/otherwindow.c:573 src/otherwindow.c:818
 #: src/toolbar.c:299
 msgid "Saturation"
-msgstr "Tinkad"
+msgstr "Tawant"
 
 #: src/cpick.c:835
 msgid "Hex"
@@ -701,53 +696,52 @@ msgstr ""
 #: src/cpick.c:840 src/layer.c:1109 src/otherwindow.c:2530 src/prefs.c:323
 #: src/toolbar.c:457
 msgid "Opacity"
-msgstr ""
+msgstr "Tiḍullest"
 
 #: src/font.c:982
 msgid "Creating Font Index"
-msgstr "Gumagawa ng Font Index"
+msgstr "Asnulfu n umatar n tsefsit"
 
 #: src/font.c:1353
 msgid "You must select at least one directory to search for fonts."
-msgstr ""
-"Dapat ay pumili ka ng kahit isang directory mara makahanap ng mga font."
+msgstr "Isefk ad tferneḍ xerṣum yiwen n ukaram anida ara tnadiḍ tisefsa."
 
 #: src/font.c:1529 src/font.c:1624 src/toolbar.c:609 src/viewer.c:1213
 #: src/viewer.c:1258
 msgid "Paste Text"
-msgstr "Idikit ang Teksto"
+msgstr "Senṭeḍ aḍris"
 
 #: src/font.c:1533 src/font.c:1572 src/png.c:3578
 msgid "Text"
-msgstr "Teksto"
+msgstr "Aḍris"
 
 #: src/font.c:1540
 msgid "Font"
-msgstr "Font"
+msgstr "Tasefsit"
 
 #: src/font.c:1548
 msgid "Style"
-msgstr "Istilo"
+msgstr "Aɣanib"
 
 #: src/font.c:1566
 msgid "Filename"
-msgstr "Pangalan ng file"
+msgstr "Isem n ufaylu"
 
 #: src/font.c:1567
 msgid "Face"
-msgstr "Harap"
+msgstr ""
 
 #: src/font.c:1587 src/viewer.c:1222
 msgid "Antialias"
-msgstr ""
+msgstr "Amzay"
 
 #: src/font.c:1590 src/viewer.c:1224
 msgid "Invert"
-msgstr "Baliktarin"
+msgstr "Tti"
 
 #: src/font.c:1593 src/viewer.c:1226
 msgid "Background colour ="
-msgstr "Kulay ng Likuran ="
+msgstr "Ini n ugilal ="
 
 #: src/font.c:1601 src/viewer.c:1233
 msgid "DPI ="
@@ -755,11 +749,11 @@ msgstr ""
 
 #: src/font.c:1610
 msgid "Oblique"
-msgstr "Tabinge"
+msgstr "Yekna"
 
 #: src/font.c:1612 src/viewer.c:1244
 msgid "Angle of rotation ="
-msgstr "Anggulo ng pag-ikot"
+msgstr "Tiɣmert n tuzzya ="
 
 #: src/font.c:1617 src/viewer.c:1248
 msgid "Align"
@@ -771,129 +765,129 @@ msgstr ""
 
 #: src/font.c:1629
 msgid "Font Directories"
-msgstr "Directory ng Font"
+msgstr "Ikaramen n tsefsa"
 
 #: src/font.c:1634 src/spawn.c:664
 msgid "Directory"
-msgstr "Directory"
+msgstr "Akaram"
 
 #: src/font.c:1637
 msgid "New Directory"
-msgstr "Bagong directory"
+msgstr "Akaram amaynut"
 
 #: src/font.c:1644 src/prefs.c:532
 msgid "Add"
-msgstr "Magdagdag"
+msgstr "Rnu"
 
 #: src/font.c:1645 src/prefs.c:533
 msgid "Remove"
-msgstr "Alisin"
+msgstr "Kkes"
 
 #: src/font.c:1646
 msgid "Create Index"
-msgstr "Gumawa ng Index"
+msgstr "Snulfu-d amatar"
 
 #: src/font.c:1660 src/viewer.c:1267
 msgid "Enter Text Here"
-msgstr "Ilagay ang Teksto Dito"
+msgstr "Aru aḍris dagi"
 
 #: src/fpick.c:635
 #, c-format
 msgid "Could not access directory %s"
-msgstr "Hindi mapasok ang direktori na %s"
+msgstr "Ur yezmir ara ad yaddef ɣer ukaram %s"
 
 #: src/fpick.c:668 src/fpick.c:698
 msgid "Delete"
-msgstr "Alisin"
+msgstr "Kkes"
 
 #: src/fpick.c:669 src/fpick.c:698
 msgid "Rename"
-msgstr "Palitan ng pangalan"
+msgstr "Beddel isem"
 
 #: src/fpick.c:672 src/otherwindow.c:255 src/otherwindow.c:1666
 msgid "Create"
-msgstr "Lumikha"
+msgstr "Snulfu-d"
 
 #: src/fpick.c:699
 msgid "Enter the new filename"
-msgstr "Ilagay ang bagong pangalan ng file"
+msgstr "Sekcem isem amaynut n ufaylu"
 
 #: src/fpick.c:704
 msgid "Create Directory"
-msgstr "Gumawa ng Direktori"
+msgstr "Snulfu-d akaram"
 
 #: src/fpick.c:705
 msgid "Enter the name of the new directory"
-msgstr ""
+msgstr "Sekcem isem amaynut n ukaram"
 
 #: src/fpick.c:729
 #, c-format
 msgid "Do you really want to delete \"%s\" ?"
-msgstr "Gusto mo ba talagang burahin ang \"%s\" ?"
+msgstr "D tidet tebɣiḍ ad tekkseḍ \"%s\" ?"
 
 #: src/fpick.c:735
 msgid "Unable to delete"
-msgstr "Hindi mabura"
+msgstr "D awezɣi tukksa"
 
 #: src/fpick.c:741
 msgid "Unable to rename"
-msgstr "Hindi mabago ang pangalan"
+msgstr "D awezɣi abeddel n yisem"
 
 #: src/fpick.c:750
 msgid "Unable to create directory"
-msgstr "Hindi makagawa ng directory"
+msgstr "D awezɣi asnulfu n ukaram"
 
 #: src/fpick.c:924
 msgid "Up"
-msgstr "Umakyat"
+msgstr "Uksawen"
 
 #: src/fpick.c:925
 msgid "Home"
-msgstr "Tahanan"
+msgstr "Asebter agejdan"
 
 #: src/fpick.c:926
 msgid "Create New Directory"
-msgstr "Gumawa ng bagong directory"
+msgstr "Snulfu-d akaram amaynut"
 
 #: src/fpick.c:927
 msgid "Show Hidden Files"
-msgstr "Ipakita ang mga nakatagong Files"
+msgstr "Beqqeḍ ifuyla uffiren"
 
 #: src/fpick.c:929
 msgid "Case Insensitive Sort"
-msgstr ""
+msgstr "Afran ur nettḥulfu ara i tejṛut n usekkil"
 
 #: src/fpick.c:936
 msgid "Name"
-msgstr "Pangalan"
+msgstr "Isem"
 
 #: src/fpick.c:938
 msgid "Type"
-msgstr "Tipo"
+msgstr "Anaw"
 
 #: src/fpick.c:939
 msgid "Modified"
-msgstr "Huling nabago"
+msgstr "Yettwabeddel"
 
 #: src/help.c:25 src/prefs.c:160
 msgid "General"
-msgstr "Pangkalahatan"
+msgstr "Amatu"
 
 #: src/help.c:26
 msgid "Keyboard shortcuts"
-msgstr "Shortcut sa kibord"
+msgstr "Inegzumen n unasiw"
 
 #: src/help.c:27
 msgid "Mouse shortcuts"
-msgstr "Shortcut sa Mouse"
+msgstr "Inegzumen n umumed"
 
 #: src/help.c:28
 msgid "Credits"
-msgstr "Mga Pagkilala"
+msgstr "Imttekkiyen"
 
 #: src/help.c:32
 msgid "mtPaint 3.51 - Copyright (C) 2004-2021 The Authors\n"
-msgstr ""
+msgstr "mtPaint 3.51 - Copyright (C) 2004-2021 Imeskaren\n"
 
 #: src/help.c:33
 msgid "See 'Credits' section for a list of the authors.\n"
@@ -906,10 +900,6 @@ msgid ""
 "Foundation; either version 3 of the License, or (at your option) any later "
 "version.\n"
 msgstr ""
-"Ang mtPaint ay isang libreng software; pwede mo siyang ipakalat at/o kaya "
-"baguhin ayon sa mga tuntunin ng GNU General Public License na inilimbag ng "
-"Free Software Foundation;  either version 3 of the License, or (at your "
-"option) any later version.\n"
 
 #: src/help.c:35
 msgid ""
@@ -935,9 +925,6 @@ msgid ""
 "If you don't already have this, you can download it from the mtPaint "
 "website.\n"
 msgstr ""
-"Merong kumpetong dokyumentasyon ng lahat ng pwedeng magawa ng mtPaint at ito "
-"ay nasa handbook. Kung wala ka pa nito, pwede mo siyang ma-download mula sa "
-"websayt ng mtPaint\n"
 
 #: src/help.c:38
 msgid ""
@@ -952,31 +939,31 @@ msgstr "http://sourceforge.net/mail/?group_id=155874"
 
 #: src/help.c:42
 msgid "  Ctrl-N            Create new image"
-msgstr "  Ctrl-N            Gumawa ng bagong imahe"
+msgstr "  Ctrl-N         Snulfu-d tugna tamaynutt"
 
 #: src/help.c:43
 msgid "  Ctrl-O            Open Image"
-msgstr "  Ctrl-O            Magbukas ng Image"
+msgstr "  Ctrl-O         Ldi tugna"
 
 #: src/help.c:44
 msgid "  Ctrl-S            Save Image"
-msgstr "  Ctrl-S            I-Save ang Imahe"
+msgstr "  Ctrl-S         Sekles tugna"
 
 #: src/help.c:45
 msgid "  Ctrl-Shift-S      Save layers file"
-msgstr ""
+msgstr "  Ctrl-Shift-S     Sekles afaylu n tissiyin"
 
 #: src/help.c:46
 msgid "  Ctrl-Q            Quit program\n"
-msgstr "  Ctrl-Q            Umalis sa Program\n"
+msgstr "  Ctrl-Q         Ffeɣ seg wahil\n"
 
 #: src/help.c:47
 msgid "  Ctrl-A            Select whole image"
-msgstr "  Ctrl-A            I-select ang buong imahe"
+msgstr "  Ctrl-A         Fren akk tugna"
 
 #: src/help.c:48
 msgid "  Escape            Select nothing, cancel paste box"
-msgstr ""
+msgstr "  Escape         Ur ferren ara, sefsex taɣzut n usenṭeḍ"
 
 #: src/help.c:49
 msgid "  J                 Lasso selection\n"
@@ -984,25 +971,26 @@ msgstr ""
 
 #: src/help.c:50
 msgid "  Ctrl-C            Copy selection to clipboard"
-msgstr "  Ctrl-C            Kopyahin ang seleksyon patungo sa clipboard"
+msgstr "  Ctrl-C         Nɣel tafrayt ɣer tecfawit"
 
 #: src/help.c:51
 msgid ""
 "  Ctrl-X            Copy selection to clipboard, and then paint current "
 "pattern to selection area"
 msgstr ""
+"  Ctrl-X         Nɣel tafrayt ɣer tacfawit, sakin aččar tafrayt s wudlif"
 
 #: src/help.c:52
 msgid "  Ctrl-V            Paste clipboard to centre of current view"
-msgstr ""
+msgstr "  Ctrl-V         Senṭeḍ tacfawit di tlemmast n tmuɣli tamirant"
 
 #: src/help.c:53
 msgid "  Ctrl-K            Paste clipboard to location it was copied from"
-msgstr ""
+msgstr "  Ctrl-K         Senṭeḍ tacfawit deg umḍiq ansi d-tettwanɣel"
 
 #: src/help.c:54
 msgid "  Ctrl-Shift-V      Paste clipboard to new layer"
-msgstr ""
+msgstr "  Ctrl-Shift-V      Senṭeḍ tacfawit di tissi tamaynutt"
 
 #: src/help.c:55
 msgid "  Enter/Return      Commit paste to canvas"
@@ -1014,7 +1002,7 @@ msgstr ""
 
 #: src/help.c:57
 msgid "  Arrow keys        Paint Mode - Move the mouse pointer"
-msgstr ""
+msgstr "  Tineccabin        Smutti unuɣ - Smutti taḥnacaḍt n umumed"
 
 #: src/help.c:58
 msgid ""
@@ -1031,6 +1019,7 @@ msgstr ""
 #: src/help.c:60
 msgid "  Ctrl+Arrows       Move layer or resize selection box"
 msgstr ""
+"  Ctrl+Tineccabin       Smutti tissi neɣ ales tiddi n tenkult n tefrayt"
 
 #: src/help.c:61
 msgid "  Ctrl+Shift+Arrows  Move layer or resize selection box by x pixels\n"
@@ -1047,16 +1036,16 @@ msgstr ""
 #: src/help.c:64
 msgid ""
 "  [ or ]            Change colour A to the next or previous palette item"
-msgstr ""
+msgstr "  [ neɣ ]         Beddel ini A ɣer uferdis uzwir neɣ uḍfir n tpaliḍt"
 
 #: src/help.c:65
 msgid ""
 "  Shift+[ or ]      Change colour B to the next or previous palette item\n"
-msgstr ""
+msgstr "  Shift+[ neɣ ]   Semselsi ini B s yini uzwir neɣ uḍfir n tpaliḍt\n"
 
 #: src/help.c:66
 msgid "  Delete            Crop image to selection"
-msgstr ""
+msgstr "  Kkes          Ɣeẓ tugna alama tafrayt"
 
 #: src/help.c:67
 msgid ""
@@ -1066,11 +1055,11 @@ msgstr ""
 
 #: src/help.c:68
 msgid "  Ctrl-G            Greyscale the image"
-msgstr ""
+msgstr "  Ctrl-G         Err tugna ɣer yiswiren n umelliɣdi"
 
 #: src/help.c:69
 msgid "  Shift-Ctrl-G      Greyscale the image (Gamma corrected)"
-msgstr ""
+msgstr "  Shift-Ctrl-G   Err tugna s yiswiren n umelliɣdi (aseɣti n gama)"
 
 #: src/help.c:70
 msgid "  Ctrl+M            Mirror the image"
@@ -1078,65 +1067,65 @@ msgstr ""
 
 #: src/help.c:71
 msgid "  Shift-Ctrl-I      Invert the image\n"
-msgstr ""
+msgstr "  Shift-Ctrl-I      Tti tugna\n"
 
 #: src/help.c:72
 msgid ""
 "  Ctrl-T            Draw a rectangle around the selection area with the "
 "current fill"
-msgstr ""
+msgstr "  Ctrl-T         Suneɣ asrem yezzin i teɣzut n tefrayt s wudlif amiran"
 
 #: src/help.c:73
 msgid "  Ctrl-Shift-T      Fill in the selection area with the current fill"
-msgstr ""
+msgstr "  Ctrl-Shift-T   Aččar taɣzut n tefrayt s wudlif amiran"
 
 #: src/help.c:74
 msgid "  Ctrl-L            Draw an ellipse spanning the selection area"
-msgstr ""
+msgstr "  Ctrl-L         Suneɣ taglayt di teɣzut n tefrayt"
 
 #: src/help.c:75
 msgid "  Ctrl-Shift-L      Draw a filled ellipse spanning the selection area\n"
-msgstr ""
+msgstr "  Ctrl-Shift-L   Suneɣ taglayt yeččuren di teɣzut n tefrayt\n"
 
 #: src/help.c:76
 msgid "  Ctrl-E            Edit the RGB values for colours A & B"
-msgstr ""
+msgstr "  Ctrl-E         Ẓreg azalen RVB n yiniten A & B"
 
 #: src/help.c:77
 msgid "  Ctrl-W            Edit all palette colours\n"
-msgstr ""
+msgstr "  Ctrl-W         Ẓreg tapaliḍt n yiniten\n"
 
 #: src/help.c:78
 msgid "  Ctrl-P            Preferences"
-msgstr ""
+msgstr "  Ctrl-P         Ismenyifen"
 
 #: src/help.c:79
 msgid "  Ctrl-I            Information\n"
-msgstr ""
+msgstr "  Ctrl-I         Talɣut\n"
 
 #: src/help.c:80
 msgid "  Ctrl-Z            Undo last action"
-msgstr ""
+msgstr "  Ctrl-Z         Sefsex tigawt taneggarut"
 
 #: src/help.c:81
 msgid "  Ctrl-R            Redo an undone action\n"
-msgstr ""
+msgstr "  Ctrl-R         Err-d tigawt yettwasfesxen\n"
 
 #: src/help.c:82
 msgid "  Shift-T           Text Tool (GTK+)"
-msgstr ""
+msgstr "  Shift-T           Afrcku Aḍris (GTK+)"
 
 #: src/help.c:83
 msgid "  T                 Text Tool (FreeType)\n"
-msgstr ""
+msgstr "  T                 Afecku Aḍris (FreeType)\n"
 
 #: src/help.c:84
 msgid "  V                 View Window"
-msgstr ""
+msgstr "  V              Asfaylu n tmuɣli"
 
 #: src/help.c:85
 msgid "  L                 Layers Window\n"
-msgstr ""
+msgstr "  L              Asfaylu n tissiyin\n"
 
 #: src/help.c:86
 msgid "  Ctrl-H            Toggle Hide Image mode"
@@ -1148,27 +1137,31 @@ msgstr ""
 
 #: src/help.c:88
 msgid "  X                 Swap Colours A & B"
-msgstr ""
+msgstr "  X                 Semselsi initen A & B"
 
 #: src/help.c:89
 msgid "  E                 Choose Colour\n"
-msgstr ""
+msgstr "  E                 Fren ini\n"
 
 #: src/help.c:90
 msgid ""
 "  A                 Draw open arrow head when using the line tool (size set "
 "by flow setting)"
 msgstr ""
+"  A              Suneɣ taqamumt yeldin n tneccabt mi ara yettwaseqdec ufecku "
+"izirig (tiddi yesbadu-tt \"flow setting\")"
 
 #: src/help.c:91
 msgid ""
 "  S                 Draw closed arrow head when using the line tool (size "
 "set by flow setting)\n"
 msgstr ""
+"  S              Suneɣ taqamumt imedlen n tneccabt mi ara yettwaseqdec "
+"ufecku izirig (tiddi yesbadu-tt \"flow setting\")\n"
 
 #: src/help.c:92
 msgid "  D                 Line Tool"
-msgstr ""
+msgstr "  D                 Afecku Izirig"
 
 #: src/help.c:93
 msgid "  F                 Flood Fill Tool\n"
@@ -1176,96 +1169,96 @@ msgstr ""
 
 #: src/help.c:94
 msgid "  +,=               Main edit window - Zoom in"
-msgstr ""
+msgstr "  +,=            Asfaylu n usiẓreg agejdan - Zoom +"
 
 #: src/help.c:95
 msgid "  -                 Main edit window - Zoom out"
-msgstr ""
+msgstr "  -              Asfaylu n usiẓreg agejdan - Zoom -"
 
 #: src/help.c:96
 msgid "  Shift +,=         View window - Zoom in"
-msgstr ""
+msgstr "  Shift +,=      Asfaylu n tmuɣli - Zoom +"
 
 #: src/help.c:97
 msgid "  Shift -           View window - Zoom out\n"
-msgstr ""
+msgstr "  Shift -        Asfaylu n tmuɣli - Zoom -\n"
 
 #: src/help.c:98
 #, c-format
 msgid "  1                 10% zoom"
-msgstr ""
+msgstr "  1              10% zoom"
 
 #: src/help.c:99
 #, c-format
 msgid "  2                 25% zoom"
-msgstr ""
+msgstr "  2              25% zoom"
 
 #: src/help.c:100
 #, c-format
 msgid "  3                 50% zoom"
-msgstr ""
+msgstr "  3              50% zoom"
 
 #: src/help.c:101
 #, c-format
 msgid "  4                 100% zoom"
-msgstr ""
+msgstr "  4              100% zoom"
 
 #: src/help.c:102
 #, c-format
 msgid "  5                 400% zoom"
-msgstr ""
+msgstr "  5              400% zoom"
 
 #: src/help.c:103
 #, c-format
 msgid "  6                 800% zoom"
-msgstr ""
+msgstr "  6              800% zoom"
 
 #: src/help.c:104
 #, c-format
 msgid "  7                 1200% zoom"
-msgstr ""
+msgstr "  7              1200% zoom"
 
 #: src/help.c:105
 #, c-format
 msgid "  8                 1600% zoom"
-msgstr ""
+msgstr "  8              1600% zoom"
 
 #: src/help.c:106
 #, c-format
 msgid "  9                 2000% zoom\n"
-msgstr ""
+msgstr "  9              2000% zoom\n"
 
 #: src/help.c:107
 msgid "  Shift + 1         Edit image channel"
-msgstr ""
+msgstr "  Shift + 1      Ẓreg abadu n tugna"
 
 #: src/help.c:108
 msgid "  Shift + 2         Edit alpha channel"
-msgstr ""
+msgstr "  Shift + 2      Ẓreg abadu alfa"
 
 #: src/help.c:109
 msgid "  Shift + 3         Edit selection channel"
-msgstr ""
+msgstr "  Shift + 3      Ẓreg tafrayt"
 
 #: src/help.c:110
 msgid "  Shift + 4         Edit mask channel\n"
-msgstr ""
+msgstr "  Shift + 4      Ẓreg abadu n teglmust\n"
 
 #: src/help.c:111
 msgid "  F1                Help"
-msgstr "  F1                Tulong"
+msgstr "  F1             Tallelt"
 
 #: src/help.c:112
 msgid "  F2                Choose Pattern"
-msgstr ""
+msgstr "  F2             Fren udlif"
 
 #: src/help.c:113
 msgid "  F3                Choose Brush"
-msgstr ""
+msgstr "  F3             Fren amfezzu"
 
 #: src/help.c:114
 msgid "  F4                Paint Tool"
-msgstr ""
+msgstr "  F4             Allal n teklut"
 
 #: src/help.c:115
 msgid "  F5                Toggle Main Toolbar"
@@ -1285,7 +1278,7 @@ msgstr ""
 
 #: src/help.c:119
 msgid "  F9                Selection Tool"
-msgstr ""
+msgstr "  F9             Afecku Tafrayt"
 
 #: src/help.c:120
 msgid "  F12               Toggle Dock Area\n"
@@ -1293,11 +1286,11 @@ msgstr ""
 
 #: src/help.c:121
 msgid "  Ctrl + F1 - F12   Save current clipboard to file 1-12"
-msgstr ""
+msgstr "  Ctrl + F1 - F12   Sekles tacfawit tamirant deg ufaylu 1-12"
 
 #: src/help.c:122
 msgid "  Shift + F1 - F12  Load clipboard from file 1-12\n"
-msgstr ""
+msgstr "  Shift + F1 - F12  Sali-d tacfawit seg ufaylu 1-12\n"
 
 #: src/help.c:123
 msgid ""
@@ -1307,11 +1300,11 @@ msgstr ""
 
 #: src/help.c:124
 msgid "  Ctrl + + or =     Increase opacity by 1"
-msgstr ""
+msgstr "  Ctrl + + or =  Sali tiḍullest s 1"
 
 #: src/help.c:125
 msgid "  Ctrl + -          Decrease opacity by 1\n"
-msgstr ""
+msgstr "  Ctrl + -       Sader tiḍullest s1\n"
 
 #: src/help.c:126
 msgid ""
@@ -1320,7 +1313,7 @@ msgstr ""
 
 #: src/help.c:127
 msgid "  Page Up           Scale Image"
-msgstr ""
+msgstr "  Asebter d asawen     Beddel taskala n tugna"
 
 #: src/help.c:128
 msgid "  Page Down         Resize Image canvas"
@@ -1332,7 +1325,7 @@ msgstr ""
 
 #: src/help.c:132
 msgid "  Left button          Paint to canvas using the current tool"
-msgstr ""
+msgstr "  Taqeffalt tazelmaḍt        Klu di teɣzut n usuneɣ s ufecku amiran"
 
 #: src/help.c:133
 msgid ""
@@ -1345,6 +1338,8 @@ msgid ""
 "  Right button         Commit paste to canvas / Stop drawing current line / "
 "Cancel selection\n"
 msgstr ""
+"  Taqeffalt tayfust         Sentem tamhelt / Seḥbes asuneɣ amiranl / Sefsex "
+"tafrayt\n"
 
 #: src/help.c:135
 msgid ""
@@ -1365,6 +1360,8 @@ msgid ""
 "  Ctrl+Middle button   Create colour A/B and pattern based on the RGB colour "
 "in A (RGB images only)"
 msgstr ""
+"  Ctrl+Taqeffalt talemmast   Snulfu-d ini A/B yebnan ɣef yini RGB di A "
+"(tugniwin n RGB kan)"
 
 #: src/help.c:139
 msgid "  Ctrl+Right button    Choose colour B from under mouse pointer"
@@ -1379,6 +1376,8 @@ msgstr ""
 #: src/help.c:141
 msgid "  Ctrl+Scroll Wheel    Scroll the main edit window left or right\n"
 msgstr ""
+"  Ctrl+Ṛṛuda n udrurem         Smutti asfaylu n usiẓreg ɣer zelmaḍ neɣ ɣer "
+"yefus\n"
 
 #: src/help.c:142
 msgid ""
@@ -1395,15 +1394,15 @@ msgstr ""
 
 #: src/help.c:144
 msgid "You can fixate the X/Y co-ordinates while moving the mouse:\n"
-msgstr ""
+msgstr "Tzemreḍ ad tesweḥleḍ amutti X/Y mi ara yettmutti umumed:\n"
 
 #: src/help.c:145
 msgid "  Shift                Constrain mouse movements to vertical line"
-msgstr ""
+msgstr "  Shift                Ḥettem amutti n umumed ɣer yizirig ubdid"
 
 #: src/help.c:146
 msgid "  Shift+Ctrl           Constrain mouse movements to horizontal line"
-msgstr ""
+msgstr "  Shift+Ctrl           Ḥettem amutti n umumed ɣer yizirig aglawan"
 
 #: src/help.c:149
 msgid "mtPaint is maintained by Dmitry Groshev.\n"
@@ -1427,7 +1426,7 @@ msgstr ""
 
 #: src/help.c:153
 msgid "Authors\n"
-msgstr "Mga May-Akda\n"
+msgstr "Imeskaren\n"
 
 #: src/help.c:154
 msgid ""
@@ -1440,8 +1439,6 @@ msgid ""
 "Mark Tyler - Original author and maintainer up to version 3.00, occasional "
 "contributor thereafter."
 msgstr ""
-"Mark Tyler - Orihinal na awtor at tagapamahala hanggang sa version 3.00, "
-"kasalukuyang kontributor pa rin."
 
 #: src/help.c:156
 msgid ""
@@ -1493,16 +1490,12 @@ msgid ""
 "Eddie Kohler - Created Gifsicle which is needed for the creation and viewing "
 "of animated GIF files http://www.lcdf.org/gifsicle/"
 msgstr ""
-"Eddie Kohler - Ang gumawa ng Gifsicle na kailangan para makabuo at "
-"makatingin ng mga animated GIF files http://www.lcdf.org/gifsicle/"
 
 #: src/help.c:167
 msgid ""
 "Guadalinex Team (Junta de Andalucia) - man page, Launchpad/Rosetta "
 "registration"
 msgstr ""
-"Guadalinex Team (Junta de Andalucia) - man page, Launchpad/Rosetta "
-"registration"
 
 #: src/help.c:168
 msgid "Lou Afonso"
@@ -1522,7 +1515,7 @@ msgstr ""
 
 #: src/help.c:172
 msgid "Pavel Ruzicka"
-msgstr ""
+msgstr "Pavel Ruzicka"
 
 #: src/help.c:173
 msgid "Puppy Linux (Barry Kauler)"
@@ -1546,45 +1539,47 @@ msgstr ""
 
 #: src/help.c:177
 msgid "Translations\n"
-msgstr "Mga Pag-sasalin ng Wika\n"
+msgstr "Tisuqilin\n"
 
 #: src/help.c:178
 msgid "Brazilian Portuguese - Paulo Trevizan, Valter Nazianzeno"
-msgstr "Brazilian Portuguese - Paulo Trevizan, Valter Nazianzeno"
+msgstr "Tapurtugalit n Brizil - Paulo Trevizan, Valter Nazianzeno"
 
 #: src/help.c:179
 msgid "Czech - Pavel Ruzicka, Martin Petricek, Roman Hornik, Pavel Fric"
-msgstr ""
+msgstr "Tačikit - Pavel Ruzicka, Martin Petricek, Roman Hornik, Pavel Fric"
 
 #: src/help.c:180
 msgid "Dutch - Hans Strijards, Pjotr"
-msgstr ""
+msgstr "Tahulandit - Hans Strijards, Pjotr"
 
 #: src/help.c:181
 msgid ""
 "French - Nicolas Velin, Pascal Billard, Sylvain Cresto, Johan Serre, "
 "Philippe Etienne, Victor Copovi"
 msgstr ""
+"Tafransist - Nicolas Velin, Pascal Billard, Sylvain Cresto, Johan Serre, "
+"Philippe Etienne, Victor Copovi"
 
 #: src/help.c:182
 msgid "Galician - Miguel Anxo Bouzada"
-msgstr "Galician - Miguel Anxo Bouzada"
+msgstr "Tagalikant - Miguel Anxo Bouzada"
 
 #: src/help.c:183
 msgid "German - Oliver Frommel, B. Clausius, Ulrich Ringel, Simon Brixel"
-msgstr "Aleman - Oliver Frommel, B. Clausius, Ulrich Ringel, Simon Brixel"
+msgstr "Talmanit - Oliver Frommel, B. Clausius, Ulrich Ringel, Simon Brixel"
 
 #: src/help.c:184
 msgid "Hungarian - Ur Balazs"
-msgstr ""
+msgstr "Tahungarit - Ur Balazs"
 
 #: src/help.c:185
 msgid "Italian - Angelo Gemmi"
-msgstr ""
+msgstr "Taṭelyanit - Angelo Gemmi"
 
 #: src/help.c:186
 msgid "Japanese - Norihiro YONEDA"
-msgstr "Hapon - Norihiro YONEDA"
+msgstr "Tajapunit - Norihiro YONEDA"
 
 #: src/help.c:187
 msgid "Kabyle - Yacine Bouklif"
@@ -1592,57 +1587,59 @@ msgstr ""
 
 #: src/help.c:188
 msgid "Polish - Bartosz Kaszubowski, LucaS"
-msgstr "Polish - Bartosz Kaszubowski, LucaS"
+msgstr "Tapulunit - Bartosz Kaszubowski, LucaS"
 
 #: src/help.c:189
 msgid "Portuguese - Israel G. Lugo, Tiago Silva"
-msgstr "Portuges - Israel G. Lugo, Tiago Silva"
+msgstr "Tapurtugalit - Israel G. Lugo, Tiago Silva"
 
 #: src/help.c:190
 msgid "Russian - Sergey Irupin, Dmitry Groshev"
-msgstr "Ruso - Sergey Irupin, Dmitry Groshev"
+msgstr "Tarusit - Sergey Irupin, Dmitry Groshev"
 
 #: src/help.c:191
 msgid "Simplified Chinese - Cecc"
-msgstr ""
+msgstr "Tacinwat taḥerfit - Cecc"
 
 #: src/help.c:192
 msgid "Slovak - Jozef Riha"
-msgstr "Slovak - Jozef Riha"
+msgstr "Tasluvakit - Jozef Riha"
 
 #: src/help.c:193
 msgid ""
 "Spanish - Guadalinex Team (Junta de Andalucia), Antonio Sanchez Leon, Miguel "
 "Anxo Bouzada, Francisco Jose Rey, Adolfo Jayme"
 msgstr ""
+"Taspenyulit - Guadalinex Team (Junta de Andalucia), Antonio Sanchez Leon, "
+"Miguel Anxo Bouzada, Francisco Jose Rey, Adolfo Jayme"
 
 #: src/help.c:194
 msgid "Swedish - Daniel Nylander, Daniel Eriksson"
-msgstr ""
+msgstr "Taswidit - Daniel Nylander, Daniel Eriksson"
 
 #: src/help.c:195
 msgid "Tagalog - Anjelo delCarmen"
-msgstr ""
+msgstr "Taṭagalugt - Anjelo delCarmen"
 
 #: src/help.c:196
 msgid "Taiwanese Chinese - Wei-Lun Chao"
-msgstr "Taiwanese Chinese - Wei-Lun Chao"
+msgstr "Tacinwat n Ṭaywan - Wei-Lun Chao"
 
 #: src/help.c:197
 msgid "Turkish - Muhammet Kara, Tutku Dalmaz"
-msgstr "Turko - Muhammet Kara, Tutku Dalmaz"
+msgstr "Taṭurkit - Muhammet Kara, Tutku Dalmaz"
 
 #: src/info.c:258
 msgid "Information"
-msgstr "Impormasyon"
+msgstr "Talɣut"
 
 #: src/info.c:260
 msgid "Memory"
-msgstr "Memory"
+msgstr "Takatut"
 
 #: src/info.c:261
 msgid "Total memory for main + undo images"
-msgstr "Kabuuang memory para sa main + mga undo na imahe"
+msgstr ""
 
 #: src/info.c:263
 msgid "Undo / Redo / Max levels used"
@@ -1650,91 +1647,94 @@ msgstr ""
 
 #: src/info.c:265
 msgid "Unused"
-msgstr "Hindi nagamit"
+msgstr "Ur yettwaseqdec ar"
 
 #: src/info.c:269
 msgid "Unique RGB pixels"
-msgstr "Magkaibang RGB pixels"
+msgstr "Ipikselen RVB isufen"
 
 #: src/info.c:272 src/layer.c:121
 msgid "Layers"
-msgstr "Mga Layer"
+msgstr "Tissiyin"
 
 #: src/info.c:273
 msgid "Total layer memory usage"
-msgstr ""
+msgstr "Aseqdec n tkatut n tissi"
 
 #: src/info.c:277
 msgid "Colour Histogram"
-msgstr "Histogram sa Kulay"
+msgstr ""
 
 #: src/info.c:289 src/otherwindow.c:1614
 msgid "Index"
-msgstr "Index"
+msgstr "Amatar"
 
 #: src/info.c:290
 msgid "Canvas pixels"
-msgstr ""
+msgstr "Ipikslen n teɣzut n usuneɣ"
 
 #: src/info.c:328
 #, c-format
 msgid "Clipboard = %i x %i"
-msgstr "Clipboard = %i x %i"
+msgstr "Tacfawit = %i x %i"
 
 #: src/info.c:328
 #, c-format
 msgid "Clipboard = %i x %i x RGB"
-msgstr "Clipboard = %i x %i x RGB"
+msgstr "Tacfawit = %i x %i x RVB"
 
 #: src/info.c:377
 msgid "Orphans"
-msgstr "Mga Ampon"
+msgstr ""
 
 #: src/info.c:383
 #, c-format
 msgid "Colour index totals - %i of %i used"
-msgstr "Kabuuang index ng kulay - %i ng %i ang nagagamit"
+msgstr ""
 
 #: src/inifile.c:966
 msgid ""
 "Could not find home directory. Using current directory as home directory."
 msgstr ""
+"Akaram n useqdac ur yettwaf ara. Aseqdec n ukaram amiran am ukaram n useqdac."
 
 #: src/layer.c:63
 msgid "Background"
-msgstr "Likuran"
+msgstr "Agilal"
 
 #: src/layer.c:122 src/mainwindow.c:5931
 msgid "(Modified)"
-msgstr "(Binago)"
+msgstr "(Yettwabeddel)"
 
 #: src/layer.c:123 src/mainwindow.c:5932
 msgid "Untitled"
-msgstr "Walang Pamagat"
+msgstr "War azwel"
 
 #: src/layer.c:308
 #, c-format
 msgid "Do you really want to delete layer %i (%s) ?"
-msgstr "Gusto mo bang murahin ang layer na %i (%s) ?"
+msgstr "D tidet tebɣiḍ ad tekkseḍ tissi %i (%s) ?"
 
 #: src/layer.c:380
 msgid ""
 "One or more of the layers contains changes that have not been saved.  Do you "
 "really want to lose these changes?"
 msgstr ""
+"Yiwet neɣ ugar n tissiyin yesɛan ibeddilen ur ttwaskelsent ara. D tidet "
+"tebɣiḍ ad tesṛuḥeḍ ibeddilen-agi ?"
 
 #: src/layer.c:381 src/mainwindow.c:1028
 msgid "Cancel Operation"
-msgstr "Kanselahin ang operasyon."
+msgstr "Sefsex tamhelt"
 
 #: src/layer.c:381 src/mainwindow.c:1028
 msgid "Lose Changes"
-msgstr ""
+msgstr "Eǧǧ ibeddilen"
 
 #: src/layer.c:523
 #, c-format
 msgid "%d layers failed to load"
-msgstr ""
+msgstr "%d n tissiyin ggumant ad ldint"
 
 #: src/layer.c:826
 msgid ""
@@ -1745,27 +1745,27 @@ msgstr ""
 
 #: src/layer.c:841
 msgid "Do you really want to delete all of the layers?"
-msgstr "Gusto mo ba talagang burahin ang lahat ng mga leyer?"
+msgstr "D tidet tebɣiḍ ad tekkseḍ akk tisiyin ?"
 
 #: src/layer.c:970
 msgid "You cannot add any more layers."
-msgstr "Hindi ka na pwedeng magdadag pa ng mga layer"
+msgstr "Ur tezmireḍ ara ad ternuḍ ugar n tissiyin."
 
 #: src/layer.c:1083 src/otherwindow.c:241
 msgid "New Layer"
-msgstr "Bagong Layer"
+msgstr "Tissi tamaynutt"
 
 #: src/layer.c:1085
 msgid "Raise"
-msgstr ""
+msgstr "Sali"
 
 #: src/layer.c:1087
 msgid "Lower"
-msgstr ""
+msgstr "Sider"
 
 #: src/layer.c:1089
 msgid "Duplicate Layer"
-msgstr ""
+msgstr "Sisleg tissi"
 
 #: src/layer.c:1091
 msgid "Centralise Layer"
@@ -1773,32 +1773,32 @@ msgstr ""
 
 #: src/layer.c:1093
 msgid "Delete Layer"
-msgstr ""
+msgstr "Kkes Tissi"
 
 #: src/layer.c:1095
 msgid "Close Layers Window"
-msgstr ""
+msgstr "Mdel asfaylu n tissiyin"
 
 #: src/layer.c:1101
 msgid "Layer Name"
-msgstr "Pangalan ng Layer"
+msgstr "Isem n tissi"
 
 #: src/layer.c:1104 src/toolbar.c:209
 msgid "Position"
-msgstr "Posisyon"
+msgstr "Adig"
 
 #: src/layer.c:1112
 msgid "Transparent Colour"
-msgstr ""
+msgstr "Ini afrawan"
 
 #: src/layer.c:1117
 msgid "Show all layers in main window"
-msgstr "Ipakita lahat ng mga layer sa main window"
+msgstr "Beqqeḍ akk tissiyin deg usfaylu agejdan"
 
 #: src/mainwindow.c:67 src/otherwindow.c:844 src/otherwindow.c:2756
 #: src/toolbar.c:342
 msgid "Image"
-msgstr "Imahe"
+msgstr "Tugna"
 
 #: src/mainwindow.c:69 src/mainwindow.c:489 src/otherwindow.c:1613
 #: src/otherwindow.c:2302
@@ -1807,11 +1807,11 @@ msgstr "RGB"
 
 #: src/mainwindow.c:69 src/otherwindow.c:1613 src/otherwindow.c:2302
 msgid "sRGB"
-msgstr ""
+msgstr "sRGB"
 
 #: src/mainwindow.c:342
 msgid "There were no unused colours to remove!"
-msgstr ""
+msgstr "Ulac initen ur nettwaseqdec ara ara tekkseḍ !"
 
 #: src/mainwindow.c:371
 msgid "The palette does not contain 2 colours that have identical RGB values"
@@ -1826,7 +1826,7 @@ msgstr ""
 
 #: src/mainwindow.c:492
 msgid "indexed"
-msgstr "naka-index"
+msgstr ""
 
 #: src/mainwindow.c:498
 #, c-format
@@ -1834,6 +1834,8 @@ msgid ""
 "You are trying to save an %s image to an %s file which is not possible.  I "
 "would suggest you save with a PNG extension."
 msgstr ""
+"Ala tettaɛraḍeḍ ad teskelseḍ tugna %s deg ufaylu %s, maca ulamk. Ad k-"
+"semtereɣ ad tt-teskelseḍ s usiɣzef PNG."
 
 #: src/mainwindow.c:500
 #, c-format
@@ -1841,14 +1843,16 @@ msgid ""
 "You are trying to save an %s file with a palette of more than %d colours.  "
 "Either use another format or reduce the palette to %d colours."
 msgstr ""
+"Ala tettaɛraḍeḍ ad teskelseḍ afaylu %s s tpaliḍt yesɛan ugar n %d n yiniten. "
+"Seqdec amasal-nniḍen neɣ sader tapaliḍt ɣer %d n yiniten."
 
 #: src/mainwindow.c:578
 msgid "Unable to load clipboard"
-msgstr "Hindi mai-karga ang clipboard"
+msgstr "Ulamek asali n tecfawit"
 
 #: src/mainwindow.c:604
 msgid "Unable to save clipboard"
-msgstr "Hindi mai-save ang clipboard"
+msgstr "Ulamek asekles n tecfawit"
 
 #: src/mainwindow.c:775
 msgid "Zoom in"
@@ -2034,12 +2038,10 @@ msgid ""
 "This canvas/palette contains changes that have not been saved.  Do you "
 "really want to lose these changes?"
 msgstr ""
-"Ang kanbas/paleyt na ito ay may mga nabago at hindi pa nai-sasave. Gusto mo "
-"bang bali-walain ang mga nabago?"
 
 #: src/mainwindow.c:1094
 msgid "Do you really want to quit?"
-msgstr "Gusto mo ba talagang umalis?"
+msgstr "D tidet tebɣiḍ ad teffɣeḍ ?"
 
 #: src/mainwindow.c:3754
 msgid "Empty string or broken quoting"
@@ -2079,11 +2081,11 @@ msgstr ""
 
 #: src/mainwindow.c:3982 src/spawn.c:656 src/spawn.c:662
 msgid "Action"
-msgstr "Aksyon"
+msgstr "Tigawt"
 
 #: src/mainwindow.c:3991 src/spawn.c:666
 msgid "Execute"
-msgstr "Isagawa"
+msgstr "Selkem"
 
 #: src/mainwindow.c:4045
 msgid "Unable to load script"
@@ -2091,24 +2093,24 @@ msgstr ""
 
 #: src/mainwindow.c:5182
 msgid "/_File"
-msgstr ""
+msgstr "/Afaylu"
 
 #: src/mainwindow.c:5184
 msgid "//New"
-msgstr ""
+msgstr "//Amaynut"
 
 #: src/mainwindow.c:5186
 msgid "//Open ..."
-msgstr ""
+msgstr "//Ldi ..."
 
 #: src/mainwindow.c:5188 src/mainwindow.c:5669
 msgid "//Save"
-msgstr ""
+msgstr "//Sekles"
 
 #: src/mainwindow.c:5190 src/mainwindow.c:5549 src/mainwindow.c:5627
 #: src/mainwindow.c:5671
 msgid "//Save As ..."
-msgstr ""
+msgstr "//Sekles am ..."
 
 #: src/mainwindow.c:5192
 msgid "//Export Undo Images ..."
@@ -2120,115 +2122,115 @@ msgstr ""
 
 #: src/mainwindow.c:5196
 msgid "//Export ASCII Art ..."
-msgstr ""
+msgstr "//Sifeḍ s umasal n tẓuri ASCII ..."
 
 #: src/mainwindow.c:5198
 msgid "//Export Animated GIF ..."
-msgstr ""
+msgstr "//Sifeḍ asmussu n GIF ..."
 
 #: src/mainwindow.c:5201
 msgid "//Actions"
-msgstr ""
+msgstr "//Tigawin"
 
 #: src/mainwindow.c:5235 src/mainwindow.c:5488
 msgid "///Configure"
-msgstr ""
+msgstr "///Swel"
 
 #: src/mainwindow.c:5290
 msgid "//Quit"
-msgstr ""
+msgstr "//Ffeɣ"
 
 #: src/mainwindow.c:5293
 msgid "/_Edit"
-msgstr ""
+msgstr "//Ẓreg"
 
 #: src/mainwindow.c:5295
 msgid "//Undo"
-msgstr ""
+msgstr "//Sefsex"
 
 #: src/mainwindow.c:5297
 msgid "//Redo"
-msgstr ""
+msgstr "//Err-d"
 
 #: src/mainwindow.c:5300
 msgid "//Cut"
-msgstr "//Putulin"
+msgstr "//Gzem"
 
 #: src/mainwindow.c:5302
 msgid "//Copy"
-msgstr "//Kopyahin"
+msgstr "//Nɣel"
 
 #: src/mainwindow.c:5304
 msgid "//Copy To Palette"
-msgstr ""
+msgstr "//Nɣel ɣer tpaliḍt"
 
 #: src/mainwindow.c:5306
 msgid "//Paste To Centre"
-msgstr "//Idikit sa Gitna"
+msgstr "//Senṭeḍ di tlemmast"
 
 #: src/mainwindow.c:5308
 msgid "//Paste To New Layer"
-msgstr "//Idikit sa Bagong Layer"
+msgstr "//Senṭeḍ am tissi tamaynutt"
 
 #: src/mainwindow.c:5310
 msgid "//Paste"
-msgstr "//Idikit"
+msgstr "//Senṭeḍ"
 
 #: src/mainwindow.c:5312
 msgid "//Paste Text"
-msgstr "//Idikit ang Teksto"
+msgstr "//Senṭeḍ aḍris"
 
 #: src/mainwindow.c:5318
 msgid "//Paste Text (FreeType)"
-msgstr ""
+msgstr "//Senṭeḍ aḍris (FreeType)"
 
 #: src/mainwindow.c:5321
 msgid "//Paste Palette"
-msgstr ""
+msgstr "//Senṭeḍ tapaliḍt"
 
 #: src/mainwindow.c:5323
 msgid "//Load Clipboard"
-msgstr "//Ikarga ang Clipbord"
+msgstr "//Sali-d tacfawit"
 
 #: src/mainwindow.c:5350
 msgid "//Save Clipboard"
-msgstr "//I-save ang Clipboard"
+msgstr "//Sekles tacfawit"
 
 #: src/mainwindow.c:5377
 msgid "//Import Clipboard from System"
-msgstr ""
+msgstr "//Kter tacfawit seg unagraw"
 
 #: src/mainwindow.c:5378
 msgid "//Export Clipboard to System"
-msgstr ""
+msgstr "//Sifeḍ tacfawit s anagraw"
 
 #: src/mainwindow.c:5381
 msgid "//Choose Pattern ..."
-msgstr ""
+msgstr "//Fren udlif ..."
 
 #: src/mainwindow.c:5383
 msgid "//Choose Brush ..."
-msgstr "//Pumili ng Brush ..."
+msgstr "//Fren amfezzu ..."
 
 #: src/mainwindow.c:5385
 msgid "//Choose Colour ..."
-msgstr ""
+msgstr "//Fren ini ..."
 
 #: src/mainwindow.c:5392
 msgid "/_View"
-msgstr "/_Tignan"
+msgstr "//Tamuɣli"
 
 #: src/mainwindow.c:5394
 msgid "//Show Main Toolbar"
-msgstr "//Ipakita ang Main Toolbar"
+msgstr "//Beqqeḍ afeggag n yifedka agejdan"
 
 #: src/mainwindow.c:5396
 msgid "//Show Tools Toolbar"
-msgstr "//Ipakita ang Tools Toolbar"
+msgstr "//Beqqeḍ afeggag n yifecka"
 
 #: src/mainwindow.c:5399
 msgid "//Show Settings Toolbar"
-msgstr "//Ipakita ang Settings Toolbar"
+msgstr "//Beqqeḍ afeggag n yiɣewwaren"
 
 #: src/mainwindow.c:5402
 msgid "//Show Dock"
@@ -2236,11 +2238,11 @@ msgstr ""
 
 #: src/mainwindow.c:5404
 msgid "//Show Palette"
-msgstr "//Ipakita ang Palette"
+msgstr "//Beqqeḍ tapaliḍt"
 
 #: src/mainwindow.c:5406
 msgid "//Show Status Bar"
-msgstr "//Ipakita ang Istatus Bar"
+msgstr "//Beqqeḍ afeggag n waddad"
 
 #: src/mainwindow.c:5409
 msgid "//Toggle Image View"
@@ -2248,7 +2250,7 @@ msgstr ""
 
 #: src/mainwindow.c:5413
 msgid "//Centralize Image"
-msgstr "//Igitna ang Imahe"
+msgstr "//Selmes tugna"
 
 #: src/mainwindow.c:5414
 msgid "//Show Zoom Grid"
@@ -2260,7 +2262,7 @@ msgstr ""
 
 #: src/mainwindow.c:5417
 msgid "//Configure Grid ..."
-msgstr ""
+msgstr "//Swel aferrug ..."
 
 #: src/mainwindow.c:5418
 msgid "//Tracing Image ..."
@@ -2268,15 +2270,15 @@ msgstr ""
 
 #: src/mainwindow.c:5421
 msgid "//View Window"
-msgstr ""
+msgstr "//Asfaylu n tmuɣli"
 
 #: src/mainwindow.c:5423
 msgid "//Horizontal Split"
-msgstr "//Pahalang na hati"
+msgstr ""
 
 #: src/mainwindow.c:5425
 msgid "//Focus View Window"
-msgstr "//Ipokus ang View Window"
+msgstr "//Fren asfaylu n tmuɣli"
 
 #: src/mainwindow.c:5427
 msgid "//Pan Window"
@@ -2284,15 +2286,15 @@ msgstr ""
 
 #: src/mainwindow.c:5430
 msgid "//Layers Window"
-msgstr ""
+msgstr "//Asfaylu n tissiyin"
 
 #: src/mainwindow.c:5433
 msgid "/_Image"
-msgstr ""
+msgstr "/Tugna"
 
 #: src/mainwindow.c:5436
 msgid "//Convert To RGB"
-msgstr ""
+msgstr "//Selket ɣer RVB"
 
 #: src/mainwindow.c:5438
 msgid "//Convert To Indexed ..."
@@ -2300,43 +2302,43 @@ msgstr ""
 
 #: src/mainwindow.c:5441
 msgid "//Scale Canvas ..."
-msgstr ""
+msgstr "//Beddel taskala n teɣzut n usuneɣ ..."
 
 #: src/mainwindow.c:5443
 msgid "//Resize Canvas ..."
-msgstr ""
+msgstr "//Tiddi n tugna ..."
 
 #: src/mainwindow.c:5445
 msgid "//Crop"
-msgstr ""
+msgstr "//Ɣeẓ"
 
 #: src/mainwindow.c:5448 src/mainwindow.c:5517
 msgid "//Flip Vertically"
-msgstr ""
+msgstr "Tuzzya taratakt"
 
 #: src/mainwindow.c:5449 src/mainwindow.c:5519
 msgid "//Flip Horizontally"
-msgstr ""
+msgstr "Tuzttya taglawant"
 
 #: src/mainwindow.c:5452 src/mainwindow.c:5521
 msgid "//Rotate Clockwise"
-msgstr ""
+msgstr "Tuzzya yugdan tamrilt"
 
 #: src/mainwindow.c:5453 src/mainwindow.c:5523
 msgid "//Rotate Anti-Clockwise"
-msgstr ""
+msgstr "//Tuzzya mgal tamrilt"
 
 #: src/mainwindow.c:5454
 msgid "//Free Rotate ..."
-msgstr ""
+msgstr "//Tuzzya ..."
 
 #: src/mainwindow.c:5455
 msgid "//Skew ..."
-msgstr ""
+msgstr "//Seknu ..."
 
 #: src/mainwindow.c:5458
 msgid "//Segment ..."
-msgstr ""
+msgstr "//Iɣil..."
 
 #: src/mainwindow.c:5462
 msgid "//Script ..."
@@ -2348,19 +2350,19 @@ msgstr ""
 
 #: src/mainwindow.c:5491
 msgid "//Information ..."
-msgstr ""
+msgstr "//Talɣut..."
 
 #: src/mainwindow.c:5494
 msgid "//Preferences ..."
-msgstr ""
+msgstr "//Ismenyifen..."
 
 #: src/mainwindow.c:5497
 msgid "/_Selection"
-msgstr ""
+msgstr "/Tafrayt"
 
 #: src/mainwindow.c:5499
 msgid "//Select All"
-msgstr ""
+msgstr "//Fren akk"
 
 #: src/mainwindow.c:5501
 msgid "//Select None (Esc)"
@@ -2376,15 +2378,15 @@ msgstr ""
 
 #: src/mainwindow.c:5508
 msgid "//Outline Selection"
-msgstr ""
+msgstr "//Suneɣ azizdew n tefrayt"
 
 #: src/mainwindow.c:5510
 msgid "//Fill Selection"
-msgstr ""
+msgstr "//Aččar tafrayt"
 
 #: src/mainwindow.c:5512
 msgid "//Outline Ellipse"
-msgstr ""
+msgstr "//Suneɣ taglayt"
 
 #: src/mainwindow.c:5514
 msgid "//Fill Ellipse"
@@ -2416,39 +2418,39 @@ msgstr ""
 
 #: src/mainwindow.c:5539
 msgid "//Mask All Colours"
-msgstr ""
+msgstr "//Ferr akk initen"
 
 #: src/mainwindow.c:5541
 msgid "//Clear Mask"
-msgstr ""
+msgstr "//Sfeḍ tagelmust"
 
 #: src/mainwindow.c:5544
 msgid "/_Palette"
-msgstr ""
+msgstr "/Ta_paliḍt"
 
 #: src/mainwindow.c:5548 src/mainwindow.c:5626
 msgid "//Load ..."
-msgstr ""
+msgstr "//Sali-d ..."
 
 #: src/mainwindow.c:5550
 msgid "//Load Default"
-msgstr ""
+msgstr "//Sali-d lexṣas"
 
 #: src/mainwindow.c:5552
 msgid "//Mask All"
-msgstr ""
+msgstr "//Ffer akk"
 
 #: src/mainwindow.c:5553
 msgid "//Mask None"
-msgstr ""
+msgstr "//Ulac tagelmust"
 
 #: src/mainwindow.c:5555
 msgid "//Swap A & B"
-msgstr ""
+msgstr "//Semmeskel A & B"
 
 #: src/mainwindow.c:5557
 msgid "//Edit Colour A & B ..."
-msgstr ""
+msgstr "//Ẓreg ini A & B ..."
 
 #: src/mainwindow.c:5559
 msgid "//Dither A"
@@ -2456,19 +2458,19 @@ msgstr ""
 
 #: src/mainwindow.c:5561
 msgid "//Palette Editor ..."
-msgstr ""
+msgstr "//Amaẓrag n tpaliḍt ..."
 
 #: src/mainwindow.c:5563
 msgid "//Set Palette Size ..."
-msgstr ""
+msgstr "//Sbadu tiddi n tpaliḍt ..."
 
 #: src/mainwindow.c:5564
 msgid "//Merge Duplicate Colours"
-msgstr ""
+msgstr "//Smezdi initen usligen"
 
 #: src/mainwindow.c:5566
 msgid "//Remove Unused Colours"
-msgstr ""
+msgstr "//Kkes initen ur nettwaseqdec ara"
 
 #: src/mainwindow.c:5569
 msgid "//Create Quantized ..."
@@ -2476,7 +2478,7 @@ msgstr ""
 
 #: src/mainwindow.c:5572
 msgid "//Sort Colours ..."
-msgstr ""
+msgstr "//Fren initen ..."
 
 #: src/mainwindow.c:5573
 msgid "//Palette Shifter ..."
@@ -2484,27 +2486,27 @@ msgstr ""
 
 #: src/mainwindow.c:5574
 msgid "//Pick Gradient ..."
-msgstr ""
+msgstr "//Fren afesnaw..."
 
 #: src/mainwindow.c:5576
 msgid "/Effe_cts"
-msgstr ""
+msgstr "/Ise_mda"
 
 #: src/mainwindow.c:5578
 msgid "//Transform Colour ..."
-msgstr ""
+msgstr "//Beddel initen ..."
 
 #: src/mainwindow.c:5580
 msgid "//Invert"
-msgstr ""
+msgstr "//Tti"
 
 #: src/mainwindow.c:5582
 msgid "//Greyscale"
-msgstr ""
+msgstr "//Iswiren n umelliɣdi"
 
 #: src/mainwindow.c:5584
 msgid "//Greyscale (Gamma corrected)"
-msgstr ""
+msgstr "//Iswiren n umelliɣdi (aseɣti n gama)"
 
 #: src/mainwindow.c:5586
 msgid "//Normalize"
@@ -2512,7 +2514,7 @@ msgstr ""
 
 #: src/mainwindow.c:5587 src/mainwindow.c:5658
 msgid "//Threshold ..."
-msgstr ""
+msgstr "//Amnar ..."
 
 #: src/mainwindow.c:5588
 msgid "//Map ..."
@@ -2540,7 +2542,7 @@ msgstr ""
 
 #: src/mainwindow.c:5598
 msgid "//Edge Detect ..."
-msgstr ""
+msgstr "//Tifin n yiran ..."
 
 #: src/mainwindow.c:5600
 msgid "//Difference of Gaussians ..."
@@ -2556,23 +2558,23 @@ msgstr ""
 
 #: src/mainwindow.c:5606
 msgid "//Soften ..."
-msgstr ""
+msgstr "//Silweɣ ..."
 
 #: src/mainwindow.c:5608
 msgid "//Gaussian Blur ..."
-msgstr ""
+msgstr "//Aluɣu n Gauss ..."
 
 #: src/mainwindow.c:5610
 msgid "//Kuwahara-Nagao Blur ..."
-msgstr ""
+msgstr "//Aluɣu n Kuwahara-Nagao ..."
 
 #: src/mainwindow.c:5612
 msgid "//Emboss"
-msgstr ""
+msgstr "//Eg tiɛnurin"
 
 #: src/mainwindow.c:5614
 msgid "//Dilate"
-msgstr ""
+msgstr "//Ḍleq"
 
 #: src/mainwindow.c:5616
 msgid "//Erode"
@@ -2584,51 +2586,51 @@ msgstr ""
 
 #: src/mainwindow.c:5620
 msgid "//Bacteria ..."
-msgstr ""
+msgstr "//Tibaktiriyin ..."
 
 #: src/mainwindow.c:5623
 msgid "/Cha_nnels"
-msgstr ""
+msgstr "/Ibuda"
 
 #: src/mainwindow.c:5625
 msgid "//New ..."
-msgstr ""
+msgstr "//Amaynut..."
 
 #: src/mainwindow.c:5628
 msgid "//Delete ..."
-msgstr ""
+msgstr "//Kkes..."
 
 #: src/mainwindow.c:5632
 msgid "//Edit Image"
-msgstr ""
+msgstr "//Ẓreg tugna"
 
 #: src/mainwindow.c:5635
 msgid "//Edit Alpha"
-msgstr ""
+msgstr "//Ẓreg alfa"
 
 #: src/mainwindow.c:5638
 msgid "//Edit Selection"
-msgstr ""
+msgstr "//Ẓreg tafrayt"
 
 #: src/mainwindow.c:5641
 msgid "//Edit Mask"
-msgstr ""
+msgstr "//Ẓreg tagelmust"
 
 #: src/mainwindow.c:5645
 msgid "//Hide Image"
-msgstr ""
+msgstr "//Ffer tugna"
 
 #: src/mainwindow.c:5648
 msgid "//Disable Alpha"
-msgstr ""
+msgstr "//Sens alfa"
 
 #: src/mainwindow.c:5651
 msgid "//Disable Selection"
-msgstr ""
+msgstr "//Sens tafrayt"
 
 #: src/mainwindow.c:5654
 msgid "//Disable Mask"
-msgstr ""
+msgstr "//Sens tafrayt"
 
 #: src/mainwindow.c:5657
 msgid "//Couple RGBA Operations"
@@ -2648,15 +2650,15 @@ msgstr ""
 
 #: src/mainwindow.c:5666
 msgid "/_Layers"
-msgstr ""
+msgstr "/Tissiyin"
 
 #: src/mainwindow.c:5668
 msgid "//New Layer"
-msgstr ""
+msgstr "//Tissi tamaynutt"
 
 #: src/mainwindow.c:5672
 msgid "//Save Composite Image ..."
-msgstr ""
+msgstr "//Sekles tugna tuddist ..."
 
 #: src/mainwindow.c:5673
 msgid "//Composite to New Layer"
@@ -2664,39 +2666,39 @@ msgstr ""
 
 #: src/mainwindow.c:5674
 msgid "//Remove All Layers"
-msgstr ""
+msgstr "//Kkes akk tissiyin"
 
 #: src/mainwindow.c:5676
 msgid "//Configure Animation ..."
-msgstr ""
+msgstr "//Swel asmussu..."
 
 #: src/mainwindow.c:5677
 msgid "//Preview Animation ..."
-msgstr ""
+msgstr "//Tamuɣli n usmusu ..."
 
 #: src/mainwindow.c:5678
 msgid "//Set Key Frame ..."
-msgstr ""
+msgstr "//Sbadu tasarut n ukatar ..."
 
 #: src/mainwindow.c:5679
 msgid "//Remove All Key Frames ..."
-msgstr ""
+msgstr "//Kkes akk tisura n yikataren ..."
 
 #: src/mainwindow.c:5681
 msgid "/More..."
-msgstr ""
+msgstr "/Ugar..."
 
 #: src/mainwindow.c:5683
 msgid "/_Help"
-msgstr ""
+msgstr "/Tallelt"
 
 #: src/mainwindow.c:5684
 msgid "//Documentation"
-msgstr ""
+msgstr "//Tasemlit"
 
 #: src/mainwindow.c:5686
 msgid "//About"
-msgstr ""
+msgstr "//Ɣef"
 
 #: src/mainwindow.c:5689
 msgid "//Keyboard Shortcuts ..."
@@ -2720,19 +2722,19 @@ msgstr ""
 
 #: src/memory.c:5135 src/otherwindow.c:540
 msgid "Bacteria Effect"
-msgstr "Epektong Mala-Bakterya"
+msgstr "Asemdu n tbaktiriyin"
 
 #: src/memory.c:5170
 msgid "Rotating"
-msgstr "Iniikot"
+msgstr "Tuzzya"
 
 #: src/memory.c:5511
 msgid "Free Rotation"
-msgstr "Libreng Pag-iikot"
+msgstr "Tuzzya tilellit"
 
 #: src/memory.c:6096
 msgid "Scaling Image"
-msgstr ""
+msgstr "Beddel taskala n tugna"
 
 #: src/memory.c:7560
 msgid "Counting Unique RGB Pixels"
@@ -2740,15 +2742,15 @@ msgstr ""
 
 #: src/memory.c:7608
 msgid "Applying Effect"
-msgstr "Ginagawa ang Effect"
+msgstr "Asnes n usemdu"
 
 #: src/memory.c:8792
 msgid "Kuwahara-Nagao Filter"
-msgstr ""
+msgstr "Tastayt Kuwahara-Nagao"
 
 #: src/memory.c:10456 src/otherwindow.c:2665
 msgid "Skew"
-msgstr ""
+msgstr "Seknu"
 
 #: src/memory.c:10630
 msgid "Segmentation Pass 1"
@@ -2764,11 +2766,11 @@ msgstr ""
 
 #: src/mygtk.c:134 src/mygtk.c:163
 msgid "Please Wait ..."
-msgstr "Maghintay lang po ..."
+msgstr "Ttxil-k m arǧu ..."
 
 #: src/mygtk.c:141
 msgid "STOP"
-msgstr "ITIGIL"
+msgstr "Ḥbes"
 
 #: src/mygtk.c:504
 msgid "Disabled"
@@ -2776,7 +2778,7 @@ msgstr ""
 
 #: src/mygtk.c:504 src/toolbar.c:301
 msgid "Screen"
-msgstr "Screen"
+msgstr "Agdil"
 
 #: src/mygtk.c:504
 msgid "Window"
@@ -2828,11 +2830,11 @@ msgstr ""
 
 #: src/otherwindow.c:236
 msgid "24 bit RGB"
-msgstr "24 bit na RGB"
+msgstr "RGB 24 ibiten"
 
 #: src/otherwindow.c:236 src/otherwindow.c:3179
 msgid "Greyscale"
-msgstr "Greyscale"
+msgstr "Iswiren n umelliɣdi"
 
 #: src/otherwindow.c:237
 msgid "Indexed Palette"
@@ -2840,45 +2842,45 @@ msgstr ""
 
 #: src/otherwindow.c:237
 msgid "From Clipboard"
-msgstr "Mula sa Klipbord"
+msgstr "Si tecfawit"
 
 #: src/otherwindow.c:237
 msgid "Grab Screenshot"
-msgstr "Dumukot ng Iskrinshat"
+msgstr ""
 
 #: src/otherwindow.c:242 src/toolbar.c:542
 msgid "New Image"
-msgstr "Bagong Imahe"
+msgstr "Tugna tamaynutt"
 
 #: src/otherwindow.c:246 src/otherwindow.c:3164
 msgid "Colours"
-msgstr "Mga Kulay"
+msgstr "Initen"
 
 #: src/otherwindow.c:409
 msgid "Pattern Chooser"
-msgstr ""
+msgstr "Amefran n wudlifen"
 
 #: src/otherwindow.c:497
 msgid "Set Palette Size"
-msgstr ""
+msgstr "Sbadu tiddi n tpaliḍt"
 
 #: src/otherwindow.c:517 src/otherwindow.c:591 src/otherwindow.c:870
 #: src/otherwindow.c:2538 src/otherwindow.c:2776 src/otherwindow.c:2939
 #: src/prefs.c:338 src/prefs.c:538
 msgid "Apply"
-msgstr "I-apply"
+msgstr "Snes"
 
 #: src/otherwindow.c:573
 msgid "Luminance"
-msgstr "Pagka-liwanag"
+msgstr "Tifawit"
 
 #: src/otherwindow.c:573 src/otherwindow.c:814
 msgid "Brightness"
-msgstr "Pagka-liwanag"
+msgstr "Tifawit"
 
 #: src/otherwindow.c:574
 msgid "Distance to A"
-msgstr "Layo patungo sa A"
+msgstr ""
 
 #: src/otherwindow.c:575
 msgid "Projection to A->B"
@@ -2886,23 +2888,23 @@ msgstr ""
 
 #: src/otherwindow.c:576
 msgid "Frequency"
-msgstr "Frequency"
+msgstr "Asnagar"
 
 #: src/otherwindow.c:580
 msgid "Sort Palette Colours"
-msgstr ""
+msgstr "Smizzwer initen n tpaliḍt"
 
 #: src/otherwindow.c:582
 msgid "Start Index"
-msgstr "Simulan ang Indes"
+msgstr "Amatar n tazwara"
 
 #: src/otherwindow.c:583
 msgid "End Index"
-msgstr "Tapusin ang Index"
+msgstr "Amatar n taggara"
 
 #: src/otherwindow.c:589
 msgid "Reverse Order"
-msgstr ""
+msgstr "Tti asmizzwer"
 
 #: src/otherwindow.c:805
 msgid "Bitwise"
@@ -2914,11 +2916,11 @@ msgstr ""
 
 #: src/otherwindow.c:805
 msgid "Rounded"
-msgstr ""
+msgstr "Imdewwer"
 
 #: src/otherwindow.c:809 src/toolbar.c:311 src/toolbar.c:558
 msgid "Transform Colour"
-msgstr ""
+msgstr "Beddel initen"
 
 #: src/otherwindow.c:812
 msgid "Gamma"
@@ -2926,15 +2928,15 @@ msgstr "Gama"
 
 #: src/otherwindow.c:816
 msgid "Contrast"
-msgstr ""
+msgstr "Amyeẓli"
 
 #: src/otherwindow.c:822 src/otherwindow.c:1674
 msgid "Posterize"
-msgstr "Posterize"
+msgstr ""
 
 #: src/otherwindow.c:831
 msgid "Show Detail"
-msgstr "Ipakita ang Detalye"
+msgstr "Beqqeḍ talqayt"
 
 #: src/otherwindow.c:836
 msgid "Posterize type"
@@ -2942,11 +2944,11 @@ msgstr ""
 
 #: src/otherwindow.c:857
 msgid "Auto-Preview"
-msgstr ""
+msgstr "Tamuɣli tawurmant"
 
 #: src/otherwindow.c:869
 msgid "Reset"
-msgstr "Ibalik sa Dati"
+msgstr "Ales awennez"
 
 #: src/otherwindow.c:931
 msgid "New geometry is the same as now - nothing to do."
@@ -2954,17 +2956,17 @@ msgstr ""
 
 #: src/otherwindow.c:980
 msgid "The operating system cannot allocate the memory for this operation."
-msgstr ""
+msgstr "Anagraw n wammud ur yezmir ad iḥerri takatut i temhelt-agi."
 
 #: src/otherwindow.c:982
 msgid ""
 "You have not allocated enough memory in the Preferences window for this "
 "operation."
-msgstr ""
+msgstr "Ur tḥeṛṛaḍ ara ddeqs n tkatut i temhelt-agi deg usfaylu n yismenyifen."
 
 #: src/otherwindow.c:993 src/otherwindow.c:2495
 msgid "Mirror"
-msgstr "Salamin"
+msgstr ""
 
 #: src/otherwindow.c:993 src/otherwindow.c:994
 msgid "Tile"
@@ -2972,11 +2974,11 @@ msgstr ""
 
 #: src/otherwindow.c:993
 msgid "Void"
-msgstr ""
+msgstr "Ilem"
 
 #: src/otherwindow.c:994 src/shifter.c:283
 msgid "Clear"
-msgstr "Burahin"
+msgstr "Sfeḍ"
 
 #: src/otherwindow.c:994
 msgid "Mirror tile"
@@ -2984,7 +2986,7 @@ msgstr ""
 
 #: src/otherwindow.c:996
 msgid "Nearest Neighbour"
-msgstr "Pinakamalapit na Kapitbahay"
+msgstr "Anarag iqerben aṭas"
 
 #: src/otherwindow.c:997
 msgid "Bilinear / Area Mapping"
@@ -3012,27 +3014,27 @@ msgstr ""
 
 #: src/otherwindow.c:1008
 msgid "Scale Canvas"
-msgstr ""
+msgstr "Beddel taskala n teɣzut n usuneɣ"
 
 #: src/otherwindow.c:1009
 msgid "Resize Canvas"
-msgstr "Ibahin ang Size ng Kanbas"
+msgstr "Beddel tiddi n teɣzut n usuneɣ"
 
 #: src/otherwindow.c:1012
 msgid "Original      "
-msgstr "Orihinal      "
+msgstr "Tazwara      "
 
 #: src/otherwindow.c:1013
 msgid "New"
-msgstr "Panibago"
+msgstr "Amaynut"
 
 #: src/otherwindow.c:1014
 msgid "Width     "
-msgstr "Lapad     "
+msgstr "Tehri     "
 
 #: src/otherwindow.c:1018
 msgid "Height    "
-msgstr "Taas    "
+msgstr "Teɣzi    "
 
 #: src/otherwindow.c:1023 src/otherwindow.c:2514 src/otherwindow.c:2672
 #: src/toolbar.c:212
@@ -3041,15 +3043,15 @@ msgstr ""
 
 #: src/otherwindow.c:1026 src/otherwindow.c:1615 src/viewer.c:1209
 msgid "Centre"
-msgstr "Gitna"
+msgstr ""
 
 #: src/otherwindow.c:1033 src/otherwindow.c:1052
 msgid "Fix Aspect Ratio"
-msgstr ""
+msgstr "Ḥrez assaɣ n tmeẓri"
 
 #: src/otherwindow.c:1039 src/otherwindow.c:2070 src/toolbar.c:312
 msgid "Settings"
-msgstr "Mga Kaayusan"
+msgstr "Iɣewwaren"
 
 #: src/otherwindow.c:1046
 msgid "Sharper image reduction"
@@ -3069,31 +3071,31 @@ msgstr ""
 
 #: src/otherwindow.c:1615
 msgid "Limit"
-msgstr "Hangganan"
+msgstr ""
 
 #: src/otherwindow.c:1616
 msgid "Sphere"
-msgstr "Bola"
+msgstr "Takurt"
 
 #: src/otherwindow.c:1616 src/otherwindow.c:2670
 msgid "Angle"
-msgstr "Anggulo"
+msgstr "Tiɣmert"
 
 #: src/otherwindow.c:1616
 msgid "Cube"
-msgstr ""
+msgstr "Agasas"
 
 #: src/otherwindow.c:1617
 msgid "Opaque"
-msgstr ""
+msgstr "Imḍulles"
 
 #: src/otherwindow.c:1617
 msgid "Border"
-msgstr "Gilid"
+msgstr "Iri"
 
 #: src/otherwindow.c:1618
 msgid "Transparent"
-msgstr "Transparent"
+msgstr "Afrawan"
 
 #: src/otherwindow.c:1618
 msgid "Tile "
@@ -3101,31 +3103,31 @@ msgstr ""
 
 #: src/otherwindow.c:1618
 msgid "Segment"
-msgstr ""
+msgstr "Iɣil"
 
 #: src/otherwindow.c:1656
 msgid "Scale"
-msgstr "Baguhin ang Laki"
+msgstr "Taskala"
 
 #: src/otherwindow.c:1657 src/otherwindow.c:3059
 msgid "From"
-msgstr "Mula sa"
+msgstr "Seg"
 
 #: src/otherwindow.c:1659 src/otherwindow.c:3061
 msgid "To"
-msgstr "Hanggang"
+msgstr ""
 
 #: src/otherwindow.c:1699
 msgid "Range"
-msgstr ""
+msgstr "Tagrumma"
 
 #: src/otherwindow.c:1702
 msgid "Inverse"
-msgstr ""
+msgstr "Tti"
 
 #: src/otherwindow.c:1710
 msgid "Smart grid"
-msgstr "Matalinong grid"
+msgstr ""
 
 #: src/otherwindow.c:1712
 msgid "Tile grid"
@@ -3137,15 +3139,15 @@ msgstr ""
 
 #: src/otherwindow.c:1717
 msgid "Tile width"
-msgstr "Lapad ng Tile"
+msgstr ""
 
 #: src/otherwindow.c:1720
 msgid "Tile height"
-msgstr "Taas ng Tile"
+msgstr ""
 
 #: src/otherwindow.c:1744
 msgid "Palette Editor"
-msgstr "Editor ng Palette"
+msgstr "Amaẓrag n tpaliḍt"
 
 #: src/otherwindow.c:1763
 msgid "Configure Overlays"
@@ -3153,7 +3155,7 @@ msgstr ""
 
 #: src/otherwindow.c:1782
 msgid "Colour Editor"
-msgstr "Editor ng Kulay"
+msgstr "Amaẓrag n yiniten"
 
 #: src/otherwindow.c:1818 src/toolbar.c:430
 msgid "Colour-Selective Mode"
@@ -3161,15 +3163,15 @@ msgstr ""
 
 #: src/otherwindow.c:1843
 msgid "Configure Grid"
-msgstr ""
+msgstr "Swel taferrugt"
 
 #: src/otherwindow.c:2045
 msgid "Exact Conversion"
-msgstr "Saktong Konbersyon"
+msgstr ""
 
 #: src/otherwindow.c:2045
 msgid "Use Current Palette"
-msgstr ""
+msgstr "Seqdec tapaliḍt tamirant"
 
 #: src/otherwindow.c:2046
 msgid "PNN Quantize (slow, better quality)"
@@ -3186,31 +3188,31 @@ msgstr ""
 #: src/otherwindow.c:2049 src/otherwindow.c:2495 src/otherwindow.c:2756
 #: src/png.c:2794 src/prefs.c:377
 msgid "None"
-msgstr "Wala"
+msgstr "Ulac"
 
 #: src/otherwindow.c:2049
 msgid "Floyd-Steinberg"
-msgstr "Floyd-Steinberg"
+msgstr ""
 
 #: src/otherwindow.c:2049
 msgid "Stucki"
-msgstr "Stucki"
+msgstr ""
 
 #: src/otherwindow.c:2052
 msgid "Floyd-Steinberg (quick)"
-msgstr "Floyd-Steinberg (madalian)"
+msgstr ""
 
 #: src/otherwindow.c:2052
 msgid "Dithered (effect)"
-msgstr "Dithered (effect)"
+msgstr ""
 
 #: src/otherwindow.c:2053
 msgid "Scattered (effect)"
-msgstr "Pakalat (effect)"
+msgstr ""
 
 #: src/otherwindow.c:2054
 msgid "Gamut"
-msgstr "Gamut"
+msgstr ""
 
 #: src/otherwindow.c:2054
 msgid "Weakly"
@@ -3222,7 +3224,7 @@ msgstr ""
 
 #: src/otherwindow.c:2055
 msgid "Off"
-msgstr "Off"
+msgstr "Yensa"
 
 #: src/otherwindow.c:2055
 msgid "Separate/Sum"
@@ -3242,11 +3244,11 @@ msgstr ""
 
 #: src/otherwindow.c:2057
 msgid "Largest (Linf)"
-msgstr "Pinakamalaki (Linf)"
+msgstr "Ahrawan maḍi (Linf)"
 
 #: src/otherwindow.c:2057
 msgid "Sum (L1)"
-msgstr "Kabuuan (L1)"
+msgstr ""
 
 #: src/otherwindow.c:2057
 msgid "Euclidean (L2)"
@@ -3266,7 +3268,7 @@ msgstr ""
 
 #: src/otherwindow.c:2078
 msgid "Truncate palette"
-msgstr "Putulin ang paleyt"
+msgstr ""
 
 #: src/otherwindow.c:2079
 msgid "Diameter based weighting"
@@ -3278,7 +3280,7 @@ msgstr ""
 
 #: src/otherwindow.c:2087 src/otherwindow.c:2584 src/otherwindow.c:2928
 msgid "Colour space"
-msgstr ""
+msgstr "Tallunt n yiniten"
 
 #: src/otherwindow.c:2088 src/otherwindow.c:2929
 msgid "Difference measure"
@@ -3310,19 +3312,19 @@ msgstr ""
 
 #: src/otherwindow.c:2303 src/otherwindow.c:2326
 msgid "Constant"
-msgstr ""
+msgstr "Timezgit"
 
 #: src/otherwindow.c:2307
 msgid "Edit Gradient"
-msgstr ""
+msgstr "Ẓreg afesnaw"
 
 #: src/otherwindow.c:2329
 msgid "Points:"
-msgstr ""
+msgstr "Tinqiḍin:"
 
 #: src/otherwindow.c:2493
 msgid "Linear"
-msgstr ""
+msgstr "Imzirig"
 
 #: src/otherwindow.c:2493 src/otherwindow.c:2703
 msgid "Bilinear"
@@ -3334,11 +3336,11 @@ msgstr ""
 
 #: src/otherwindow.c:2494
 msgid "Square"
-msgstr "Parisukat"
+msgstr "Amkuẓ"
 
 #: src/otherwindow.c:2494
 msgid "Angular"
-msgstr ""
+msgstr "Uɣmir"
 
 #: src/otherwindow.c:2494
 msgid "Conical"
@@ -3350,35 +3352,35 @@ msgstr ""
 
 #: src/otherwindow.c:2495
 msgid "Repeat"
-msgstr ""
+msgstr "Ales"
 
 #: src/otherwindow.c:2496
 msgid "A to B"
-msgstr "Mula A hanggang B"
+msgstr "A ɣer B"
 
 #: src/otherwindow.c:2496
 msgid "A to B (RGB)"
-msgstr "Mula A hanggang B (RGB)"
+msgstr "A ɣer B (RGB)"
 
 #: src/otherwindow.c:2497
 msgid "A to B (sRGB)"
-msgstr ""
+msgstr "A ɣer B (sRGB)"
 
 #: src/otherwindow.c:2497
 msgid "A to B (HSV)"
-msgstr "Mula A hanggang B (HSV)"
+msgstr "A ɣer B (TSV)"
 
 #: src/otherwindow.c:2497
 msgid "A to B (backward HSV)"
-msgstr "Mula A hanggang B (pabaligtad na HSV)"
+msgstr ""
 
 #: src/otherwindow.c:2498
 msgid "A only"
-msgstr "A lang"
+msgstr ""
 
 #: src/otherwindow.c:2498 src/otherwindow.c:2500
 msgid "Custom"
-msgstr ""
+msgstr "Udmawan"
 
 #: src/otherwindow.c:2499
 msgid "Current to 0"
@@ -3386,31 +3388,31 @@ msgstr ""
 
 #: src/otherwindow.c:2499
 msgid "Current only"
-msgstr ""
+msgstr "Amiran kan"
 
 #: src/otherwindow.c:2504
 msgid "Configure Gradient"
-msgstr ""
+msgstr "Swel afesnaw"
 
 #: src/otherwindow.c:2507 src/png.c:1001
 msgid "Channel"
-msgstr ""
+msgstr "Abadu"
 
 #: src/otherwindow.c:2512
 msgid "Length"
-msgstr "Haba"
+msgstr "Teɣzi"
 
 #: src/otherwindow.c:2513
 msgid "Repeat length"
-msgstr "Ulitin ang haba"
+msgstr ""
 
 #: src/otherwindow.c:2515
 msgid "Gradient type"
-msgstr ""
+msgstr "Anaw n ufesnaw"
 
 #: src/otherwindow.c:2516
 msgid "Extension type"
-msgstr ""
+msgstr "Anaw n ufesnaw"
 
 #: src/otherwindow.c:2517
 msgid "Distance type"
@@ -3418,23 +3420,23 @@ msgstr ""
 
 #: src/otherwindow.c:2518
 msgid "Preview opacity"
-msgstr ""
+msgstr "Tiḍullest n tmuɣli"
 
 #: src/otherwindow.c:2527 src/otherwindow.c:2533 src/toolbar.c:309
 msgid "Reverse"
-msgstr ""
+msgstr "Tti"
 
 #: src/otherwindow.c:2528 src/otherwindow.c:2534
 msgid "Edit Custom"
-msgstr ""
+msgstr "Asiẓreg yugnen"
 
 #: src/otherwindow.c:2592
 msgid "Pick Gradient"
-msgstr ""
+msgstr "Fren afesnaw"
 
 #: src/otherwindow.c:2668
 msgid "Horizontal "
-msgstr "Pahalang "
+msgstr "Aglawan "
 
 #: src/otherwindow.c:2674
 msgid "At distance"
@@ -3442,11 +3444,11 @@ msgstr ""
 
 #: src/otherwindow.c:2675
 msgid "Vertical"
-msgstr "Patindig"
+msgstr "Ubdid"
 
 #: src/otherwindow.c:2756
 msgid "Unchanged"
-msgstr "Hindi nagbago"
+msgstr ""
 
 #: src/otherwindow.c:2761
 msgid "Tracing Image"
@@ -3454,11 +3456,11 @@ msgstr ""
 
 #: src/otherwindow.c:2763 src/toolbar.c:315
 msgid "Source"
-msgstr "Pinanggalingan"
+msgstr "Aɣbalu"
 
 #: src/otherwindow.c:2768
 msgid "Origin"
-msgstr "Pinagmulan"
+msgstr ""
 
 #: src/otherwindow.c:2771
 msgid "Relative scale"
@@ -3466,7 +3468,7 @@ msgstr ""
 
 #: src/otherwindow.c:2774
 msgid "Display"
-msgstr "Display"
+msgstr "Beqqeḍ"
 
 #: src/otherwindow.c:2926
 msgid "Segment Image"
@@ -3474,15 +3476,15 @@ msgstr ""
 
 #: src/otherwindow.c:2931 src/toolbar.c:304
 msgid "Threshold"
-msgstr ""
+msgstr "Amnar"
 
 #: src/otherwindow.c:2933
 msgid "Level"
-msgstr ""
+msgstr "Aswir"
 
 #: src/otherwindow.c:2934
 msgid "Minimum size"
-msgstr ""
+msgstr "Tiddi taddayt"
 
 #: src/otherwindow.c:3053
 msgid "Max"
@@ -3515,16 +3517,16 @@ msgstr ""
 #: src/png.c:620
 #, c-format
 msgid "Saving %s image"
-msgstr "Sinasave na ang imaheng %s"
+msgstr "Asekles n tugna %s"
 
 #: src/png.c:620
 #, c-format
 msgid "Loading %s image"
-msgstr "Kinakarga na ang imaheng %s"
+msgstr "Asali n tugna %s"
 
 #: src/png.c:998
 msgid "Layer"
-msgstr "Leyer"
+msgstr "Tissi"
 
 #: src/png.c:3577
 msgid "Lossless"
@@ -3552,7 +3554,7 @@ msgstr ""
 
 #: src/png.c:8370
 msgid "Applying colour profile"
-msgstr ""
+msgstr "Asnes n ulegdis n yini"
 
 #: src/png.c:8792
 #, c-format
@@ -3565,51 +3567,51 @@ msgstr ""
 
 #: src/prefs.c:56
 msgid "Default System Language"
-msgstr ""
+msgstr "Tutlayt n lexṣas n unagraw"
 
 #: src/prefs.c:57
 msgid "Chinese (Simplified)"
-msgstr "Intsik (Simple)"
+msgstr "Tacinwat (taḥerfit)"
 
 #: src/prefs.c:57
 msgid "Chinese (Taiwanese)"
-msgstr "Intsik (Taiwanese)"
+msgstr "Tacinwat (Taṭaywanit)"
 
 #: src/prefs.c:57
 msgid "Czech"
-msgstr "Czech"
+msgstr "Tačikit"
 
 #: src/prefs.c:58
 msgid "Dutch"
-msgstr "Dutch"
+msgstr "Tahulandit"
 
 #: src/prefs.c:58
 msgid "English (UK)"
-msgstr "Ingles (UK)"
+msgstr "Taglizit (Tagelda yedduklen)"
 
 #: src/prefs.c:58
 msgid "French"
-msgstr "Pranses"
+msgstr "Tafransist"
 
 #: src/prefs.c:58
 msgid "Galician"
-msgstr "Galisyiano"
+msgstr "Tagalikant"
 
 #: src/prefs.c:58
 msgid "German"
-msgstr "Aleman"
+msgstr "Talmanit"
 
 #: src/prefs.c:59
 msgid "Hungarian"
-msgstr ""
+msgstr "Tahungarit"
 
 #: src/prefs.c:59
 msgid "Italian"
-msgstr ""
+msgstr "Taṭelyanit"
 
 #: src/prefs.c:59
 msgid "Japanese"
-msgstr "Hapones"
+msgstr "Tajapunit"
 
 #: src/prefs.c:59
 msgid "Kabyle"
@@ -3617,51 +3619,51 @@ msgstr ""
 
 #: src/prefs.c:59
 msgid "Polish"
-msgstr "Polish"
+msgstr "Tapulunit"
 
 #: src/prefs.c:60
 msgid "Portuguese"
-msgstr "Portuges"
+msgstr "Tapurtugit"
 
 #: src/prefs.c:60
 msgid "Portuguese (Brazilian)"
-msgstr "Portuges (Pam-Brazil)"
+msgstr "Tapurtugalit (Brizil)"
 
 #: src/prefs.c:60
 msgid "Russian"
-msgstr "Ruso"
+msgstr "Tarusit"
 
 #: src/prefs.c:60
 msgid "Slovak"
-msgstr "Islovak"
+msgstr "Tasluvakit"
 
 #: src/prefs.c:61
 msgid "Spanish"
-msgstr "Kastila"
+msgstr "Taspenyulit"
 
 #: src/prefs.c:61
 msgid "Swedish"
-msgstr ""
+msgstr "Taswidit"
 
 #: src/prefs.c:61
 msgid "Tagalog"
-msgstr ""
+msgstr "Taṭagalugt"
 
 #: src/prefs.c:61
 msgid "Turkish"
-msgstr "Turko"
+msgstr "Taṭurkit"
 
 #: src/prefs.c:81
 msgid "Current Device"
-msgstr ""
+msgstr "Ibenk amiran"
 
 #: src/prefs.c:135
 msgid "Pressure"
-msgstr "Presyur"
+msgstr ""
 
 #: src/prefs.c:149
 msgid "Preferences"
-msgstr "Mga kagustuhan"
+msgstr "Isemenyifen"
 
 #: src/prefs.c:163
 msgid "Max threads (0 to autodetect)"
@@ -3713,7 +3715,7 @@ msgstr ""
 
 #: src/prefs.c:189
 msgid "Language"
-msgstr "Wika/Lenguahe"
+msgstr "Tutlayt"
 
 #: src/prefs.c:191
 msgid ""
@@ -3722,18 +3724,18 @@ msgid ""
 "You will need to restart mtPaint\n"
 "for this to take full effect"
 msgstr ""
-"Pumili ng gustong lenguahe\n"
+"Fren tutlayt n ugrudem\n"
 "\n"
-"Dapat i-restart mo ang mtPaint\n"
-"para gumana ito"
+"Isefk ad talseḍ asekker n mtPaint\n"
+"akken ad yeddu wayagi"
 
 #: src/prefs.c:198
 msgid "Interface"
-msgstr "Interpeys"
+msgstr "Agrudem"
 
 #: src/prefs.c:200
 msgid "Greyscale backdrop"
-msgstr "Greyscale na bakdrop"
+msgstr "Iswiren n umelliɣdi"
 
 #: src/prefs.c:201
 msgid "Selection nudge pixels"
@@ -3745,19 +3747,19 @@ msgstr ""
 
 #: src/prefs.c:204
 msgid "Display clipboard while pasting"
-msgstr "Ipakita ang klipbord habang nagdidikit"
+msgstr "Beqqeḍ tacfawit deg usenṭeḍ"
 
 #: src/prefs.c:205
 msgid "Mouse cursor = Tool"
-msgstr ""
+msgstr "Taḥnaccaḍt n umumed = Afecku"
 
 #: src/prefs.c:206
 msgid "Confirm Exit"
-msgstr ""
+msgstr "Sentem tuffɣa"
 
 #: src/prefs.c:207
 msgid "Q key quits mtPaint"
-msgstr ""
+msgstr "Taqeffalt Q tessufuɣ si mtPaint"
 
 #: src/prefs.c:208
 msgid "Arrow keys scroll canvas"
@@ -3785,23 +3787,23 @@ msgstr ""
 
 #: src/prefs.c:215
 msgid "Use menu icons"
-msgstr "Gumamit ng menu icons"
+msgstr "Seqdec tignitin n wumuɣ"
 
 #: src/prefs.c:220
 msgid "Files"
-msgstr "Mga Files"
+msgstr "Ifuyla"
 
 #: src/prefs.c:223
 msgid "XBM X hotspot"
-msgstr "XBM X na hotspot"
+msgstr ""
 
 #: src/prefs.c:224
 msgid "XBM Y hotspot"
-msgstr "XBM Y na hotspot"
+msgstr ""
 
 #: src/prefs.c:228
 msgid "Recently Used Files"
-msgstr "Mga Files na Kasalukuyang Ginamit"
+msgstr "Ifuyla yettwasqedcen melmi kan"
 
 #: src/prefs.c:229
 msgid "Progress bar silence limit"
@@ -3857,47 +3859,47 @@ msgstr ""
 
 #: src/prefs.c:280
 msgid "Paths"
-msgstr ""
+msgstr "Iberdan"
 
 #: src/prefs.c:281
 msgid "Clipboard Files"
-msgstr ""
+msgstr "Ifuyla n tecfawit"
 
 #: src/prefs.c:281
 msgid "Select Clipboard File"
-msgstr ""
+msgstr "Fren afaylu n tecfawit"
 
 #: src/prefs.c:283
 msgid "HTML Browser Program"
-msgstr "Browser Program sa HTML"
+msgstr "Iminig HTML"
 
 #: src/prefs.c:283
 msgid "Select Browser Program"
-msgstr "Pumili ng Browser Program"
+msgstr "Fren iminig"
 
 #: src/prefs.c:285
 msgid "Location of Handbook index"
-msgstr "Lokasyon ng Handbook index"
+msgstr ""
 
 #: src/prefs.c:285
 msgid "Select Handbook Index File"
-msgstr "Pumili ng Handbook Index File"
+msgstr ""
 
 #: src/prefs.c:287
 msgid "Default Palette"
-msgstr ""
+msgstr "Tapaliḍt n lexṣas"
 
 #: src/prefs.c:287
 msgid "Select Default Palette"
-msgstr ""
+msgstr "Fren tapaliḍt n lexṣas"
 
 #: src/prefs.c:289
 msgid "Default Patterns"
-msgstr ""
+msgstr "Udlifen n lexṣas"
 
 #: src/prefs.c:289
 msgid "Select Default Patterns File"
-msgstr ""
+msgstr "Fren afaylu n wudlifen n lexṣas"
 
 #: src/prefs.c:292
 msgid "Default CSS"
@@ -3909,47 +3911,47 @@ msgstr ""
 
 #: src/prefs.c:295
 msgid "Default Theme"
-msgstr ""
+msgstr "Asentel n lexṣas"
 
 #: src/prefs.c:295
 msgid "Select Default Theme File"
-msgstr ""
+msgstr "Fren afaylu n usentel n lexṣas"
 
 #: src/prefs.c:300
 msgid "Status Bar"
-msgstr "Istatus Bar"
+msgstr "Afeggag n waddad"
 
 #: src/prefs.c:301
 msgid "Canvas Geometry"
-msgstr "Geometry ng Kanbas"
+msgstr ""
 
 #: src/prefs.c:302
 msgid "Cursor X,Y"
-msgstr "Cursor X,Y"
+msgstr "Taḥnaccaḍt X,Y"
 
 #: src/prefs.c:303
 msgid "Pixel [I] {RGB}"
-msgstr "Pixel [I] {RGB}"
+msgstr "Apiksel [I] {RGB}"
 
 #: src/prefs.c:304
 msgid "Selection Geometry"
-msgstr "Selection Geometry"
+msgstr "Tisekta n tefrayt"
 
 #: src/prefs.c:305
 msgid "Undo / Redo"
-msgstr ""
+msgstr "Sefsex / Err-d"
 
 #: src/prefs.c:308
 msgid "Tablet"
-msgstr "Tabletas"
+msgstr "Tafelwit"
 
 #: src/prefs.c:309
 msgid "Device Settings"
-msgstr "Device Settings"
+msgstr "Iɣewwaren n yibenk"
 
 #: src/prefs.c:313
 msgid "Configure Device"
-msgstr ""
+msgstr "Swel ibenk"
 
 #: src/prefs.c:319
 msgid "Tool Variable"
@@ -3957,15 +3959,15 @@ msgstr ""
 
 #: src/prefs.c:322 src/toolbar.c:454
 msgid "Flow"
-msgstr "Daloy"
+msgstr ""
 
 #: src/prefs.c:330
 msgid "Test Area"
-msgstr "Test Area"
+msgstr "Taɣzut n usekyed"
 
 #: src/prefs.c:373
 msgid "Factor"
-msgstr "Paktor"
+msgstr "Ameskar"
 
 #: src/prefs.c:459
 msgid "This key is builtin"
@@ -3988,7 +3990,7 @@ msgstr ""
 
 #: src/shifter.c:147
 msgid "Frames"
-msgstr "Mga Preym"
+msgstr "Ikataren"
 
 #: src/shifter.c:258
 msgid "Palette Shifter"
@@ -3996,28 +3998,28 @@ msgstr ""
 
 #: src/shifter.c:263
 msgid "Start"
-msgstr "Simulan"
+msgstr "Sekker"
 
 #: src/shifter.c:265
 msgid "Finish"
-msgstr "Wakas"
+msgstr "Fak"
 
 #: src/shifter.c:284
 msgid "Fix Palette"
-msgstr ""
+msgstr "Ḥrez tapaliḍt"
 
 #: src/spawn.c:651
 msgid "Configure File Actions"
-msgstr ""
+msgstr "Swel tigawin n ufaylu"
 
 #: src/spawn.c:657 src/spawn.c:663
 msgid "Command"
-msgstr "Command"
+msgstr "Taladna"
 
 #: src/spawn.c:922
 #, c-format
 msgid "Error %i reported when trying to run %s"
-msgstr ""
+msgstr "Tuccḍa %i deg uselkem n tladna %s"
 
 #: src/spawn.c:979
 msgid ""
@@ -4031,6 +4033,8 @@ msgid ""
 "There was a problem running the HTML browser.  You need to set the correct "
 "program name in the Preferences window."
 msgstr ""
+"Yeḍra-d wugur deg uelkem n yiminig HTML. Isefk ad tesbaduḍ isem n wahil "
+"ameɣtu deg usfaylu n yiɣewwaren."
 
 #: src/thread.c:361
 msgid "Helper thread is not responding. Save your work and exit the program."
@@ -4038,11 +4042,11 @@ msgstr ""
 
 #: src/toolbar.c:147
 msgid "RGB Cube"
-msgstr ""
+msgstr "Agasas RVB"
 
 #: src/toolbar.c:148
 msgid "By image channel"
-msgstr ""
+msgstr "S ubadu n tugna"
 
 #: src/toolbar.c:149
 msgid "Gradient-driven"
@@ -4050,11 +4054,11 @@ msgstr ""
 
 #: src/toolbar.c:157
 msgid "Fill settings"
-msgstr ""
+msgstr "Iɣewwaren n taččart"
 
 #: src/toolbar.c:170
 msgid "Respect opacity mode"
-msgstr ""
+msgstr "Qader askar n tiḍullest"
 
 #: src/toolbar.c:176
 msgid "Smudge settings"
@@ -4082,23 +4086,23 @@ msgstr ""
 
 #: src/toolbar.c:299 src/toolbar.c:341
 msgid "Normal"
-msgstr "Normal"
+msgstr "Amagnu"
 
 #: src/toolbar.c:300
 msgid "Colour"
-msgstr "Kulay"
+msgstr "Ini"
 
 #: src/toolbar.c:300
 msgid "Saturate More"
-msgstr ""
+msgstr "Seṛwu ugar"
 
 #: src/toolbar.c:301
 msgid "Multiply"
-msgstr "Multiply"
+msgstr "Ssugget"
 
 #: src/toolbar.c:301
 msgid "Divide"
-msgstr "Hatiin"
+msgstr "Bḍu"
 
 #: src/toolbar.c:301
 msgid "Dodge"
@@ -4106,27 +4110,27 @@ msgstr ""
 
 #: src/toolbar.c:302
 msgid "Burn"
-msgstr "Sungin"
+msgstr ""
 
 #: src/toolbar.c:302
 msgid "Hard Light"
-msgstr "Malakas na Ilaw"
+msgstr "Tafat iǧehdden"
 
 #: src/toolbar.c:302
 msgid "Soft Light"
-msgstr "Mahinang Ilaw"
+msgstr ""
 
 #: src/toolbar.c:302
 msgid "Difference"
-msgstr "Pagkakaiba"
+msgstr "Amgarrad"
 
 #: src/toolbar.c:303
 msgid "Darken"
-msgstr "Padilimin"
+msgstr ""
 
 #: src/toolbar.c:303
 msgid "Lighten"
-msgstr ""
+msgstr "Sfaw"
 
 #: src/toolbar.c:303
 msgid "Grain Extract"
@@ -4138,59 +4142,59 @@ msgstr ""
 
 #: src/toolbar.c:330
 msgid "Blend mode"
-msgstr ""
+msgstr "Askar n usmezdi"
 
 #: src/toolbar.c:417
 msgid "Continuous Mode"
-msgstr ""
+msgstr "Askar amaɣlal"
 
 #: src/toolbar.c:421
 msgid "Opacity Mode"
-msgstr ""
+msgstr "Askar n tiḍullest"
 
 #: src/toolbar.c:424
 msgid "Tint Mode"
-msgstr ""
+msgstr "Askar n tiɣmi"
 
 #: src/toolbar.c:427
 msgid "Tint +-"
-msgstr ""
+msgstr "Tiɣmi +-"
 
 #: src/toolbar.c:434
 msgid "Blend Mode"
-msgstr ""
+msgstr "Askar n usmezdi"
 
 #: src/toolbar.c:438
 msgid "Disable All Masks"
-msgstr ""
+msgstr "Sens akk tigelmusin"
 
 #: src/toolbar.c:441
 msgid "Gradient Mode"
-msgstr ""
+msgstr "Askar n ufesnaw"
 
 #: src/toolbar.c:486
 msgid "Settings Toolbar"
-msgstr ""
+msgstr "Afeggag n yiɣewwaren"
 
 #: src/toolbar.c:546
 msgid "Cut"
-msgstr "Putulin"
+msgstr "Gzem"
 
 #: src/toolbar.c:548
 msgid "Copy"
-msgstr "Kopyahin"
+msgstr "Tanɣelt"
 
 #: src/toolbar.c:550
 msgid "Paste"
-msgstr "Idikit"
+msgstr "Senṭeḍ"
 
 #: src/toolbar.c:553
 msgid "Undo"
-msgstr "Ibalik"
+msgstr "Sefsex"
 
 #: src/toolbar.c:555
 msgid "Redo"
-msgstr "Gawin muli"
+msgstr "Err-d"
 
 #: src/toolbar.c:559 src/viewer.c:328
 msgid "Pan Window"
@@ -4198,15 +4202,15 @@ msgstr ""
 
 #: src/toolbar.c:560 src/toolbar.c:640
 msgid "More..."
-msgstr "Iba pa..."
+msgstr "Ugar..."
 
 #: src/toolbar.c:574
 msgid "Paint"
-msgstr "I-pinta"
+msgstr "Klu"
 
 #: src/toolbar.c:580
 msgid "Shuffle"
-msgstr "Balasahin"
+msgstr ""
 
 #: src/toolbar.c:583
 msgid "Flood Fill"
@@ -4214,67 +4218,67 @@ msgstr ""
 
 #: src/toolbar.c:587
 msgid "Straight Line"
-msgstr "Deretsong linya"
+msgstr "Ajerriḍ usrid"
 
 #: src/toolbar.c:590
 msgid "Smudge"
-msgstr "Punasan"
+msgstr ""
 
 #: src/toolbar.c:594
 msgid "Clone"
-msgstr "Gayahin"
+msgstr "Sisleg"
 
 #: src/toolbar.c:597
 msgid "Make Selection"
-msgstr "Bumuo ng Seleksyon"
+msgstr "Eg tafrayt"
 
 #: src/toolbar.c:600
 msgid "Polygon Selection"
-msgstr "Polygon na Seleksyon"
+msgstr "Tafrayt s ugedis"
 
 #: src/toolbar.c:603
 msgid "Place Gradient"
-msgstr "Ilagay ang Gradient"
+msgstr "Afesnaw"
 
 #: src/toolbar.c:606
 msgid "Lasso Selection"
-msgstr "Seleksyong Lasso"
+msgstr ""
 
 #: src/toolbar.c:614
 msgid "Ellipse Outline"
-msgstr "Ellipse na Outliine"
+msgstr "Azizdew n teglayt"
 
 #: src/toolbar.c:617
 msgid "Filled Ellipse"
-msgstr "Ellipse na may Laman"
+msgstr "Taglayt yeččuren"
 
 #: src/toolbar.c:620
 msgid "Outline Selection"
-msgstr "Selekyiong Outline"
+msgstr "Suneɣ azizdew n tefrayt"
 
 #: src/toolbar.c:623
 msgid "Fill Selection"
-msgstr ""
+msgstr "Aččar tafrayt"
 
 #: src/toolbar.c:627
 msgid "Flip Selection Vertically"
-msgstr "Baligtarin ang Seleksyon ng Patayo"
+msgstr "Tuttya taratakt n tefrayt"
 
 #: src/toolbar.c:630
 msgid "Flip Selection Horizontally"
-msgstr "Baligtarin ang Seleksyon ng Palihis"
+msgstr "Tuttya taglawant n tefrayt"
 
 #: src/toolbar.c:633
 msgid "Rotate Selection Clockwise"
-msgstr "Iikot ang Seleksyon ng Pa-clockwise"
+msgstr "Tuzzya yugdan tamrilt n tefrayt"
 
 #: src/toolbar.c:636
 msgid "Rotate Selection Anti-Clockwise"
-msgstr "Iikot ang Seleksyon ng Pa-counterclockwise"
+msgstr "Tuzzya mgal tamrilt n tefrayt"
 
 #: src/vcode.c:5201
 msgid "Browse"
-msgstr "Magtingin-tingin"
+msgstr "Snirem"
 
 #: src/vcode.c:7886
 msgid "New key ..."
@@ -4292,7 +4296,7 @@ msgstr ""
 
 #: src/viewer.c:115
 msgid "About"
-msgstr "Tungkol dito"
+msgstr "Ɣef"
 
 #: src/viewer.c:1179
 msgid "No font selected"
@@ -4307,7 +4311,16 @@ msgid "Right"
 msgstr ""
 
 #~ msgid "Create GIF frames"
-#~ msgstr "Gumawa ng GIF frames"
+#~ msgstr "Snulfu-d ikataren n GIF"
 
-#~ msgid "Distance to A+B"
-#~ msgstr "Layo patungo sa A+B"
+#~ msgid ""
+#~ "You are trying to save an XPM file with more than 4096 colours.  Either "
+#~ "use another format or posterize the image to 4 bits, or otherwise reduce "
+#~ "the number of colours."
+#~ msgstr ""
+#~ "Ala tettaɛraḍeḍ ad teskelseḍ afaylu XPM s wugar n 4096 n yiniten. Seqdec "
+#~ "amasal-nniḍen neɣ err tugna ɣer uskar n 4 n ibiten, neɣ sader amḍan n "
+#~ "yiniten."
+
+#~ msgid "Store Values"
+#~ msgstr "Sekles azalen"

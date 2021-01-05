@@ -1,5 +1,5 @@
 /*	help.c
-	Copyright (C) 2004-2020 Mark Tyler and Dmitry Groshev
+	Copyright (C) 2004-2021 Mark Tyler and Dmitry Groshev
 
 	This file is part of mtPaint.
 
@@ -29,7 +29,7 @@ _("Credits"),
 };
 
 static char *help_page0[] = {
-_("mtPaint 3.50 - Copyright (C) 2004-2020 The Authors\n"),
+_("mtPaint 3.51 - Copyright (C) 2004-2021 The Authors\n"),
 _("See 'Credits' section for a list of the authors.\n"),
 _("mtPaint is free software; you can redistribute it and/or modify it under the terms of the GNU General Public License as published by the Free Software Foundation; either version 3 of the License, or (at your option) any later version.\n"),
 _("mtPaint is distributed in the hope that it will be useful, but WITHOUT ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License for more details.\n"),
@@ -176,7 +176,7 @@ _("Vlastimil Krejcir"),
 _("William Kern\n\n"),
 _("Translations\n"),
 _("Brazilian Portuguese - Paulo Trevizan, Valter Nazianzeno"),
-_("Czech - Pavel Ruzicka, Martin Petricek, Roman Hornik"),
+_("Czech - Pavel Ruzicka, Martin Petricek, Roman Hornik, Pavel Fric"),
 _("Dutch - Hans Strijards, Pjotr"),
 _("French - Nicolas Velin, Pascal Billard, Sylvain Cresto, Johan Serre, Philippe Etienne, Victor Copovi"),
 _("Galician - Miguel Anxo Bouzada"),
@@ -184,6 +184,7 @@ _("German - Oliver Frommel, B. Clausius, Ulrich Ringel, Simon Brixel"),
 _("Hungarian - Ur Balazs"),
 _("Italian - Angelo Gemmi"),
 _("Japanese - Norihiro YONEDA"),
+_("Kabyle - Yacine Bouklif"),
 _("Polish - Bartosz Kaszubowski, LucaS"),
 _("Portuguese - Israel G. Lugo, Tiago Silva"),
 _("Russian - Sergey Irupin, Dmitry Groshev"),

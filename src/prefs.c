@@ -1,5 +1,5 @@
 /*	prefs.c
-	Copyright (C) 2005-2020 Mark Tyler and Dmitry Groshev
+	Copyright (C) 2005-2021 Mark Tyler and Dmitry Groshev
 
 	This file is part of mtPaint.
 
@@ -44,20 +44,19 @@ int tablet_tool_factor[3];			// Size, flow, opacity
 
 #ifdef U_NLS
 
-#define PREF_LANGS 21
+#define PREF_LANGS 22
 
 static char *pref_lang_ini_code[PREF_LANGS] = { "system",
-	"zh_CN.utf8", "zh_TW.utf8",
-	"cs_CZ", "nl_NL", "en_GB", "fr_FR",
-	"gl_ES", "de_DE", "hu_HU", "it_IT",
-	"ja_JP.utf8", "pl_PL", "pt_PT",
-	"pt_BR", "ru_RU", "sk_SK",
+	"zh_CN.utf8", "zh_TW.utf8", "cs_CZ",
+	"nl_NL", "en_GB", "fr_FR", "gl_ES", "de_DE",
+	"hu_HU", "it_IT", "ja_JP.utf8", "kab_DZ", "pl_PL",
+	"pt_PT", "pt_BR", "ru_RU", "sk_SK",
 	"es_ES", "sv_SE", "tl_PH", "tr_TR" };
 
 static char *pref_langs[PREF_LANGS] = { _("Default System Language"),
 	_("Chinese (Simplified)"), _("Chinese (Taiwanese)"), _("Czech"),
 	_("Dutch"), _("English (UK)"), _("French"), _("Galician"), _("German"),
-	_("Hungarian"), _("Italian"), _("Japanese"), _("Polish"),
+	_("Hungarian"), _("Italian"), _("Japanese"), _("Kabyle"), _("Polish"),
 	_("Portuguese"), _("Portuguese (Brazilian)"), _("Russian"), _("Slovak"),
 	_("Spanish"), _("Swedish"), _("Tagalog"), _("Turkish") };
 
