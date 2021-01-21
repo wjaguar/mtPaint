@@ -1,5 +1,5 @@
 /*	vcode.c
-	Copyright (C) 2013-2020 Dmitry Groshev
+	Copyright (C) 2013-2021 Dmitry Groshev
 
 	This file is part of mtPaint.
 
@@ -5750,7 +5750,7 @@ GtkWidget *smarttbar_button(smarttbar_data *sd, char *v)
 {
 	GtkWidget *box = sd->r[0], *ritem = NULL;
 	GtkWidget *button, *arrow, *popup, *ebox, *frame, *bbox, *item;
-	void **slot, *rvar = (void *)(-1);
+	void **slot, *rvar = MEM_NONE;
 
 	sd->button = button = pack(box, gtk_button_new());
 #if GTK_MAJOR_VERSION == 1

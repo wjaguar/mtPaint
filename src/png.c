@@ -1432,13 +1432,12 @@ static void composite_gif_frame(frameset *fset, ani_status *stat,
 	}
 	else // To RGB
 	{
-		unsigned char rgb[513 * 3], *tmp, *fg = fg0, *bg = bg0;
+		unsigned char rgb[513 * 3], *fg = fg0, *bg = bg0;
 		int x, y, bpp = urgb + urgb + 1;
 
 		/* Setup global palette map: underlayer, image, background */
-		tmp = pal2rgb(rgb, bkf->pal);
-		tmp = pal2rgb(tmp, settings->pal);
-		tmp[0] = tmp[1] = tmp[2] = 0;
+		if (bkf->pal) pal2rgb(rgb, bkf->pal, 256, 0);
+		pal2rgb(rgb + 256 * 3, settings->pal, 256, 257);
 		frame->trans = -1; // No color-key transparency
 
 		for (y = 0; y < frame->height; y++)
@@ -5936,17 +5935,6 @@ static const png_color def_pal[16] = {
 {0xFF, 0x55, 0x55}, {0xFF, 0x55, 0xFF}, {0xFF, 0xFF, 0x55}, {0xFF, 0xFF, 0xFF},
 };
 
-static void copy_rgb_pal(png_color *dest, unsigned char *src, int cnt)
-{
-	while (cnt-- > 0)
-	{
-		dest->red = src[0];
-		dest->green = src[1];
-		dest->blue = src[2];
-		dest++; src += 3;
-	}
-}
-
 static int load_pcx(char *file_name, ls_settings *settings)
 {
 	static const unsigned char planarconfig[9] = {
@@ -6028,10 +6016,10 @@ static int load_pcx(char *file_name, ls_settings *settings)
 			if ((fseek(fp, -769, SEEK_END) < 0) ||
 				(fread(pbuf, 1, 769, fp) < 769) ||
 				(pbuf[0] != 0x0C)) goto fail;
-			copy_rgb_pal(settings->pal, pbuf + 1, 256);
+			rgb2pal(settings->pal, pbuf + 1, 256);
 		}
 		/* 8 or 16 colors - read from header */
-		else copy_rgb_pal(settings->pal, hdr + PCX_PAL, cols);
+		else rgb2pal(settings->pal, hdr + PCX_PAL, cols);
 
 		/* If palette is all we need */
 		res = 1;
@@ -6189,16 +6177,8 @@ static int save_pcx(char *file_name, ls_settings *settings)
 	/* Write palette */
 	if (bpp == 1)
 	{
-		png_color *col = settings->pal;
-
-		memset(dest = buf + 1, 0, 768);
 		buf[0] = 0x0C;
-		for (i = 0; i < settings->colors; i++ , dest += 3 , col++)
-		{
-			dest[0] = col->red;
-			dest[1] = col->green;
-			dest[2] = col->blue;
-		}
+		pal2rgb(buf + 1, settings->pal, settings->colors, 256);
 		fwrite(buf, 1, 769, fp);
 	}
 
@@ -6421,7 +6401,7 @@ static int load_lbm(char *file_name, ls_settings *settings)
 			l += 32 * 3;
 		}
 		/* Store the result */
-		copy_rgb_pal(settings->pal, pbuf, settings->colors = l / 3);
+		rgb2pal(settings->pal, pbuf, settings->colors = l / 3);
 	}
 	if (want_pal) goto fail;
 
@@ -6763,7 +6743,7 @@ static int save_lbm(char *file_name, ls_settings *settings)
 		i = settings->colors * 3;
 		i += i & 1; // Align the size itself, as in every example observed
 		PUT32B(buf + 4, i);
-		pal2rgb(buf + 8, settings->pal);
+		pal2rgb(buf + 8, settings->pal, settings->colors, 256);
 		fwrite(buf, 1, 8 + i, fp);
 	}
 
@@ -7837,7 +7817,7 @@ static int save_pmm(char *file_name, ls_settings *settings, memFILE *mf)
 			" TRANS=%d", settings->xpm_trans);
 		mfputss(mf, "HEIGHT 1\nDEPTH 3\nMAXVAL 255\nTUPLTYPE PALETTE",
 			sbuf, "\nENDHDR\n", NULL);
-		pal2rgb(sbuf, settings->pal);
+		pal2rgb(sbuf, settings->pal, settings->colors, 0);
 		mfwrite(sbuf, 1, settings->colors * 3, mf);
 	}
 	/* All done if only writing palette */

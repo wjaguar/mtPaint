@@ -1692,7 +1692,7 @@ msgstr "Órfãos"
 #: src/info.c:383
 #, c-format
 msgid "Colour index totals - %i of %i used"
-msgstr "Índice de Cores - i% de %i usados"
+msgstr "Índice de Cores - %i de %i usados"
 
 #: src/inifile.c:966
 msgid ""

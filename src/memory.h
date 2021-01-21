@@ -1,5 +1,5 @@
 /*	memory.h
-	Copyright (C) 2004-2020 Mark Tyler and Dmitry Groshev
+	Copyright (C) 2004-2021 Mark Tyler and Dmitry Groshev
 
 	This file is part of mtPaint.
 
@@ -652,10 +652,9 @@ int cmask_from(chanlist img);	// Chanlist to cmask
 int mem_count_all_cols();			// Count all colours - Using main image
 int mem_count_all_cols_real(unsigned char *im, int w, int h);	// Count all colours - very memory greedy
 
-int mem_cols_used(int max_count);		// Count colours used in main RGB image
-int mem_cols_used_real(unsigned char *im, int w, int h, int max_count, int prog);
-			// Count colours used in RGB chunk and dump to found table
-void mem_cols_found(png_color *userpal);	// Convert colours list into palette
+int mem_cols_used(png_color *pal);	// Count and collect colours used in main RGB image
+int mem_cols_used_real(unsigned char *im, int w, int h, png_color *pal);
+			// Count and collect colours used in RGB chunk
 
 #define FREE_IMAGE 1
 #define FREE_UNDO  2
@@ -724,12 +723,15 @@ void mem_pal_load_def();		// Load default palette
 
 #define mem_pal_copy(A, B) memcpy((A), (B), SIZEOF_PALETTE)
 void mem_pal_init();			// Initialise whole of palette RGB
-unsigned char *pal2rgb(unsigned char *rgb, png_color *pal);	// Palette to image
+//	Expand palette to RGB triples, pad with 0 if needed
+void pal2rgb(unsigned char *rgb, png_color *pal, int cnt, int len);
+//	Pack RGB triples into palette
+void rgb2pal(png_color *pal, unsigned char *rgb, int cnt);
 double pal2B(png_color *c);		// Linear brightness for palette color
 void mem_greyscale(int gcor);		// Convert image to greyscale
 void do_convert_rgb(int start, int step, int cnt, unsigned char *dest,
 	unsigned char *src, png_color *pal);	// Convert image to RGB
-int mem_convert_indexed();		// Convert image to Indexed Palette
+int mem_convert_indexed(int cols, png_color *pal);	// Convert image to Indexed Palette
 //	Quantize image using Max-Min algorithm
 int maxminquan(unsigned char *inbuf, int width, int height, int quant_to,
 	png_color *userpal);

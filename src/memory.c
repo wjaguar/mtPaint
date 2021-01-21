@@ -1,5 +1,5 @@
 /*	memory.c
-	Copyright (C) 2004-2020 Mark Tyler and Dmitry Groshev
+	Copyright (C) 2004-2021 Mark Tyler and Dmitry Groshev
 
 	This file is part of mtPaint.
 
@@ -152,8 +152,6 @@ int mem_pal_id_c, mem_pal_ab_c;	// Text & A/B highlight colors
 
 unsigned char mem_pals[PALETTE_WIDTH * PALETTE_HEIGHT * 3];
 				// RGB screen memory holding current palette
-static int found[1024];		// Used by mem_cols_used() & mem_convert_indexed
-
 int mem_brush_list[NUM_BRUSHES][3] = {		// Preset brushes parameters
 { TOOL_SPRAY, 5, 1 }, { TOOL_SPRAY, 7, 1 }, { TOOL_SPRAY, 9, 2 },
 { TOOL_SPRAY, 13, 2 }, { TOOL_SPRAY, 15, 3 }, { TOOL_SPRAY, 19, 3 },
@@ -555,7 +553,7 @@ int mem_add_frame(frameset *fset, int w, int h, int bpp, int cmask, png_color *p
 
 	/* Allocate channels */
 	l = sz * bpp;
-	res = (void *)(-1);
+	res = MEM_NONE;
 	for (i = CHN_IMAGE; res && (i < NUM_CHANNELS); i++)
 	{
 		if (cmask & CMASK_FOR(i))
@@ -803,7 +801,7 @@ void mem_free_chanlist(chanlist img)
 	for (i = 0; i < NUM_CHANNELS; i++)
 	{
 		if (!img[i]) continue;
-		if (img[i] != (void *)(-1)) free(img[i]);
+		if (img[i] != MEM_NONE) free(img[i]);
 	}
 }
 
@@ -956,7 +954,7 @@ int mem_alloc_image(int mode, image_info *image, int w, int h, int bpp,
 
 	sz = (size_t)w * h;
 	l = sz * bpp;
-	res = (void *)(-1);
+	res = MEM_NONE;
 	for (i = CHN_IMAGE; res && (i < NUM_CHANNELS); i++)
 	{
 		if (cmask & CMASK_FOR(i)) res = image->img[i] = malloc(l);
@@ -1068,7 +1066,7 @@ unsigned char *mem_undo_previous(int channel)
 	unsigned char *res;
 
 	undo = mem_undo_im_[(mem_undo_pointer ? mem_undo_pointer : mem_undo_max) - 1];
-	if (!undo || !(res = undo->img[channel]) || (res == (void *)(-1)) ||
+	if (!undo || !(res = undo->img[channel]) || (res == MEM_NONE) ||
 		(undo->flags & UF_TILED))
 		res = mem_img[channel];	// No usable undo so use current
 	return (res);
@@ -1264,7 +1262,7 @@ static void mem_undo_tile(undo_item *undo)
 		/* Not tileable if different set of channels */
 		if (!!undo->img[i] ^ !!mem_img[i]) return;
 		if (undo->img[i] && mem_img[i] &&
-			(undo->img[i] != (void *)(-1))) nc |= 1 << i;
+			(undo->img[i] != MEM_NONE)) nc |= 1 << i;
 	}
 	/* Not tileable if no matching channels */
 	if (!nc) return;
@@ -1327,7 +1325,7 @@ static void mem_undo_tile(undo_item *undo)
 		if (!ntiles) /* Channels unchanged - free the memory */
 		{
 			free(undo->img[cc]);
-			undo->img[cc] = (void *)(-1);
+			undo->img[cc] = MEM_NONE;
 			continue;
 		}
 
@@ -1437,7 +1435,7 @@ static size_t mem_undo_size(undo_stack *ustack)
 			bpp = undo->bpp;
 			for (j = l = 0; j < NUM_CHANNELS; j++)
 			{
-				if (undo->img[j] && (undo->img[j] != (void *)(-1)))
+				if (undo->img[j] && (undo->img[j] != MEM_NONE))
 					l += k * bpp + 32;
 				bpp = 1;
 			}
@@ -1634,7 +1632,7 @@ int undo_next_core(int mode, int new_width, int new_height, int new_bpp, int cma
 	undo = mem_undo_im_[mem_undo_pointer];
 	memcpy(frame, undo->img, sizeof(chanlist));
 	if (!(mode & UC_RESET)) for (i = 0; i < NUM_CHANNELS; i++)
-		if (frame[i] && !(cmask & (1 << i))) frame[i] = (void *)(-1);
+		if (frame[i] && !(cmask & (1 << i))) frame[i] = MEM_NONE;
 
 	/* Allocate new palette */
 	newpal = mem_try_malloc(SIZEOF_PALETTE);
@@ -1749,7 +1747,7 @@ static void mem_undo_tile_swap(undo_item *undo, int redo)
 	nw = ((mem_width + TILE_SIZE - 1) / TILE_SIZE + 7) >> 3;
 	for (cc = 0; cc < NUM_CHANNELS; cc++)
 	{
-		if (!undo->img[cc] || (undo->img[cc] == (void *)(-1)))
+		if (!undo->img[cc] || (undo->img[cc] == MEM_NONE))
 			continue;
 		tmap = undo->tileptr;
 		bpp = BPP(cc);
@@ -1812,7 +1810,7 @@ static void mem_undo_swap(undo_item *prev, int redo)
 	{
 		for (i = 0; i < NUM_CHANNELS; i++)
 		{
-			if (prev->img[i] != (void *)(-1))
+			if (prev->img[i] != MEM_NONE)
 			{
 				prev->img[i] = mem_img[i];
 				mem_img[i] = tmp.img[i];
@@ -2566,27 +2564,12 @@ void mem_bw_pal(png_color *pal, int i1, int i2)
 
 void transform_pal(png_color *pal1, png_color *pal2, int p1, int p2)
 {
-	int i, l = p2 - p1 + 1;
-	unsigned char tmp[256 * 3], *wrk;
+	int l = p2 - p1 + 1;
+	unsigned char tmp[256 * 3];
 
-
-	wrk = tmp; pal2 += p1;
-	for (i = 0; i < l; i++ , wrk += 3 , pal2++)
-	{
-		wrk[0] = pal2->red;
-		wrk[1] = pal2->green;
-		wrk[2] = pal2->blue;
-	}
-
+	pal2rgb(tmp, pal2 + p1, l, 0);
 	do_transform(0, 1, l, NULL, tmp, tmp, 0);
-
-	wrk = tmp; pal1 += p1;
-	for (i = 0; i < l; i++ , wrk += 3 , pal1++)
-	{
-		pal1->red = wrk[0];
-		pal1->green = wrk[1];
-		pal1->blue = wrk[2];
-	}
+	rgb2pal(pal1 + p1, tmp, l);
 }
 
 void set_zoom_centre( int x, int y )
@@ -2615,25 +2598,56 @@ void do_convert_rgb(int start, int step, int cnt, unsigned char *dest,
 	}
 }
 
-// Convert colours list into palette
-void mem_cols_found(png_color *userpal)
-{
-	int i, j;
+/* With 16-bit rg[], would be a little bit more compact (24K vs 26K) */
+typedef struct {
+	uint32_t rg[0x10000 / 32], b[256 * (0x100 / 32)];
+	unsigned char rgx[0x10000 / 32], vx[256 * 32];
+	int nv, nb;
+} rgb_256_map;
 
-	for (i = 0; i < 256; i++)
-	{
-		j = found[i];
-		userpal[i].red = INT_2_R(j);
-		userpal[i].green = INT_2_G(j);
-		userpal[i].blue = INT_2_B(j);
-	}
-}
-
-// Convert RGB image to Indexed Palette - call after mem_cols_used
-int mem_convert_indexed()
+// Convert RGB image to Indexed Palette
+int mem_convert_indexed(int cols, png_color *pal)
 {
+	rgb_256_map m;
+	unsigned char bx[256 * (0x100 / 32)], idx[256];
 	unsigned char *old_image, *new_image;
-	int i, j, k, pix;
+	int i, j, k, l, n, v, vn, pix;
+
+	/* Put palette into bitmap */
+	memset(&m, 0, sizeof(m));
+	for (i = 0; i < cols; i++)
+	{
+		pix = PNG_2_INT(pal[i]);
+		k = pix & 0xFF;
+		n = (pix >> 8) & 0x1F;
+		v = pix >> (8 + 5);
+		/* Insert into tiers */
+		if (!m.rg[v]) m.rgx[v] = m.nv++;
+		vn = m.rgx[v] * 32 + n;
+		if (!((m.rg[v] >> n) & 1))
+			m.vx[vn] = m.nb++ , m.rg[v] |= 1U << n;
+		m.b[m.vx[vn] * 8 + (k >> 5)] |= 1U << (k & 0x1F);
+	}
+	/* Calculate bitcounts */
+	for (i = j = 0; i < sizeof(bx); i++)
+	{
+		bx[i] = j;
+		j += bitcount(m.b[i]);
+	}
+	/* Prepare mapping */
+	for (i = 0; i < cols; i++)
+	{
+		pix = PNG_2_INT(pal[i]);
+		k = pix & 0xFF;
+		n = (pix >> 8) & 0x1F;
+		v = pix >> (8 + 5);
+		/* Locate in bitmap */
+		vn = m.rgx[v] * 32 + n;
+		j = m.vx[vn] * 8 + (k >> 5);
+		j = bx[j] + bitcount(m.b[j] & ((1U << (k & 0x1F)) - 1));
+		/* Remember the palette slot for the location */
+		idx[j] = i;
+	}
 
 	old_image = mem_undo_previous(CHN_IMAGE);
 	new_image = mem_img[CHN_IMAGE];
@@ -2641,12 +2655,19 @@ int mem_convert_indexed()
 	for (i = 0; i < j; i++)
 	{
 		pix = MEM_2_INT(old_image, 0);
-		for (k = 0; k < 256; k++)	// Find index of this RGB
-		{
-			if (found[k] == pix) break;
-		}
-		if (k > 255) return (1);	// No index found - BAD ERROR!!
-		*new_image++ = k;
+		k = pix & 0xFF;
+		n = (pix >> 8) & 0x1F;
+		v = pix >> (8 + 5);
+		/* Test presence on both tiers at once: if the 1st is unset,
+		 * the 2nd simply defaults to block #0 */
+		vn = m.rgx[v] * 32 + n;
+		l = m.vx[vn] * 8 + (k >> 5);
+		if (!((m.rg[v] >> n) & 1 & (m.b[l] >> (k & 0x1F))))
+			return (1);	// No index found - BAD ERROR!!
+		/* Get index */
+		l = bx[l] + bitcount(m.b[l] & ((1U << (k & 0x1F)) - 1));
+		/* Map to palette */
+		*new_image++ = idx[l];
 		old_image += 3;
 	}
 
@@ -3901,20 +3922,14 @@ void mem_prepare_map(unsigned char *map, int how)
 		map[2] = wrk[2] >> 8;
 	}
 	/* Palette */
-	else if (how == MAP_PAL) pal2rgb(map, mem_pal);
+	else if (how == MAP_PAL) pal2rgb(map, mem_pal, mem_cols, 0);
 	/* Clipboard */
 	else if (how == MAP_CLIP)
 	{
 		n = mem_clip_w * mem_clip_h;
 		if (n > 256) n = 256;
-		if (mem_clip_bpp == 3) memcpy(map, mem_clipboard, 768);
-		else for (i = 0; i < n; i++ , map += 3)
-		{
-			png_color *c = mem_pal + mem_clipboard[i];
-			map[0] = c->red;
-			map[1] = c->green;
-			map[2] = c->blue;
-		}
+		if (mem_clip_bpp == 3) memcpy(map, mem_clipboard, n * 3);
+		else do_convert_rgb(0, 1, n, map, mem_clipboard, mem_pal);
 	}
 }
 
@@ -3950,19 +3965,30 @@ void mem_remap_rgb(unsigned char *map, int what) // Remap V/R/G/B to color
 	}
 }
 
-/* Convenience wrapper - expand palette to RGB triples */
-unsigned char *pal2rgb(unsigned char *rgb, png_color *pal)
+/* Expand palette to RGB triples, pad with 0 if needed */
+void pal2rgb(unsigned char *rgb, png_color *pal, int cnt, int len)
 {
-	int i;
-
-	if (!pal) return (rgb + 768); // Nothing to expand
-	for (i = 0; i < 256; i++ , rgb += 3 , pal++)
+	len -= cnt;
+	while (cnt-- > 0)
 	{
 		rgb[0] = pal->red;
 		rgb[1] = pal->green;
 		rgb[2] = pal->blue;
+		rgb += 3; pal++;
 	}
-	return (rgb);
+	if (len > 0) memset(rgb, 0, len * 3);
+}
+
+/* Pack RGB triples into palette */
+void rgb2pal(png_color *pal, unsigned char *rgb, int cnt)
+{
+	while (cnt-- > 0)
+	{
+		pal->red = rgb[0];
+		pal->green = rgb[1];
+		pal->blue = rgb[2];
+		pal++; rgb += 3;
+	}
 }
 
 /* !!! The rectangles here exclude bottom & right border */
@@ -7543,37 +7569,48 @@ int mem_count_all_cols_real(unsigned char *im, int w, int h)	// Count all colour
 	return k;
 }
 
-int mem_cols_used(int max_count)			// Count colours used in main RGB image
+int mem_cols_used(png_color *pal)	// Count and collect colours used in main RGB image
 {
 	if ( mem_img_bpp == 1 ) return -1;			// RGB only
 
-	return (mem_cols_used_real(mem_img[CHN_IMAGE], mem_width, mem_height,
-		max_count, 1));
+	return (mem_cols_used_real(mem_img[CHN_IMAGE], mem_width, mem_height, pal));
 }
 
-int mem_cols_used_real(unsigned char *im, int w, int h, int max_count, int prog)
-			// Count colours used in RGB chunk
+int mem_cols_used_real(unsigned char *im, int w, int h, png_color *pal)
+			// Count and collect up to 256 colours used in RGB chunk
 {
-	int i, j = w * h * 3, k, res = 1, pix;
+	rgb_256_map m;
+	int i, j = w * h, k, l, n, v, vn, res, pix;
 
-	found[0] = MEM_2_INT(im, 0);
-	if (prog) progress_init(_("Counting Unique RGB Pixels"), 0);
-	for (i = 3; (i < j) && (res < max_count); i += 3) // Skim all pixels
+	memset(&m, 0, sizeof(m));
+	for (i = res = 0; i < j; i++ , im += 3) // Skim all pixels
 	{
-		pix = MEM_2_INT(im, i);
-		for (k = 0; k < res; k++)
-		{
-			if (found[k] == pix) break;
-		}
-		if (k >= res)	// New colour so add to list
-		{
-			found[res++] = pix;
-			if (!prog || (res & 7)) continue;
-			if (progress_update((float)res / max_count)) break;
-		}
+		pix = MEM_2_INT(im, 0);
+		k = pix & 0xFF;
+		n = (pix >> 8) & 0x1F;
+		v = pix >> (8 + 5);
+		/* Test presence on both tiers at once: if the 1st is unset,
+		 * the 2nd simply defaults to block #0 */
+		vn = m.rgx[v] * 32 + n;
+		l = m.vx[vn] * 8 + (k >> 5);
+		if ((m.rg[v] >> n) & 1 & (m.b[l] >> (k & 0x1F)))
+			continue;
+		/* New color - stop if too many */
+		if (++res > 256) break;
+		/* Insert into tiers */
+		if (!m.rg[v]) m.rgx[v] = m.nv++;
+		vn = m.rgx[v] * 32 + n;
+		if (!((m.rg[v] >> n) & 1))
+			m.vx[vn] = m.nb++ , m.rg[v] |= 1U << n;
+		l = m.vx[vn] * 8 + (k >> 5);
+		m.b[l] |= 1U << (k & 0x1F);
+		/* Add to palette */
+		if (!pal) continue;
+		pal->red = im[0];
+		pal->green = im[1];
+		pal->blue = im[2];
+		pal++;
 	}
-	if (prog) progress_end();
-
 	return (res);
 }
 

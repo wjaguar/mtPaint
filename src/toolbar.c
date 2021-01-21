@@ -1,5 +1,5 @@
 /*	toolbar.c
-	Copyright (C) 2006-2020 Mark Tyler and Dmitry Groshev
+	Copyright (C) 2006-2021 Mark Tyler and Dmitry Groshev
 
 	This file is part of mtPaint.
 
@@ -663,15 +663,7 @@ void ts_update_gradient()
 		}
 	}
 	else if (mem_img_bpp == 1) /* Read in current palette */
-	{
-		memset(pal, 0, sizeof(pal));
-		for (i = 0; i < 256; i++)
-		{
-			pal[i * 3 + 0] = mem_pal[i].red;
-			pal[i * 3 + 1] = mem_pal[i].green;
-			pal[i * 3 + 2] = mem_pal[i].blue;
-		}
-	}
+		pal2rgb(pal, mem_pal, 256, 256);
 	else tmp = cset , --slot; /* Use gradient colors */
 	if (!IS_INDEXED) idx = 0; /* Allow intermediate opacities */
 

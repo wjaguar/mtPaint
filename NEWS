@@ -5,13 +5,18 @@ mtPaint NEWS
 Here is a summary of the main changes in this release (see handbook for full details):
 
 3.51	2021-??-??
+
 	* Kabyle translation added by Yacine Bouklif
 	* Czech translation updated by Pavel Fric
 	* Spanish translation updated by Adolfo Jayme
 	* Tagalog translation updated by Anjelo delCarmen
+	* Counting used colours and exact conversion to indexed now are 9-19 times faster
 	* Support for compiling with libtiff 3 restored
+	* BUGFIX - RGB clipboard when used in Map effect now is padded with black if too small, as it should
+	* BUGFIX - Gradient editor now displays correct overlay colours for utility channels again
 
 3.50	2020-12-31
+
 	* Dutch translation updated by Pjotr
 	* French translation updated by Victor Copovi
 	* German translation updated by Simon Brixel

@@ -1,5 +1,5 @@
 /*	info.c
-	Copyright (C) 2005-2014 Mark Tyler and Dmitry Groshev
+	Copyright (C) 2005-2021 Mark Tyler and Dmitry Groshev
 
 	This file is part of mtPaint.
 
@@ -338,9 +338,9 @@ void pressed_information()
 		i = mem_count_all_cols();
 		if (i < 0) // not enough memory
 		{
-			i = mem_cols_used(1024);
-			if (i >= 1024) i = -1;
-			strcpy(tdata.rgb_d, ">1023");
+			i = mem_cols_used(NULL);
+			if (i > 256) i = -1;
+			strcpy(tdata.rgb_d, ">256");
 		}
 		if (i >= 0) snprintf(tdata.rgb_d, sizeof(tdata.rgb_d), "%d", i);
 	}

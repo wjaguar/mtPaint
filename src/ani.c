@@ -1,5 +1,5 @@
 /*	ani.c
-	Copyright (C) 2005-2016 Mark Tyler and Dmitry Groshev
+	Copyright (C) 2005-2021 Mark Tyler and Dmitry Groshev
 
 	This file is part of mtPaint.
 
@@ -771,12 +771,10 @@ static void create_frames_ani()
 
 		if (settings.bpp == 1)	// Prepare palette
 		{
-			cols = mem_cols_used_real(layer_rgb, layer_w, layer_h, 258, 0);
-							// Count colours in image
+			cols = mem_cols_used_real(layer_rgb, layer_w, layer_h, pngpal);
+						// Count & collect colours in image
 
-			if ( cols <= 256 )	// If <=256 convert directly
-				mem_cols_found(pngpal);	// Get palette
-			else			// If >256 use Wu to quantize
+			if (cols > 256)		// If >256 use Wu to quantize
 			{
 				cols = 256;
 				if (wu_quant(layer_rgb, layer_w, layer_h, cols,

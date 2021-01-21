@@ -1,5 +1,5 @@
 /*	otherwindow.c
-	Copyright (C) 2004-2020 Mark Tyler and Dmitry Groshev
+	Copyright (C) 2004-2021 Mark Tyler and Dmitry Groshev
 
 	This file is part of mtPaint.
 
@@ -294,34 +294,30 @@ typedef struct {
 
 static void make_crgb(unsigned char *tmp, int channel)
 {
-	int col, j, k;
+	int col, k, r, g, b;
+
+	if (channel <= CHN_IMAGE) /* Palette as such */
+	{
+		pal2rgb(tmp, mem_pal, mem_cols, 256);
+		return;
+	}
+
+	if (channel < NUM_CHANNELS) /* Utility */
+	{
+		r = channel_rgb[channel][0];
+		g = channel_rgb[channel][1];
+		b = channel_rgb[channel][2];
+	}
+	else r = g = b = 255; /* Opacity */
 
 	for (col = 0; col < 256; col++)
 	{
-		j = col * 3;
-		if (channel <= CHN_IMAGE + 1) /* Palette as such */
-		{
-			tmp[j + 0] = tmp[j + 1] = tmp[j + 2] = 0;
-			if (col < mem_cols) /* Draw only existing colors */
-			{
-				tmp[j + 0] = mem_pal[col].red;
-				tmp[j + 1] = mem_pal[col].green;
-				tmp[j + 2] = mem_pal[col].blue;
-			}
-		}
-		else if (channel < NUM_CHANNELS + 1) /* Utility */
-		{
-			k = channel_rgb[channel][0] * col;
-			tmp[j + 0] = (k + (k >> 8) + 1) >> 8;
-			k = channel_rgb[channel][1] * col;
-			tmp[j + 1] = (k + (k >> 8) + 1) >> 8;
-			k = channel_rgb[channel][2] * col;
-			tmp[j + 2] = (k + (k >> 8) + 1) >> 8;
-		}
-		else /* Opacity */
-		{
-			tmp[j + 0] = tmp[j + 1] = tmp[j + 2] = col;
-		}
+		k = r * col;
+		*tmp++ = (k + (k >> 8) + 1) >> 8;
+		k = g * col;
+		*tmp++ = (k + (k >> 8) + 1) >> 8;
+		k = b * col;
+		*tmp++ = (k + (k >> 8) + 1) >> 8;
 	}
 }
 
@@ -1142,16 +1138,7 @@ static void color_refresh(colsel_dd *dt)
 
 static void do_allcol(csdata_dd *v)
 {
-	unsigned char *rgb = v->rgb;
-	int i;
-
-	for (i = 0; i < mem_cols; i++)
-	{
-		mem_pal[i].red = rgb[0];
-		mem_pal[i].green = rgb[1];
-		mem_pal[i].blue = rgb[2];
-		rgb += 3;
-	}
+	rgb2pal(mem_pal, v->rgb, mem_cols);
 	update_stuff(UPD_PAL);
 }
 
@@ -1747,15 +1734,9 @@ void colour_selector(int cs_type)
 		tdata.idx = cs_type - COLSEL_EDIT_ALL;
 		tdata.is_pal = TRUE;
 
-		for (i = 0; i < mem_cols; i++)
-		{
-			rgb[0] = mem_pal[i].red;
-			rgb[1] = mem_pal[i].green;
-			rgb[2] = mem_pal[i].blue;
-			// Opacity (unused)
-//			tdata.v.opac[i] = 255;
-			rgb += 3;
-		}
+		pal2rgb(rgb, mem_pal, mem_cols, 0);
+		// Opacity (unused)
+//		memset(tdata.v.opac, 255, mem_cols);
 	}
 	else if (cs_type == COLSEL_OVERLAYS)
 	{
@@ -1888,6 +1869,7 @@ typedef struct {
 	int pflag;
 	int cols, cols0;
 	int err;
+	png_color newpal[256];
 	char **qtxt;
 	void **dith, **colspin, **errspin;
 	void **book, **qbook;
@@ -1937,9 +1919,11 @@ static void click_quantize_ok(quantize_dd *dt, void **wdata)
 	run_query(wdata);
 	dither = quantize_mode != QUAN_EXACT ? dither_mode : DITH_NONE;
 	new_cols = dt->cols;
+	mem_pal_copy(newpal, dt->newpal);
 	if (have_image) /* Work on image */
 		dither_pfract[dither_sel ? 1 : 0] = efrac = dt->err;
 
+	/* !!! No touching dt past this point */
 	run_destroy(wdata);
 
 	/* Paranoia */
@@ -1958,8 +1942,7 @@ static void click_quantize_ok(quantize_dd *dt, void **wdata)
 	{
 	case QUAN_EXACT: /* Use image colours */
 		new_cols = quantize_cols;
-		mem_cols_found(newpal);
-		if (have_image) err = mem_convert_indexed();
+		if (have_image) err = mem_convert_indexed(new_cols, newpal);
 		dither = DITH_MAX;
 		break;
 	default:
@@ -2109,7 +2092,7 @@ void pressed_quantize(int palette)
 	quantize_dd tdata;
 
 	tdata.pflag = palette;
-	tdata.cols = tdata.cols0 = mem_cols_used(257);
+	tdata.cols = tdata.cols0 = mem_cols_used(tdata.newpal);
 	tdata.qtxt = qnames;
 
 	memcpy(qnames, quan_txt, sizeof(qnames));
@@ -2370,7 +2353,7 @@ static void grad_edit(void **wdata, int opac)
 	tdata.crgb[1] = tdata.crgb[3] = 255;
 	tdata.cidx[2] = tdata.mode <= CHN_IMAGE + 1 ? mem_cols - 1 : 255;
 
-	make_crgb(tdata.rgb, tdata.mode);
+	make_crgb(tdata.rgb, tdata.mode - 1);
 
 	if (!script_cmds)
 	{

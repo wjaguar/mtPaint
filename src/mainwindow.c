@@ -1,5 +1,5 @@
 /*	mainwindow.c
-	Copyright (C) 2004-2020 Mark Tyler and Dmitry Groshev
+	Copyright (C) 2004-2021 Mark Tyler and Dmitry Groshev
 
 	This file is part of mtPaint.
 
@@ -1786,18 +1786,7 @@ int config_bkg(int src)
 	if (!bkg_rgb) return (FALSE);
 
 	if (img->bpp == 1)
-	{
-		unsigned char *src = img->img[CHN_IMAGE], *dest = bkg_rgb;
-		int i, j;
-
-		for (i = 0; i < l; i++ , dest += 3)
-		{
-			j = *src++;
-			dest[0] = mem_pal[j].red;
-			dest[1] = mem_pal[j].green;
-			dest[2] = mem_pal[j].blue;
-		}
-	}
+		do_convert_rgb(0, 1, l, bkg_rgb, img->img[CHN_IMAGE], mem_pal);
 	else memcpy(bkg_rgb, img->img[CHN_IMAGE], l * 3);
 	bkg_w = img->width;
 	bkg_h = img->height;
