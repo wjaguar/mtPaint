@@ -1,7 +1,7 @@
 #!/bin/sh
 # winbuild64.sh - cross-compile GTK+ and its dependencies for Windows 64-bit
 
-# Copyright (C) 2010,2011,2017,2019,2020 Dmitry Groshev
+# Copyright (C) 2010,2011,2017,2019,2020,2021 Dmitry Groshev
 
 # This program is free software; you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -21,7 +21,7 @@
 # CONFIGURATION SETTINGS #
 ##########################
 
-LIBS="libgcc pthread libcxx giflib zlib xz zstd libjpeg libwebp libpng "\
+LIBS="libgcc pthread libcxx zlib xz zstd libjpeg libwebp libpng "\
 "libtiff openjpeg lcms bzip2 freetype_base libiconv gettext expat fontconfig "\
 "pcre libffi glib pixman cairo icu harfbuzz freetype fribidi pango gdkpixbuf "\
 "libxml2 libcroco libgsf librsvg atk gtk"
@@ -256,97 +256,6 @@ DEP_libcxx="libgcc pthread"
 BUILD_libcxx ()
 {
 	IMPORT_DLL stdc++
-}
-
-BUILD_giflib ()
-{
-	UNPACK "giflib-*.tar.*" || return 0
-	patch -p0 <<- 'MINGW' # Fix makefile for MinGW
-	--- Makefile.0	2019-06-24 19:08:57.000000000 +0300
-	+++ Makefile	2020-11-06 01:27:06.702201012 +0200
-	@@ -29,11 +29,11 @@
-	 LIBVER=$(LIBMAJOR).$(LIBMINOR).$(LIBPOINT)
-	 
-	 SOURCES = dgif_lib.c egif_lib.c gifalloc.c gif_err.c gif_font.c \
-	-	gif_hash.c openbsd-reallocarray.c
-	+	gif_hash.c openbsd-reallocarray.c quantize.c
-	 HEADERS = gif_hash.h  gif_lib.h  gif_lib_private.h
-	 OBJECTS = $(SOURCES:.c=.o)
-	 
-	-USOURCES = qprintf.c quantize.c getarg.c 
-	+USOURCES = qprintf.c getarg.c
-	 UHEADERS = getarg.h
-	 UOBJECTS = $(USOURCES:.c=.o)
-	 
-	@@ -61,27 +61,25 @@
-	 
-	 LDLIBS=libgif.a -lm
-	 
-	-all: libgif.so libgif.a libutil.so libutil.a $(UTILS)
-	+all: libgif-$(LIBMAJOR).dll libgif.a libutil-$(LIBMAJOR).dll libutil.a $(UTILS)
-	 	$(MAKE) -C doc
-	 
-	 $(UTILS):: libgif.a libutil.a
-	 
-	-libgif.so: $(OBJECTS) $(HEADERS)
-	-	$(CC) $(CFLAGS) -shared $(LDFLAGS) -Wl,-soname -Wl,libgif.so.$(LIBMAJOR) -o libgif.so $(OBJECTS)
-	+libgif-$(LIBMAJOR).dll: $(OBJECTS) $(HEADERS)
-	+	$(CC) $(CFLAGS) -shared $(LDFLAGS) -Wl,--out-implib,libgif.dll.a -o libgif-$(LIBMAJOR).dll $(OBJECTS)
-	 
-	 libgif.a: $(OBJECTS) $(HEADERS)
-	 	$(AR) rcs libgif.a $(OBJECTS)
-	 
-	-libutil.so: $(UOBJECTS) $(UHEADERS)
-	-	$(CC) $(CFLAGS) -shared $(LDFLAGS) -Wl,-soname -Wl,libutil.so.$(LIBMAJOR) -o libutil.so $(UOBJECTS)
-	+libutil-$(LIBMAJOR).dll: $(UOBJECTS) $(UHEADERS)
-	+	$(CC) $(CFLAGS) -shared $(LDFLAGS)  -Wl,--out-implib,libutil.dll.a -o libutil-$(LIBMAJOR).dll $(UOBJECTS) -L. -lgif
-	 
-	 libutil.a: $(UOBJECTS) $(UHEADERS)
-	 	$(AR) rcs libutil.a $(UOBJECTS)
-	 
-	 clean:
-	-	rm -f $(UTILS) $(TARGET) libgetarg.a libgif.a libgif.so libutil.a libutil.so *.o
-	-	rm -f libgif.so.$(LIBMAJOR).$(LIBMINOR).$(LIBPOINT)
-	-	rm -f libgif.so.$(LIBMAJOR)
-	+	rm -f $(UTILS) $(TARGET) libgetarg.a libgif.a libgif-$(LIBMAJOR).dll libgif.dll.a libutil.a libutil-$(LIBMAJOR).dll libutil.dll.a *.o
-	 	rm -fr doc/*.1 *.html doc/staging
-	 
-	 check: all
-	@@ -99,9 +97,8 @@
-	 install-lib:
-	 	$(INSTALL) -d "$(DESTDIR)$(LIBDIR)"
-	 	$(INSTALL) -m 644 libgif.a "$(DESTDIR)$(LIBDIR)/libgif.a"
-	-	$(INSTALL) -m 755 libgif.so "$(DESTDIR)$(LIBDIR)/libgif.so.$(LIBVER)"
-	-	ln -sf libgif.so.$(LIBVER) "$(DESTDIR)$(LIBDIR)/libgif.so.$(LIBMAJOR)"
-	-	ln -sf libgif.so.$(LIBMAJOR) "$(DESTDIR)$(LIBDIR)/libgif.so"
-	+	$(INSTALL) -m 644 libgif.dll.a "$(DESTDIR)$(LIBDIR)/libgif.dll.a"
-	+	$(INSTALL) -m 755 libgif-$(LIBMAJOR).dll "$(DESTDIR)$(BINDIR)/libgif-$(LIBMAJOR).dll"
-	 install-man:
-	 	$(INSTALL) -d "$(DESTDIR)$(MANDIR)/man1"
-	 	$(INSTALL) -m 644 doc/*.1 "$(DESTDIR)$(MANDIR)/man1"
-	@@ -112,7 +109,7 @@
-	 	rm -f "$(DESTDIR)$(INCDIR)/gif_lib.h"
-	 uninstall-lib:
-	 	cd "$(DESTDIR)$(LIBDIR)" && \
-	-		rm -f libgif.a libgif.so libgif.so.$(LIBMAJOR) libgif.so.$(LIBVER)
-	+		rm -f libgif.a libgif-$(LIBMAJOR).dll libgif.dll.a
-	 uninstall-man:
-	 	cd "$(DESTDIR)$(MANDIR)/man1" && rm -f $(shell cd doc >/dev/null && echo *.1)
-	 
-	MINGW
-	PATH="$SHORTPATH"
-	make LDFLAGS=-static-libgcc
-	local ZAD
-	local INSTALLABLE
-	INSTALLABLE="gif2rgb.exe gifbuild.exe giffix.exe giftext.exe giftool.exe gifclrmp.exe"
-	for ZAD in $INSTALLABLE
-	do
-		[ -f $ZAD ] || cp ${ZAD%.exe} $ZAD
-	done
-	make install DESTDIR="$DESTDIR" PREFIX="$WPREFIX" LDFLAGS=-static-libgcc \
-		INSTALLABLE="$INSTALLABLE"
-	"$TARGET_STRIP" --strip-unneeded "$DEST"/bin/*
-	EXPORT
 }
 
 BUILD_zlib ()

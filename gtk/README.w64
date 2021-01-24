@@ -4,6 +4,8 @@ The History
 
 For simpler installation and more consistent behaviour, official Windows build of mtPaint is packaged with its own copy of GTK+ runtime environment. With version 3.40, it was a 32-bit custom build of GTK+2 based on version 2.6.7 with a set of patches backported from the later versions. That build is still provided with mtPaint 3.50, to support old and ancient 32-bit Windows systems, but to make full use of capabilities of 64-bit CPUs, a 64-bit build for Windows systems of the newer generations is needed. This build is based on GTK+ 2.24, with patches taken from MXE, MSYS2 and mxe-octave.
 
+For mtPaint 3.51, the only notable change is that giflib library which was a dependency before, now isn't and was removed.
+
 -------------
 The Specifics
 -------------
@@ -119,12 +121,9 @@ To replicate it, you need the following source packages:
 - FreeType 2.10.4:
     freetype-2.10.4.tar.xz
     https://sourceforge.net/projects/freetype/files/freetype2/2.10.4/freetype-2.10.4.tar.xz/download
-- giflib 5.2.1:
-    giflib-5.2.1.tar.gz
-    https://sourceforge.net/projects/giflib/files/giflib-5.2.1.tar.gz/download
-- OpenJPEG 2.3.1:
-    openjpeg-2.3.1.tar.gz
-    https://github.com/uclouvain/openjpeg/archive/v2.3.1.tar.gz
+- OpenJPEG 2.4.0:
+    openjpeg-2.4.0.tar.gz
+    https://github.com/uclouvain/openjpeg/archive/v2.4.0.tar.gz
 - Little CMS 2.11:
     lcms2-2.11.tar.gz
     https://sourceforge.net/projects/lcms/files/lcms/2.11/lcms2-2.11.tar.gz/download
@@ -153,4 +152,4 @@ cd mxe && make gcc MXE_TARGETS=x86_64-w64-mingw32.shared
 Using GCC 10 is not recommended, as a compiler bug was directly observed when compiling Gifsicle with GCC 10.2.0. While a workaround had been found (now commented out in that part of the script), the bug's very presence in optimization level -O2 casts serious doubt on the quality of that compiler branch and the code it generates.
 
 ---------------------------------
-Copyright (C) 2010,2011,2017,2019,2020 Dmitry Groshev
+Copyright (C) 2010,2011,2017,2019,2020,2021 Dmitry Groshev

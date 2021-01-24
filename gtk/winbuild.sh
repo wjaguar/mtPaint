@@ -1,7 +1,7 @@
 #!/bin/sh
 # winbuild.sh - cross-compile GTK+ and its dependencies for Windows
 
-# Copyright (C) 2010,2011,2017,2019,2020 Dmitry Groshev
+# Copyright (C) 2010,2011,2017,2019,2020,2021 Dmitry Groshev
 
 # This program is free software; you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -21,7 +21,7 @@
 # CONFIGURATION SETTINGS #
 ##########################
 
-LIBS="giflib zlib xz zstd libjpeg libwebp libpng libtiff freetype openjpeg lcms "\
+LIBS="zlib xz zstd libjpeg libwebp libpng libtiff freetype openjpeg lcms "\
 "libiconv gettext glib atk pango gtk"
 PROGRAMS="gifsicle mtpaint mtpaint_handbook"
 PHONY="libs all"
@@ -194,19 +194,6 @@ RELATIVIZE ()
 
 # Tools
 TARGET_STRIP="$MPREFIX/bin/$MTARGET-strip"
-
-BUILD_giflib ()
-{
-	UNPACK "giflib-*.tar.*" || return 0
-	sed -i '/-no-undefined/ n; /libgif_la_LDFLAGS/ s/=/= -no-undefined/' lib/Makefile.in
-	PATH="$LONGPATH"
-	./configure CPPFLAGS=-D_OPEN_BINARY LDFLAGS=-static-libgcc \
-		--prefix="$WPREFIX" --host=$MTARGET
-	make all
-	make install-strip DESTDIR="$DESTDIR"
-	"$TARGET_STRIP" --strip-unneeded "$DEST"/bin/*.dll
-	EXPORT
-}
 
 BUILD_zlib ()
 {

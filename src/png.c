@@ -26,9 +26,6 @@
 
 #include <png.h>
 #include <zlib.h>
-#ifdef U_GIF
-#include <gif_lib.h>
-#endif
 #ifdef U_JPEG
 #define NEED_CMYK
 /* !!! libjpeg 9 headers conflict with these */
@@ -39,6 +36,9 @@
  * conflict can be avoided if windows.h is included BEFORE this - WJ */
 #endif
 #ifdef U_JP2
+#if U_JP2 < 2
+#define NEED_FILE2MEM
+#endif
 #define HANDLE_JP2
 #include <openjpeg.h>
 #endif
@@ -51,6 +51,7 @@
 #include <tiffio.h>
 #endif
 #ifdef U_WEBP
+#define NEED_FILE2MEM
 #include <webp/encode.h>
 #include <webp/decode.h>
 #endif
@@ -122,11 +123,7 @@ fformat file_formats[NUM_FTYPES] = {
 #else
 	{ "", "", "", 0},
 #endif
-#ifdef U_GIF
 	{ "GIF", "gif", "", FF_256 | FF_ANIM, XF_TRANS },
-#else
-	{ "", "", "", 0},
-#endif
 	{ "BMP", "bmp", "", FF_256 | FF_RGB | FF_ALPHAR | FF_MEM },
 	{ "XPM", "xpm", "", FF_256 | FF_RGB, XF_TRANS | XF_SPOT },
 	{ "XBM", "xbm", "", FF_BW, XF_SPOT },
@@ -1111,8 +1108,6 @@ exit0:	free(rgba_row);
 	return (res);
 }
 
-#ifdef U_GIF
-
 /* *** PREFACE ***
  * Contrary to what GIF89 docs say, all contemporary browser implementations
  * always render background in an animated GIF as transparent. So does mtPaint,
@@ -1529,45 +1524,239 @@ done:	if ((fset->cnt > 1) && (stat->prev_idx != fset->cnt - 1) &&
 	}
 }
 
-static int convert_gif_palette(png_color *pal, ColorMapObject *cmap)
-{
-	int i, j;
+/* Macros for accessing values in Intel byte order */
+#define GET16(buf) (((buf)[1] << 8) + (buf)[0])
+#define GET32(buf) (((signed char)(buf)[3] * 0x1000000) + ((buf)[2] << 16) + \
+	((buf)[1] << 8) + (buf)[0])
+#define PUT16(buf, v) (buf)[0] = (v) & 0xFF; (buf)[1] = (v) >> 8;
+#define PUT32(buf, v) (buf)[0] = (v) & 0xFF; (buf)[1] = ((v) >> 8) & 0xFF; \
+	(buf)[2] = ((v) >> 16) & 0xFF; (buf)[3] = (v) >> 24;
 
-	if (!cmap) return (-1);
-	j = cmap->ColorCount;
-	if ((j > 256) || (j < 1)) return (-1);
-	for (i = 0; i < j; i++)
+#define GIF_ID       "GIF87a"
+#define GIF_IDLEN    6
+
+/* GIF header */
+#define GIF_VER       4 /* Where differing version digit goes */
+#define GIF_WIDTH     6 /* 16b */
+#define GIF_HEIGHT    8 /* 16b */
+#define GIF_GPBITS   10
+#define GIF_BKG      11
+#define GIF_ASPECT   12
+#define GIF_HDRLEN   13 /* Global palette starts here */
+
+#define GIF_GPFLAG   0x80
+#define GIF_8BPC     0x70 /* Color resolution to write out */
+
+/* Graphics Control Extension */
+#define GIF_GC_FLAGS 0
+#define GIF_GC_DELAY 1 /* 16b */
+#define GIF_GC_TRANS 3
+#define GIF_GC_LEN   4
+
+#define GIF_GC_TFLAG 1
+#define GIF_GC_DISP  2 /* Shift amount */
+
+/* Application Extension */
+#define GIF_AP_LEN   11
+
+/* Image */
+#define GIF_IX       0 /* 16b */
+#define GIF_IY       2 /* 16b */
+#define GIF_IWIDTH   4 /* 16b */
+#define GIF_IHEIGHT  6 /* 16b */
+#define GIF_IBITS    8
+#define GIF_IHDRLEN  9
+
+#define GIF_LPFLAG   0x80
+#define GIF_ILFLAG   0x40 /* Interlace */
+
+/* Read body of GIF block into buffer (or skip if NULL), return length */
+static int getblock(unsigned char *buf, FILE *fp)
+{
+	int l = getc(fp);
+	if (l == EOF) l = -1;
+	if (l > 0)
 	{
-		pal[i].red = cmap->Colors[i].Red;
-		pal[i].green = cmap->Colors[i].Green;
-		pal[i].blue = cmap->Colors[i].Blue;
+		if (!buf) fseek(fp, l, SEEK_CUR); // Just skip
+		else if (fread(buf, 1, l, fp) < l) l = -1; // Error
 	}
-	return (j);
+	return (l);
 }
 
-static int load_gif_frame(GifFileType *giffy, ls_settings *settings)
+#ifdef U_LCMS /* No other uses for it now */
+/* Load a sequence of GIF blocks into memory */
+static int getgifdata(FILE *fp, char **res, int *len)
+{
+	unsigned char *src, *dest, *mem;
+	long r, p = ftell(fp);
+	int l, size;
+
+	*res = NULL;
+	*len = 0;
+	if (p < 0) return (1); /* Leave 2Gb+ GIFs to systems where long is long */
+
+	/* Measure */
+	while ((l = getblock(NULL, fp)) > 0);
+	if (l < 0) return (-1); // Error
+	r = ftell(fp);
+	fseek(fp, p, SEEK_SET);
+	if (r <= p) return (1); // Paranoia
+	if (r - p > INT_MAX) return (1); // A 2Gb+ profile is unusable anyway :-)
+
+	/* Allocate */
+	size = r - p;
+	mem = malloc(size);
+	if (!mem) return (1); // No memory for this
+
+	/* Read */
+	if (fread(mem, 1, size, fp) < size) goto fail; // Error
+
+	/* Merge */
+	src = dest = mem;
+	while ((l = *src++))
+	{
+		if (src - mem >= size - l) goto fail; // Paranoia
+		memmove(dest, src, l);
+		src += l; dest += l;
+	}
+	size = dest - mem; // Maybe realloc?
+
+	/* Done */
+	*res = mem;
+	*len = size;
+	return (0);
+
+fail:	free(mem);
+	return (-1); // Someone overwrote the file damaging it
+}
+#endif
+
+/* Space enough to hold palette, or longest block + longest decoded sequence */
+#define GIF_BUFSIZE (256 + 4096)
+typedef struct {
+	FILE *f;
+	int ptr, end, tail;
+	int lc0, lc, nxc, clear, cmask;
+	int w, bits, prev;
+	short nxcode[4096 + 1];
+	unsigned char buf[GIF_BUFSIZE], cchar[4096 + 1];
+} gifbuf;
+
+static void resetlzw(gifbuf *gif)
+{
+	gif->nxc = gif->clear + 2; // First usable code
+	gif->lc = gif->lc0 + 1; // Actual code size
+	gif->cmask = (1 << gif->lc) - 1; // Actual code mask
+	gif->prev = -1; // Previous code
+}
+
+static int initlzw(gifbuf *gif, FILE *fp)
+{
+	int i;
+
+	gif->f = fp;
+	gif->lc0 = i = getc(fp); // Min code size
+	/* Enforce hard upper limit but allow wasteful encoding */
+	if ((i == EOF) || (i > 11)) return (FALSE);
+	gif->clear = i = 1 << i; // Clear code
+	/* Initial 1-char codes */
+	while (--i >= 0) gif->nxcode[i] = -1 , gif->cchar[i] = (unsigned char)i;
+	resetlzw(gif);
+	gif->w = gif->bits = 0; // Ready bits in shifter
+	gif->ptr = gif->end = gif->tail = 0; // Ready data in buffer
+	return (TRUE);
+}
+
+static int getlzw(unsigned char *dest, int cnt, gifbuf *gif)
+{
+	int l, c, cx, w, bits, lc, cmask, prev, nxc, tail = gif->tail;
+
+	while (TRUE)
+	{
+		l = tail > cnt ? cnt : tail;
+		cnt -= l;
+		l = tail - l;
+		while (tail > l) *dest++ = gif->buf[GIF_BUFSIZE - tail--];
+		if (cnt <= 0) break; // No tail past this point
+		w = gif->w;
+		bits = gif->bits;
+		lc = gif->lc;
+		while (bits < lc)
+		{
+			if (gif->ptr >= gif->end)
+			{
+				gif->end = getblock(gif->buf, gif->f);
+				if (gif->end <= 0) return (FALSE); // No data
+				gif->ptr = 0;
+			}
+			w |= gif->buf[gif->ptr++] << bits;
+			bits += 8;
+		}
+		cmask = gif->cmask;
+		c = w & cmask;
+		gif->w = w >> lc;
+		gif->bits = bits - lc;
+		if (c == gif->clear)
+		{
+			resetlzw(gif);
+			continue;
+		}
+		if (c == gif->clear + 1) return (FALSE); // Premature EOI
+		/* Update for next code */
+		prev = gif->prev;
+		gif->prev = c;
+		nxc = gif->nxc;
+		gif->nxcode[nxc] = prev;
+		if ((prev >= 0) && (nxc < 4096))
+		{
+			if ((++gif->nxc > cmask) && (cmask < 4096 - 1))
+				gif->cmask = (1 << ++gif->lc) - 1;
+		}
+		/* Decode this one */
+		if (c > nxc) return (FALSE); // Broken code
+		if ((c == nxc) && (prev < 0)) return (FALSE); // Too early
+		for (cx = c; cx >= 0; cx = gif->nxcode[cx])
+			gif->buf[GIF_BUFSIZE - ++tail] = gif->cchar[cx];
+		gif->cchar[nxc] = gif->buf[GIF_BUFSIZE - tail];
+		/* In case c == nxc, its char was garbage till now, so reread it */
+		gif->buf[GIF_BUFSIZE - 1] = gif->cchar[c];
+	}
+	gif->tail = tail;
+	return (TRUE);
+}
+
+static int load_gif_frame(FILE *fp, ls_settings *settings)
 {
 	/* GIF interlace pattern: Y0, DY, ... */
 	static const unsigned char interlace[10] =
 		{ 0, 1, 0, 8, 4, 8, 2, 4, 1, 2 };
+	unsigned char hdr[GIF_IHDRLEN];
+	gifbuf gif;
 	int i, k, kx, n, w, h, dy, res;
 
 
-	if (DGifGetImageDesc(giffy) == GIF_ERROR) return (-1);
+	/* Read the header */
+	if (fread(hdr, 1, GIF_IHDRLEN, fp) < GIF_IHDRLEN) return (-1);
 
 	/* Get local palette if any */
-	if (giffy->Image.ColorMap)
-		settings->colors = convert_gif_palette(settings->pal, giffy->Image.ColorMap);
+	if (hdr[GIF_IBITS] & GIF_LPFLAG)
+	{
+		int cols = 2 << (hdr[GIF_IBITS] & 7);
+		if (fread(gif.buf, 3, cols, fp) < cols) return (-1);
+		rgb2pal(settings->pal, gif.buf, settings->colors = cols);
+	}
 	if (settings->colors < 0) return (-1); // No palette at all
 	/* If palette is all we need */
 	if ((settings->mode == FS_PALETTE_LOAD) ||
 		(settings->mode == FS_PALETTE_DEF)) return (EXPLODE_FAILED);
 
+	if (!initlzw(&gif, fp)) return (-1);
+
 	/* Store actual image parameters */
-	settings->x = giffy->Image.Left;
-	settings->y = giffy->Image.Top;
-	settings->width = w = giffy->Image.Width;
-	settings->height = h = giffy->Image.Height;
+	settings->x = GET16(hdr + GIF_IX);
+	settings->y = GET16(hdr + GIF_IY);
+	settings->width = w = GET16(hdr + GIF_IWIDTH);
+	settings->height = h = GET16(hdr + GIF_IHEIGHT);
 	settings->bpp = 1;
 
 	if ((res = allocate_image(settings, CMASK_IMAGE))) return (res);
@@ -1575,7 +1764,7 @@ static int load_gif_frame(GifFileType *giffy, ls_settings *settings)
 
 	if (!settings->silent) ls_init("GIF", 0);
 
-	if (giffy->Image.Interlace) k = 2 , kx = 10;
+	if (hdr[GIF_IBITS] & GIF_ILFLAG) k = 2 , kx = 10; /* Interlace */
 	else k = 0 , kx = 2;
 
 	for (n = 0; k < kx; k += 2)
@@ -1583,12 +1772,14 @@ static int load_gif_frame(GifFileType *giffy, ls_settings *settings)
 		dy = interlace[k + 1];
 		for (i = interlace[k]; i < h; n++ , i += dy)
 		{
-			if (DGifGetLine(giffy, settings->img[CHN_IMAGE] +
-				i * w, w) == GIF_ERROR) goto fail;
+			if (!getlzw(settings->img[CHN_IMAGE] + i * w, w, &gif))
+				goto fail;
 			ls_progress(settings, n, 10);
 		}
 	}
-	res = 1;
+	/* Skip data blocks till 0 */
+	while ((i = getblock(NULL, fp)) > 0);
+	if (!i) res = 1;
 fail:	if (!settings->silent) progress_end();
 	return (res);
 }
@@ -1601,28 +1792,37 @@ static int load_gif_frames(char *file_name, ani_settings *ani)
 		/* Handling (reserved) "4" same as "3" is what Mozilla does */
 		FM_DISP_RESTORE, FM_DISP_LEAVE, FM_DISP_LEAVE, FM_DISP_LEAVE
 	};
-	GifFileType *giffy;
-	GifRecordType gif_rec;
-	GifByteType *byte_ext;
+	unsigned char hdr[GIF_HDRLEN], buf[768];
 	png_color w_pal[256];
 	ani_status stat;
 	image_frame *frame;
 	ls_settings w_set, init_set;
-	int res, val, disposal, bpp, cmask, lastzero = FALSE;
+	int l, id, disposal, bpp, cmask, lastzero = FALSE, res = -1;
+	FILE *fp;
 
+	if (!(fp = fopen(file_name, "rb"))) return (-1);
+	memset(w_set.img, 0, sizeof(chanlist));
 
-#if GIFLIB_MAJOR >= 5
-	if (!(giffy = DGifOpenFileName(file_name, NULL))) return (-1);
-#else
-	if (!(giffy = DGifOpenFileName(file_name))) return (-1);
-#endif
+	/* Read the header */
+	if (fread(hdr, 1, GIF_HDRLEN, fp) < GIF_HDRLEN) goto fail;
+
+	/* Check signature */
+	if (hdr[GIF_VER] == '9') hdr[GIF_VER] = '7'; // Does not matter anyway
+	if (memcmp(hdr, GIF_ID, GIF_IDLEN)) goto fail;
 
 	/* Init state structure */
 	memset(&stat, 0, sizeof(stat));
 	stat.mode = ani->mode;
-	stat.defw = giffy->SWidth;
-	stat.defh = giffy->SHeight;
-	stat.global_cols = convert_gif_palette(stat.global_pal, giffy->SColorMap);
+	stat.defw = GET16(hdr + GIF_WIDTH);
+	stat.defh = GET16(hdr + GIF_HEIGHT);
+	stat.global_cols = -1;
+	/* Get global palette */
+	if (hdr[GIF_GPBITS] & GIF_GPFLAG)
+	{
+		int cols = 2 << (hdr[GIF_GPBITS] & 7);
+		if (fread(buf, 3, cols, fp) < cols) goto fail;
+		rgb2pal(stat.global_pal, buf, stat.global_cols = cols);
+	}
 
 	/* Init temp container */
 	init_set = ani->settings;
@@ -1640,37 +1840,36 @@ static int load_gif_frames(char *file_name, ani_settings *ani)
 		mem_pal_copy(ani->fset.pal, stat.global_pal);
 	}
 
+	/* Go through images */
 	while (TRUE)
 	{
 		res = -1;
-		if (DGifGetRecordType(giffy, &gif_rec) == GIF_ERROR) goto fail;
-		if (gif_rec == TERMINATE_RECORD_TYPE) break;
-		else if (gif_rec == EXTENSION_RECORD_TYPE)
+		id = getc(fp);
+		if (id == ';') break; // Trailer block
+		if (id == '!') // Extension block
 		{
-			if (DGifGetExtension(giffy, &val, &byte_ext) == GIF_ERROR) goto fail;
-			while (byte_ext)
+			if ((id = getc(fp)) == EOF) goto fail;
+			if (id == 0xF9) // Graphics control - read it
 			{
-				if (val == GRAPHICS_EXT_FUNC_CODE)
-				{
+				if (getblock(buf, fp) < GIF_GC_LEN) goto fail;
 				/* !!! In practice, Graphics Control Extension
 				 * affects not only "the first block to follow"
 				 * as docs say, but EVERY following block - WJ */
-					init_set.xpm_trans = byte_ext[1] & 1 ?
-						byte_ext[4] : -1;
-					init_set.gif_delay = byte_ext[2] +
-						(byte_ext[3] << 8);
-					disposal = gif_disposal[(byte_ext[1] >> 2) & 7];
-				}
-				if (DGifGetExtensionNext(giffy, &byte_ext) == GIF_ERROR) goto fail;
+				init_set.xpm_trans = buf[GIF_GC_FLAGS] & GIF_GC_TFLAG ?
+					buf[GIF_GC_TRANS] : -1;
+				init_set.gif_delay = GET16(buf + GIF_GC_DELAY);
+				disposal = gif_disposal[(buf[GIF_GC_FLAGS] >> GIF_GC_DISP) & 7];
 			}
+			while ((l = getblock(NULL, fp)) > 0); // Skip till end
+			if (l < 0) goto fail;
 		}
-		else if (gif_rec == IMAGE_DESC_RECORD_TYPE)
+		else if (id == ',') // Image
 		{
 			res = FILE_TOO_LONG;
 			if (!check_next_frame(&ani->fset, ani->settings.mode, TRUE))
 				goto fail;
 			w_set = init_set;
-			res = load_gif_frame(giffy, &w_set);
+			res = load_gif_frame(fp, &w_set);
 			if (res != 1) goto fail;
 			/* Analyze how we can merge the frames */
 			bpp = analyze_gif_frame(&stat, &w_set);
@@ -1704,6 +1903,7 @@ static int load_gif_frames(char *file_name, ani_settings *ani)
 				if (res) goto fail;
 			}
 		}
+		else goto fail; // Garbage or EOF
 	}
 	/* Write out the final frame if not written before */
 	if ((ani->settings.mode == FS_EXPLODE_FRAMES) && lastzero)
@@ -1713,52 +1913,67 @@ static int load_gif_frames(char *file_name, ani_settings *ani)
 	}
 	res = 1;
 fail:	mem_free_chanlist(w_set.img);
-#if GIFLIB_MAJOR * 10 + GIFLIB_MINOR >= 51
-	DGifCloseFile(giffy, NULL);
-#else
-	DGifCloseFile(giffy);
-#endif
+	fclose(fp);
 	return (res);
 }
 
 static int load_gif(char *file_name, ls_settings *settings)
 {
-	GifFileType *giffy;
-	GifRecordType gif_rec;
-	GifByteType *byte_ext;
-	int res, val, frame = 0;
-	int delay = settings->gif_delay, trans = -1;//, disposal = 0;
+	unsigned char hdr[GIF_HDRLEN], buf[768];
+	int trans = -1, delay = settings->gif_delay, frame = 0;
+	int l, id, res = -1;
+	FILE *fp;
 
+	if (!(fp = fopen(file_name, "rb"))) return (-1);
 
-#if GIFLIB_MAJOR >= 5
-	if (!(giffy = DGifOpenFileName(file_name, NULL))) return (-1);
-#else
-	if (!(giffy = DGifOpenFileName(file_name))) return (-1);
-#endif
+	/* Read the header */
+	if (fread(hdr, 1, GIF_HDRLEN, fp) < GIF_HDRLEN) goto fail;
+
+	/* Check signature */
+	if (hdr[GIF_VER] == '9') hdr[GIF_VER] = '7'; // Does not matter anyway
+	if (memcmp(hdr, GIF_ID, GIF_IDLEN)) goto fail;
 
 	/* Get global palette */
-	settings->colors = convert_gif_palette(settings->pal, giffy->SColorMap);
+	settings->colors = -1;
+	if (hdr[GIF_GPBITS] & GIF_GPFLAG)
+	{
+		int cols = 2 << (hdr[GIF_GPBITS] & 7);
+		if (fread(buf, 3, cols, fp) < cols) goto fail;
+		rgb2pal(settings->pal, buf, settings->colors = cols);
+	}
 
+	/* Go read the first image */
 	while (TRUE)
 	{
-		res = -1;
-		if (DGifGetRecordType(giffy, &gif_rec) == GIF_ERROR) goto fail;
-		if (gif_rec == TERMINATE_RECORD_TYPE) break;
-		else if (gif_rec == EXTENSION_RECORD_TYPE)
+		res = frame ? FILE_LIB_ERROR : -1;
+		id = getc(fp);
+		if (id == ';') break; // Trailer block
+		if (id == '!') // Extension block
 		{
-			if (DGifGetExtension(giffy, &val, &byte_ext) == GIF_ERROR) goto fail;
-			while (byte_ext)
+			if ((id = getc(fp)) == EOF) goto fail;
+			if (id == 0xF9) // Graphics control - read it
 			{
-				if (val == GRAPHICS_EXT_FUNC_CODE)
-				{
-					trans = byte_ext[1] & 1 ? byte_ext[4] : -1;
-					delay = byte_ext[2] + (byte_ext[3] << 8);
-//					disposal = (byte_ext[1] >> 2) & 7;
-				}
-				if (DGifGetExtensionNext(giffy, &byte_ext) == GIF_ERROR) goto fail;
+				if (getblock(buf, fp) < GIF_GC_LEN) goto fail;
+				trans = buf[GIF_GC_FLAGS] & GIF_GC_TFLAG ?
+					buf[GIF_GC_TRANS] : -1;
+				delay = GET16(buf + GIF_GC_DELAY);
 			}
+#ifdef U_LCMS
+			/* Yes GIF can have a color profile - imagine that */
+			else if ((id == 0xFF) // Application extension
+				&& !settings->icc_size // No need of it otherwise
+				&& (getblock(buf, fp) >= GIF_AP_LEN) // Not broken
+				&& !memcmp(buf, "ICCRGBG1012", GIF_AP_LEN)) // The right ID
+			{
+				l = getgifdata(fp, &settings->icc, &settings->icc_size);
+				if (l < 0) goto fail;
+				if (!l) continue; // No trailing blocks to skip
+			}
+#endif
+			while ((l = getblock(NULL, fp)) > 0); // Skip till end
+			if (l < 0) goto fail;
 		}
-		else if (gif_rec == IMAGE_DESC_RECORD_TYPE)
+		else if (id == ',') // Image
 		{
 			if (frame++) /* Multipage GIF - notify user */
 			{
@@ -1767,108 +1982,210 @@ static int load_gif(char *file_name, ls_settings *settings)
 			}
 			settings->gif_delay = delay;
 			settings->xpm_trans = trans;
-			res = load_gif_frame(giffy, settings);
+			res = load_gif_frame(fp, settings);
 			if (res != 1) goto fail;
 		}
+		else goto fail; // Garbage or EOF
 	}
-	res = 1;
-fail:
-#if GIFLIB_MAJOR * 10 + GIFLIB_MINOR >= 51
-	DGifCloseFile(giffy, NULL);
-#else
-	DGifCloseFile(giffy);
-#endif
-
+	if (frame) res = 1; // No images is fail
+fail:	fclose(fp);
 	return (res);
+}
+
+/* Space enough to hold palette and all headers, or longest block */
+#define GIF_WBUFSIZE (768 + GIF_HDRLEN + (GIF_GC_LEN + 4) + (GIF_IHDRLEN + 2))
+
+/* A cuckoo hash would take 4x less space, but need much more code */
+#define GIF_CODESSIZE ((4096 * 2 * 16) * sizeof(short))
+typedef struct {
+	FILE *f;
+	int cnt, nxmap;
+	int lc0, lc, nxc, clear, nxc2;
+	int w, bits, prev;
+	short *codes;
+	unsigned char buf[GIF_WBUFSIZE];
+} gifcbuf;
+
+static void resetclzw(gifcbuf *gif)
+{
+	/* Send clear code at current length */
+	gif->w |= gif->clear << gif->bits;
+	gif->bits += gif->lc;
+	/* Reset parameters */
+	gif->nxc = gif->clear + 2; // First usable code
+	gif->lc = gif->lc0 + 1; // Actual code size
+	gif->nxc2 = 1 << gif->lc; // For next code size
+	memset(gif->codes, 0, GIF_CODESSIZE); // Maps
+	gif->nxmap = 1; // First usable intermediate map
+}
+
+static void initclzw(gifcbuf *gif, int lc0, FILE *fp)
+{
+	if (lc0 < 2) lc0 = 2; // Minimum allowed
+	gif->f = fp;
+	gif->lc0 = lc0;
+	fputc(lc0, fp);
+	gif->clear = 1 << lc0; // Clear code
+	gif->prev = -1; // No previous code
+	gif->cnt = gif->w = gif->bits = 0; // No data yet
+	gif->lc = gif->lc0 + 1; // Actual code size
+	resetclzw(gif); // Initial clear
+}
+
+static void emitlzw(gifcbuf *gif, int c)
+{
+	int bits = gif->bits, w = gif->w | (c << bits);
+
+	bits += gif->lc;
+	while (bits >= 8)
+	{
+		gif->buf[++gif->cnt] = (unsigned char)w;
+		w >>= 8;
+		bits -= 8;
+		if (gif->cnt >= 255)
+		{
+			gif->buf[0] = 255;
+			fwrite(gif->buf, 1, 256, gif->f);
+			gif->cnt = 0;
+		}
+	}
+	gif->bits = bits;
+	gif->w = w;
+	/* Extend code size if needed */
+	if (gif->nxc >= gif->nxc2) gif->nxc2 = 1 << ++gif->lc;
+}
+
+static void putlzw(gifcbuf *gif, unsigned char *src, int cnt)
+{
+	short *codes = gif->codes;
+	int i, j, c, prev = gif->prev;
+
+	while (cnt-- > 0)
+	{
+		c = *src++;
+		if (prev < 0) /* Begin */
+		{
+			prev = c;
+			continue;
+		}
+		/* Try compression */
+		i = prev * 16 + (c >> 4) + 4096 * 16;
+		j = codes[i] * 16 + (c & 0xF);
+		j = codes[j];
+		if (j) // Have match
+		{
+			prev = j - 4096;
+			continue;
+		}
+		/* Emit the code */
+		emitlzw(gif, prev);
+		prev = c;
+		/* Do a clear if needed */
+		if (gif->nxc >= 4096 - 1)
+		{
+			resetclzw(gif);
+			continue;
+		}
+		/* Add new code */
+		if (!codes[i]) codes[i] = gif->nxmap++;
+		j = codes[i] * 16 + (c & 0xF);
+		codes[j] = gif->nxc++ + 4096;
+	}
+	gif->prev = prev;
+}
+
+static void donelzw(gifcbuf *gif) /* Flush */
+{
+	emitlzw(gif, gif->prev);
+	emitlzw(gif, gif->clear + 1); // EOD
+	if (gif->bits) gif->buf[++gif->cnt] = gif->w;
+//	gif->w = gif->bits = 0;
+	gif->buf[0] = gif->cnt;
+	gif->buf[gif->cnt + 1] = 0; // Block terminator
+	fwrite(gif->buf, 1, gif->cnt + 2, gif->f);
+//	gif->cnt = 0;
 }
 
 static int save_gif(char *file_name, ls_settings *settings)
 {
-	ColorMapObject *gif_map;
-	GifFileType *giffy;
-	unsigned char gif_ext_data[8];
-	int i, nc, w = settings->width, h = settings->height, msg = -1;
-#ifndef WIN32
-	mode_t mode;
-#endif
+	gifcbuf gif;
+	unsigned char *tmp;
+	FILE *fp = NULL;
+	int i, nc, ext = FALSE, w = settings->width, h = settings->height;
 
 
 	/* GIF save must be on indexed image */
 	if (settings->bpp != 1) return WRONG_FORMAT;
 
-	/* Get the next power of 2 for colormap size */
-	nc = settings->colors - 1;
-	nc |= nc >> 1; nc |= nc >> 2; nc |= nc >> 4;
-	nc += !nc + 1; // No less than 2 colors
+	gif.codes = malloc(GIF_CODESSIZE);
+	if (!gif.codes) return (-1);
 
-#if GIFLIB_MAJOR >= 5
-	if (!(gif_map = GifMakeMapObject(nc, NULL))) return -1;
-	giffy = EGifOpenFileName(file_name, FALSE, NULL);
-#else
-	if (!(gif_map = MakeMapObject(nc, NULL))) return -1;
-	giffy = EGifOpenFileName(file_name, FALSE);
-#endif
-	if (!giffy) goto fail0;
-
-	for (i = 0; i < settings->colors; i++)
+	if (!(fp = fopen(file_name, "wb")))
 	{
-		gif_map->Colors[i].Red	 = settings->pal[i].red;
-		gif_map->Colors[i].Green = settings->pal[i].green;
-		gif_map->Colors[i].Blue	 = settings->pal[i].blue;
-	}
-	for (; i < nc; i++)
-	{
-		gif_map->Colors[i].Red = gif_map->Colors[i].Green = 
-			gif_map->Colors[i].Blue	= 0;
+		free(gif.codes);
+		return (-1);
 	}
 
-	if (EGifPutScreenDesc(giffy, w, h, nc, 0, gif_map) == GIF_ERROR)
-		goto fail;
+	/* Get colormap size bits */
+	nc = nlog2(settings->colors) - 1;
+	if (nc < 0) nc = 0;
 
+	/* Prepare header */
+	tmp = gif.buf;
+	memset(tmp, 0, GIF_HDRLEN);
+	memcpy(tmp, GIF_ID, GIF_IDLEN);
+	PUT16(tmp + GIF_WIDTH, w);
+	PUT16(tmp + GIF_HEIGHT, h);
+	tmp[GIF_GPBITS] = GIF_GPFLAG | GIF_8BPC | nc;
+	tmp += GIF_HDRLEN;
+
+	/* Prepare global palette */
+	i = 2 << nc;
+	pal2rgb(tmp, settings->pal, settings->colors, i);
+	tmp += i * 3;
+
+	/* Prepare extension */
 	if (settings->xpm_trans >= 0)
 	{
-		gif_ext_data[0] = 1;
-		gif_ext_data[1] = 0;
-		gif_ext_data[2] = 0;
-		gif_ext_data[3] = settings->xpm_trans;
-		EGifPutExtension(giffy, GRAPHICS_EXT_FUNC_CODE, 4, gif_ext_data);
+		ext = TRUE;
+		*tmp++ = '!';	// Extension block
+		*tmp++ = 0xF9;	// Graphics control
+		*tmp++ = GIF_GC_LEN;
+		memset(tmp, 0, GIF_GC_LEN + 1); // W/block terminator
+		tmp[GIF_GC_FLAGS] = GIF_GC_TFLAG;
+		tmp[GIF_GC_TRANS] = settings->xpm_trans;
+		tmp += GIF_GC_LEN + 1;
 	}
 
-	if (EGifPutImageDesc(giffy, 0, 0, w, h, FALSE, NULL) == GIF_ERROR)
-		goto fail;
+	/* Prepare image header */
+	*tmp++ = ',';
+	memset(tmp, 0, GIF_IHDRLEN);
+	PUT16(tmp + GIF_IWIDTH, w);
+	PUT16(tmp + GIF_IHEIGHT, h);
+	tmp += GIF_IHDRLEN;
+
+	if (ext) gif.buf[GIF_VER] = '9'; // If we use extension
+
+	/* Write out all the headers */
+	fwrite(gif.buf, 1, tmp - gif.buf, fp);
 
 	if (!settings->silent) ls_init("GIF", 1);
 
+	initclzw(&gif, nc + 1, fp); // "Min code size" = palette index bits
 	for (i = 0; i < h; i++)
 	{
-		EGifPutLine(giffy, settings->img[CHN_IMAGE] + i * w, w);
+		putlzw(&gif, settings->img[CHN_IMAGE] + i * w, w);
 		ls_progress(settings, i, 20);
 	}
+	donelzw(&gif);
+	fputc(';', fp); // Trailer block
+	fclose(fp);
+
 	if (!settings->silent) progress_end();
-	msg = 0;
 
-fail:
-#if GIFLIB_MAJOR * 10 + GIFLIB_MINOR >= 51
-	EGifCloseFile(giffy, NULL);
-#else
-	EGifCloseFile(giffy);
-#endif
-#ifndef WIN32
-	/* giflib creates files with 0600 permissions, which is nasty - WJ */
-	mode = umask(0022);
-	umask(mode);
-	chmod(file_name, 0666 & ~mode);
-#endif
-fail0:
-#if GIFLIB_MAJOR >= 5
-	GifFreeMapObject(gif_map);
-#else
-	FreeMapObject(gif_map);
-#endif
-
-	return (msg);
+	free(gif.codes);
+	return 0;
 }
-#endif
 
 #ifdef NEED_CMYK
 #ifdef U_LCMS
@@ -2131,6 +2448,37 @@ static int save_jpeg(char *file_name, ls_settings *settings)
 }
 #endif
 
+#ifdef NEED_FILE2MEM
+/* Read in the entire file, up to max size if given */
+static int file2mem(char *file_name, unsigned char **where, size_t *len, size_t max)
+{
+	FILE *fp;
+	unsigned char *buf;
+	long l;
+	int res = -1;
+
+	if (!(fp = fopen(file_name, "rb"))) return (-1);
+	fseek(fp, 0, SEEK_END);
+	l = ftell(fp);
+	/* Where a long is too short to hold the file's size, address space is
+	 * too small to usefully hold the whole file anyway - WJ */
+	/* And when a hard limit is set, it should be honored */
+	if ((l > 0) && (!max || (l <= max)))
+	{
+		fseek(fp, 0, SEEK_SET);
+		res = FILE_MEM_ERROR;
+		if ((buf = malloc(l)))
+		{
+			res = -1;
+			if (fread(buf, 1, l, fp) < l) free(buf);
+			else *where = buf , *len = l , res = 0;
+		}
+	}
+	fclose(fp);
+	return (res);
+}
+#endif
+
 #ifdef U_JP2
 
 /* *** PREFACE ***
@@ -2144,7 +2492,11 @@ static int save_jpeg(char *file_name, ls_settings *settings)
  * to die horribly.
  * Version 2.3.0 (04.10.17) was a sharp improvement, being twice faster than
  * JasPer when decompressing and less memory hungry (overhead of 5x size). When
- * compressing however, as of 2.3.1 still about twice slower than JasPer - WJ */
+ * compressing however, as of 2.3.1 still was about twice slower than JasPer.
+ * Version 2.4.0 (28.12.20) fixed that, becoming about twice faster than JasPer
+ * when compressing too.
+ * Decompression speedup happened only for 64-bit builds, but on 32-bit with
+ * multiple cores, multithreading still can let it overtake JasPer - WJ */
 
 static int parse_opj(opj_image_t *image, ls_settings *settings)
 {
@@ -2278,23 +2630,12 @@ static int load_jpeg2000(char *file_name, ls_settings *settings)
 	opj_image_t *image = NULL;
 	opj_event_mgr_t useless_events; // !!! Silently made mandatory in v1.2
 	unsigned char *buf = NULL;
-	FILE *fp;
-	int i, l, pr, res;
+	size_t l;
+	int pr, res;
 
 
-	if ((fp = fopen(file_name, "rb")) == NULL) return (-1);
-
-	/* Read in the entire file */
-	fseek(fp, 0, SEEK_END);
-	l = ftell(fp);
-	fseek(fp, 0, SEEK_SET);
-	buf = malloc(l);
-	res = FILE_MEM_ERROR;
-	if (!buf) goto ffail;
-	res = -1;
-	i = fread(buf, 1, l, fp);
-	if (i < l) goto ffail;
-	fclose(fp);
+	/* Read in the entire file, provided its size fits into int */
+	if ((res = file2mem(file_name, &buf, &l, INT_MAX))) return (res);
 
 	/* Decompress it */
 	dinfo = opj_create_decompress(settings->ftype == FT_J2K ? CODEC_J2K :
@@ -2324,9 +2665,6 @@ ifail:	if (pr) progress_end();
 	return (res);
 lfail:	opj_destroy_decompress(dinfo);
 	free(buf);
-	return (res);
-ffail:	free(buf);
-	fclose(fp);
 	return (res);
 }
 
@@ -2407,8 +2745,9 @@ static int load_jpeg2000(char *file_name, ls_settings *settings)
 	if (!dinfo) goto ffail;
 	opj_set_default_decoder_parameters(&par);
 	if (!opj_setup_decoder(dinfo, &par)) goto dfail;
-#if !defined(WIN32) && defined(U_THREADS) && (OPJ_VERSION_MINOR >= 2) /* 2.2+ */
-	/* Not much effect as of 2.3.0 - only 10% faster from a 2nd core */
+#if defined(U_THREADS) && (OPJ_VERSION_MINOR >= 2) /* 2.2+ */
+	/* Not much effect on 64 bit as of 2.3.0 - only 10% faster from a 2nd core
+	 * But since 2.3.1, 1.3x faster with 2 cores, 1.7x with 4+ */
 	opj_codec_set_threads(dinfo, helper_threads());
 #endif
 	if ((pr = !settings->silent)) ls_init("JPEG2000", 0);
@@ -2470,6 +2809,10 @@ static int save_jpeg2000(char *file_name, ls_settings *settings)
 	par.tcp_rates[0] = settings->jp2_rate;
 	par.cp_disto_alloc = 1;
 	opj_setup_encoder(cinfo, &par, image);
+#if defined(U_THREADS) && (OPJ_VERSION_MINOR >= 4) /* 2.4+ */
+	/* As of 2.4.0, 1.4x faster with 2 cores, 1.7x with 4+ */
+	opj_codec_set_threads(cinfo, helper_threads());
+#endif
 	if (opj_start_compress(cinfo, image, outp) &&
 		opj_encode(cinfo, outp) &&
 		opj_end_compress(cinfo, outp)) res = 0;
@@ -3490,33 +3833,6 @@ static int save_tiff(char *file_name, ls_settings *settings, memFILE *mf)
 
 #ifdef U_WEBP
 
-/* Read in the entire file */
-static int file2mem(char *file_name, unsigned char **where, size_t *len)
-{
-	FILE *fp;
-	unsigned char *buf;
-	long l;
-	int res = -1;
-
-	if (!(fp = fopen(file_name, "rb"))) return (-1);
-	fseek(fp, 0, SEEK_END);
-	/* Where a long is too short to hold the file's size, address space is
-	 * too small to usefully hold the whole file anyway - WJ */
-	if ((l = ftell(fp)) > 0)
-	{
-		fseek(fp, 0, SEEK_SET);
-		res = FILE_MEM_ERROR;
-		if ((buf = malloc(l)))
-		{
-			res = -1;
-			if (fread(buf, 1, l, fp) < l) free(buf);
-			else *where = buf , *len = l , res = 0;
-		}
-	}
-	fclose(fp);
-	return (res);
-}
-
 static int load_webp(char *file_name, ls_settings *settings)
 {
 	WebPBitstreamFeatures ffs;
@@ -3524,7 +3840,7 @@ static int load_webp(char *file_name, ls_settings *settings)
 	size_t len;
 	int res, wh, wbpp = 3, cmask = CMASK_IMAGE;
 
-	if ((res = file2mem(file_name, &buf, &len))) return (res);
+	if ((res = file2mem(file_name, &buf, &len, 0))) return (res);
 	res = -1;
 	if (WebPGetFeatures((void *)buf, len, &ffs) != VP8_STATUS_OK)
 		goto fail;
@@ -3642,14 +3958,6 @@ ffail:	fclose(fp);
 	return (res);
 }
 #endif
-
-/* Macros for accessing values in Intel byte order */
-#define GET16(buf) (((buf)[1] << 8) + (buf)[0])
-#define GET32(buf) (((signed char)(buf)[3] * 0x1000000) + ((buf)[2] << 16) + \
-	((buf)[1] << 8) + (buf)[0])
-#define PUT16(buf, v) (buf)[0] = (v) & 0xFF; (buf)[1] = (v) >> 8;
-#define PUT32(buf, v) (buf)[0] = (v) & 0xFF; (buf)[1] = ((v) >> 8) & 0xFF; \
-	(buf)[2] = ((v) >> 16) & 0xFF; (buf)[3] = (v) >> 24;
 
 /* Version 2 fields */
 #define BMP_FILESIZE  2		/* 32b */
@@ -8260,6 +8568,7 @@ static int save_image_x(char *file_name, ls_settings *settings, memFILE *mf)
 	{
 	default:
 	case FT_PNG: res = save_png(file_name, &setw, mf); break;
+	case FT_GIF: res = save_gif(file_name, &setw); break;
 #ifdef U_JPEG
 	case FT_JPEG: res = save_jpeg(file_name, &setw); break;
 #endif
@@ -8269,9 +8578,6 @@ static int save_image_x(char *file_name, ls_settings *settings, memFILE *mf)
 #endif
 #ifdef U_TIFF
 	case FT_TIFF: res = save_tiff(file_name, &setw, mf); break;
-#endif
-#ifdef U_GIF
-	case FT_GIF: res = save_gif(file_name, &setw); break;
 #endif
 #ifdef U_WEBP
 	case FT_WEBP: res = save_webp(file_name, &setw); break;
@@ -8327,7 +8633,7 @@ static void store_image_extras(image_info *image, image_state *state,
 {
 #if U_LCMS
 	/* Apply ICC profile */
-	while ((settings->icc_size > 0) && (settings->bpp == 3))
+	while (settings->icc_size > 0)
 	{
 		cmsHPROFILE from, to;
 		cmsHTRANSFORM how = NULL;
@@ -8344,7 +8650,18 @@ static void store_image_extras(image_info *image, image_state *state,
 		if (from && (cmsGetColorSpace(from) == icSigRgbData))
 			how = cmsCreateTransform(from, TYPE_RGB_8,
 				to, TYPE_RGB_8, INTENT_PERCEPTUAL, 0);
-		if (how)
+		if (how && (settings->bpp == 1)) /* For GIF: apply to palette */
+		{
+			unsigned char tm[256 * 3];
+			int l = settings->colors;
+
+			pal2rgb(tm, settings->pal, l, 0);
+			cmsDoTransform(how, tm, tm, l);
+			rgb2pal(settings->pal, tm, l);
+
+			cmsDeleteTransform(how);
+		}
+		else if (how)
 		{
 			unsigned char *img = settings->img[CHN_IMAGE];
 			size_t l = settings->width, sz = l * settings->height;
@@ -8441,9 +8758,7 @@ static int load_image_x(char *file_name, memFILE *mf, int mode, int ftype,
 	{
 	default:
 	case FT_PNG: res0 = load_png(file_name, &settings, mf); break;
-#ifdef U_GIF
 	case FT_GIF: res0 = load_gif(file_name, &settings); break;
-#endif
 #ifdef U_JPEG
 	case FT_JPEG: res0 = load_jpeg(file_name, &settings); break;
 #endif
@@ -8674,9 +8989,7 @@ static int load_frames_x(ani_settings *ani, int ani_mode, char *file_name,
 	switch (ftype)
 	{
 //	case FT_PNG: return (load_apng_frames(file_name, ani));
-#ifdef U_GIF
 	case FT_GIF: return (load_gif_frames(file_name, ani));
-#endif
 #ifdef U_TIFF
 	case FT_TIFF: return (load_tiff_frames(file_name, ani));
 #endif
@@ -8892,6 +9205,7 @@ static int do_detect_format(char *name, FILE *fp)
 
 	/* Check all unambiguous signatures */
 	if (!memcmp(buf, "\x89PNG", 4)) return (FT_PNG);
+	if (!memcmp(buf, "GIF8", 4)) return (FT_GIF);
 	if (!memcmp(buf, "\xFF\xD8", 2))
 #ifdef U_JPEG
 		return (FT_JPEG);
@@ -8913,12 +9227,6 @@ static int do_detect_format(char *name, FILE *fp)
 	if (!memcmp(buf, "II", 2) || !memcmp(buf, "MM", 2))
 #ifdef U_TIFF
 		return (FT_TIFF);
-#else
-		return (FT_NONE);
-#endif
-	if (!memcmp(buf, "GIF8", 4))
-#ifdef U_GIF
-		return (FT_GIF);
 #else
 		return (FT_NONE);
 #endif

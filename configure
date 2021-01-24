@@ -4,8 +4,8 @@
 
 echo
 
-MT_V="3.50.02"
-MT_DATE="2021-01-21"
+MT_V="3.50.03"
+MT_DATE="2021-01-24"
 
 MT_VERSION="mtPaint $MT_V"
 MT_LANG=NO
@@ -39,7 +39,7 @@ MT_HOST=
 
 # Initialize library-tracking vars
 STATICLIBS=
-for A in PNG GIF JPEG JP2 TIFF WEBP FT CMS
+for A in PNG JPEG JP2 TIFF WEBP FT CMS
 do
 	eval "N$A="
 	eval "STATIC_$A="
@@ -56,10 +56,6 @@ for A in "$@"
 do
 	case "$A" in
 	"staticpng" )	STATIC_PNG=PNG;;
-	"GIF" )		NGIF=GIF;;
-	"gif" )		NGIF=YES;;
-	"nogif" )	NGIF=NO;;
-	"staticgif" )	STATIC_GIF=GIF;;
 	"jpeg" )	NJPEG=YES;;
 	"nojpeg" )	NJPEG=NO;;
 	"staticjpeg" )	STATIC_JPEG=JPEG;;
@@ -191,10 +187,6 @@ debug ............ Include debugging info in binary
 --host= .......... Cross-compile with a specific toolchain, e.g. i586-mingw32
 
 staticpng ........ Statically link PNG library
-GIF .............. Use libgif
-gif .............. Use libungif
-nogif ............ Don't use libgif and libungif
-staticgif ........ Statically link GIF library
 jpeg ............. Use libjpeg
 nojpeg ........... Don't use libjpeg
 staticjpeg ....... Statically link JPEG library
@@ -425,16 +417,6 @@ then
 	DEFS="$DEFS -DHAVE_MKDTEMP"
 fi
 
-if IS_LIB "lgif"
-then
-	NGIF=${NGIF:-GIF}
-fi
-if IS_LIB "lungif"
-then
-	NGIF=${NGIF:-YES}
-fi
-NGIF=${NGIF:-NO}
-
 if IS_LIB "ljpeg"
 then
 	NJPEG=${NJPEG:-YES}
@@ -581,16 +563,6 @@ LIB_NAME () # ( lib_ID , static_mode , libs )
 	fi
 }
 
-if [ "$NGIF" != NO ]
-then
-	if [ "$NGIF" = GIF ]
-	then
-		LIB_NAME gif "$STATIC_GIF"
-	else
-		LIB_NAME ungif "$STATIC_GIF"
-	fi
-	DEFS="$DEFS -DU_GIF"
-fi
 if [ "$NJP2" = OpenJPEG2 ]
 then
 	INCLUDES="$INCLUDES `PKGCONFIG libopenjp2 --cflags 2>/dev/null`" || \
@@ -881,7 +853,6 @@ Compiler
 File Types
 ----------
 
-    Use GIF             $NGIF
     Use JPEG            $NJPEG
     Use JPEG 2000       $NJP2
     Use TIFF            $NTIFF
