@@ -328,7 +328,7 @@ CCLD=${CCLD:-$CC -nostartfiles}
 CCNAME=gcc # by default
 $CC -v 2>&1 | grep -q "clang version" && CCNAME=clang
 # Get compiler version
-CCVER=`$CC -dumpversion`
+CCVER=`$CC -dumpfullversion 2>/dev/null || $CC -dumpversion`
 # Get target architecture
 CCARCH=`$CC -dumpmachine`
 # For eternally misconfigured, Windows-hosted MinGW
