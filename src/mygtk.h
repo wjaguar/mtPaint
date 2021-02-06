@@ -1,5 +1,5 @@
 /*	mygtk.h
-	Copyright (C) 2004-2020 Mark Tyler and Dmitry Groshev
+	Copyright (C) 2004-2021 Mark Tyler and Dmitry Groshev
 
 	This file is part of mtPaint.
 
@@ -34,6 +34,14 @@
 #if GTK_MAJOR_VERSION == 2
 #ifndef GTK2VERSION
 #define GTK2VERSION GTK_MINOR_VERSION
+#endif
+#endif
+
+///	GTK+3 version to use
+
+#if GTK_MAJOR_VERSION == 3
+#ifndef GTK3VERSION
+#define GTK3VERSION GTK_MINOR_VERSION
 #endif
 #endif
 

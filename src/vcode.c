@@ -64,6 +64,9 @@
 static GQuark tool_key;
 #define TOOL_KEY "mtPaint.tool"
 
+/* Running in a wheel is for hamsters, and pointless churn is pointless */
+G_GNUC_BEGIN_IGNORE_DEPRECATIONS
+
 #else
 #define gtk_selection_data_get_data(A) ((A)->data)
 #define gtk_selection_data_get_length(A) ((A)->length)
@@ -453,8 +456,6 @@ typedef struct {
 #endif
 } fontsel_data;
 
-G_GNUC_BEGIN_IGNORE_DEPRECATIONS /* Leave it */
-
 #if GTK_MAJOR_VERSION >= 2
 
 /* Pango coords to pixels, inclusive */
@@ -725,8 +726,6 @@ static void do_render_text(texteng_dd *td)
 		td->ctx.rgb = buf;
 	}
 }
-
-G_GNUC_END_IGNORE_DEPRECATIONS
 
 //	Mouse handling
 
@@ -3170,7 +3169,6 @@ GtkWidget *gradbar(void **r, char *ddata)
 	void **pp = r[1];
 	int i;
 
-G_GNUC_BEGIN_IGNORE_DEPRECATIONS /* Leave it */
 	hbox = gtk_hbox_new(TRUE, 0);
 
 	dt->r = NEXT_SLOT(r);
@@ -3228,7 +3226,6 @@ G_GNUC_BEGIN_IGNORE_DEPRECATIONS /* Leave it */
 #endif
 	gtk_signal_connect(GTK_OBJECT(btn), "clicked",
 		GTK_SIGNAL_FUNC(gradbar_scroll), dt->idxs + 1);
-G_GNUC_END_IGNORE_DEPRECATIONS
 
 	gtk_widget_show_all(hbox);
 	return (hbox);
@@ -4911,10 +4908,8 @@ static void listc_reset(GtkTreeView *tree, listc_data *ld)
 		listc_sort(tree, ld, FALSE);
 	}
 
-G_GNUC_BEGIN_IGNORE_DEPRECATIONS /* Deprecate the bugs first */
 	/* !!! Sometimes it shows the wrong part and redraw doesn't help */
 	gtk_adjustment_value_changed(gtk_tree_view_get_vadjustment(tree));
-G_GNUC_END_IGNORE_DEPRECATIONS
 
 	ld->lock = FALSE;
 }
@@ -5267,12 +5262,10 @@ GtkWidget *tlspinpack(void **r, void **vp, GtkWidget *table, int wh)
 		 * reflect that */
 		np[0] = gtk_spin_button_get_value_as_int(GTK_SPIN_BUTTON(widget));
 		spin_connect(widget, GTK_SIGNAL_FUNC(spinpack_evt), tp);
-G_GNUC_BEGIN_IGNORE_DEPRECATIONS /* GtkGrid is no better for this */
 // !!! Spacing = 2
 		gtk_table_attach(GTK_TABLE(table), widget,
 			column + x, column + x + 1, row + y, row + y + 1,
 			GTK_EXPAND | GTK_FILL, 0, 0, 2);
-G_GNUC_END_IGNORE_DEPRECATIONS
 		*tp++ = vp;
 	}
 	return (widget);
@@ -5300,12 +5293,10 @@ void tltext(char *v, void **pp, GtkWidget *table, int pad)
 		tmp[i] = '\0';
 		label = gtk_label_new(tmp);
 		gtk_label_set_justify(GTK_LABEL(label), GTK_JUSTIFY_LEFT);
-G_GNUC_BEGIN_IGNORE_DEPRECATIONS /* Pointless churn is pointless */
 		gtk_misc_set_alignment(GTK_MISC(label), 0.0, 0.5);
 		gtk_widget_show(label);
 		gtk_table_attach(GTK_TABLE(table), label, x, x + 1, row, row + 1,
 			GTK_FILL, 0, pad, pad);
-G_GNUC_END_IGNORE_DEPRECATIONS
 		x++;
 		if (!c) break;
 		if (c == '\n') x = column , row++;
@@ -6052,10 +6043,8 @@ static int check_smart_menu_keys(void *sdata, GdkEventKey *event)
 		if (--l <= 0) return (FALSE); // No such key in overflow
 
 	/* Just popup - if we're here, overflow menu is offscreen anyway */
-G_GNUC_BEGIN_IGNORE_DEPRECATIONS /* Running in a wheel is for hamsters */
 	gtk_menu_popup(GTK_MENU(gtk_menu_item_get_submenu(GTK_MENU_ITEM(slot->fallback))),
 		NULL, NULL, NULL, NULL, 0, 0);
-G_GNUC_END_IGNORE_DEPRECATIONS
 	return (TRUE);
 }
 
@@ -6516,11 +6505,9 @@ static void table_it(ctslot *ct, GtkWidget *it, int wh, int pad, int pack)
 	if ((column <= 1) && (column + l > 1) && (r1 <= row)) r1 = row + 1;
 	ct->type = (r1 << 16) + (r0 << 8) + (ct->type & 255);
 
-G_GNUC_BEGIN_IGNORE_DEPRECATIONS /* Pointless churn is pointless */
 	gtk_table_attach(GTK_TABLE(ct->widget), it, column, column + l, row, row + 1,
 		pack == pk_TABLEx ? GTK_EXPAND | GTK_FILL : GTK_FILL, 0,
 		pack == pk_TABLEp ? pad : 0, pad);
-G_GNUC_END_IGNORE_DEPRECATIONS
 }
 
 /* Pack widget into container according to settings */
@@ -6598,9 +6585,7 @@ int do_pack(GtkWidget *widget, ctslot *ct, void **pp, int n, int tpad)
 	case pk_SCROLLVP: case pk_SCROLLVPv: case pk_SCROLLVPm: case pk_SCROLLVPn:
 		sw = GTK_SCROLLED_WINDOW(box);
 
-G_GNUC_BEGIN_IGNORE_DEPRECATIONS /* Pointless churn is pointless */
 		gtk_scrolled_window_add_with_viewport(sw, widget);
-G_GNUC_END_IGNORE_DEPRECATIONS
 #ifdef U_LISTS_GTK1
 		adj = gtk_scrolled_window_get_vadjustment(sw);
 		if ((n == pk_SCROLLVPv) || (n == pk_SCROLLVPm))
@@ -7262,9 +7247,7 @@ void **run_create_(void **ifcode, void *ddata, int ddsize, char **script)
 // !!! Border = 6
 			gtk_container_set_border_width(GTK_CONTAINER(window), 6);
 			/* Both boxes go onto stack, with vbox on top */
-G_GNUC_BEGIN_IGNORE_DEPRECATIONS /* Pointless churn is pointless */
 			CT_PUSH(wp, gtk_dialog_get_action_area(GTK_DIALOG(window)), ct_BOX);
-G_GNUC_END_IGNORE_DEPRECATIONS
 			CT_PUSH(wp, gtk_dialog_get_content_area(GTK_DIALOG(window)), ct_BOX);
 			break;
 		/* Create a fileselector window (with horizontal box inside) */
@@ -7305,9 +7288,7 @@ G_GNUC_END_IGNORE_DEPRECATIONS
 		case op_TOPVBOXV:
 			part = TRUE; // not toplevel
 			// Fill space vertically but not horizontally
-G_GNUC_BEGIN_IGNORE_DEPRECATIONS /* Pointless churn is pointless */
 			widget = window = gtk_alignment_new(0.0, 0.5, 0.0, 1.0);
-G_GNUC_END_IGNORE_DEPRECATIONS
 			// Keep max vertical size
 			widget_set_keepsize(window, TRUE);
 			sw = add_vbox(window);
@@ -7388,7 +7369,6 @@ G_GNUC_END_IGNORE_DEPRECATIONS
 		}
 		/* Add a table */
 		case op_TABLE:
-G_GNUC_BEGIN_IGNORE_DEPRECATIONS /* Pointless churn is pointless */
 			widget = gtk_table_new((int)v & 0xFFFF, (int)v >> 16, FALSE);
 			if (lp > 1)
 			{
@@ -7396,7 +7376,6 @@ G_GNUC_BEGIN_IGNORE_DEPRECATIONS /* Pointless churn is pointless */
 				gtk_table_set_row_spacings(GTK_TABLE(widget), s);
 				gtk_table_set_col_spacings(GTK_TABLE(widget), s);
 			}
-G_GNUC_END_IGNORE_DEPRECATIONS
 // !!! Padding = 0
 			cw = GET_BORDER(TABLE);
 			ct = ct_TABLE;
@@ -7523,10 +7502,8 @@ G_GNUC_END_IGNORE_DEPRECATIONS
 		{
 			int paw = (int)v;
 			widget = gtk_label_new("");
-G_GNUC_BEGIN_IGNORE_DEPRECATIONS /* Pointless churn is pointless */
 			gtk_misc_set_alignment(GTK_MISC(widget),
 				((paw >> 16) & 255) / 2.0, 0.0);
-G_GNUC_BEGIN_IGNORE_DEPRECATIONS
 			if (paw & 0xFFFF) mods.minw = paw & 0xFFFF; // usize
 			// Label-specific packing
 			if (pk == pk_PACKEND) pk = pk_PACKEND1;
@@ -7614,11 +7591,9 @@ G_GNUC_BEGIN_IGNORE_DEPRECATIONS
 #endif
 			gtk_label_set_justify(GTK_LABEL(widget), GTK_JUSTIFY_LEFT);
 			gtk_label_set_line_wrap(GTK_LABEL(widget), TRUE);
-G_GNUC_BEGIN_IGNORE_DEPRECATIONS /* Pointless churn is pointless */
 			gtk_misc_set_alignment(GTK_MISC(widget), 0, 0);
 // !!! Padding = 5/5
 			gtk_misc_set_padding(GTK_MISC(widget), 5, 5);
-G_GNUC_END_IGNORE_DEPRECATIONS
 			break;
 		/* Add to table a batch of labels generated from text string */
 		case op_TLTEXT:

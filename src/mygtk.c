@@ -1,5 +1,5 @@
 /*	mygtk.c
-	Copyright (C) 2004-2020 Mark Tyler and Dmitry Groshev
+	Copyright (C) 2004-2021 Mark Tyler and Dmitry Groshev
 
 	This file is part of mtPaint.
 
@@ -53,6 +53,11 @@ GtkWidget *main_window;
 
 #if GTK_MAJOR_VERSION == 3
 #define GtkAdjustment_t GtkAdjustment
+
+/* I'm totally sick and tired of this "deprecation" game. Deprecate them players
+ * and the scooter they rode in on - WJ */
+G_GNUC_BEGIN_IGNORE_DEPRECATIONS
+
 #else
 #define GtkAdjustment_t GtkObject
 #endif
@@ -313,10 +318,8 @@ void init_tablet()
 	}
 #else /* #if GTK_MAJOR_VERSION >= 2 */
 #if GTK_MAJOR_VERSION == 3
-G_GNUC_BEGIN_IGNORE_DEPRECATIONS /* Running in a wheel is for hamsters */
 	devs = gdk_device_manager_list_devices(gdk_display_get_device_manager(
 		gdk_display_get_default()), GDK_DEVICE_TYPE_SLAVE);
-G_GNUC_END_IGNORE_DEPRECATIONS
 #else
 	devs = gdk_devices_list();
 #endif
@@ -551,10 +554,8 @@ void conf_tablet(void **slot)
 	tablet_slot = slot;
 
 	memset(&tdata, 0, sizeof(tdata));
-G_GNUC_BEGIN_IGNORE_DEPRECATIONS /* Running in a wheel is for hamsters */
 	devs = gdk_device_manager_list_devices(gdk_display_get_device_manager(
 		gdk_display_get_default()), GDK_DEVICE_TYPE_SLAVE);
-G_GNUC_END_IGNORE_DEPRECATIONS
 	n = g_list_length(devs);
 	tdata.xtra = multialloc(MA_ALIGN_DEFAULT,
 		&tdata.devices, sizeof(GdkDevice *) * n,
@@ -1547,11 +1548,7 @@ int move_mouse_relative(int dx, int dy)
 	GdkDisplay *dp = gtk_widget_get_display(main_window);
 	GdkDevice *dev;
 
-	/* I'm totally sick and tired of this "deprecation" game. Deprecate them
-	 * players and the scooter they rode in on - WJ */
-G_GNUC_BEGIN_IGNORE_DEPRECATIONS
 	dev = gdk_device_manager_get_client_pointer(gdk_display_get_device_manager(dp));
-G_GNUC_END_IGNORE_DEPRECATIONS
 
 	gdk_device_get_position(dev, &screen, &x0, &y0);
 	gdk_device_warp(dev, screen, x0 + dx, y0 + dy);
@@ -2807,7 +2804,6 @@ GtkWidget *xpm_image(XPM_TYPE xpm)
 
 #if GTK_MAJOR_VERSION == 3
 
-G_GNUC_BEGIN_IGNORE_DEPRECATIONS /* Running in a wheel is for hamsters */
 int release_grab()
 {
 	GdkDisplay *dp = gdk_display_get_default();
@@ -2830,7 +2826,6 @@ int release_grab()
 
 	return (res);
 }
-G_GNUC_END_IGNORE_DEPRECATIONS
 
 #else /* if GTK_MAJOR_VERSION <= 2 */
 
@@ -2869,7 +2864,6 @@ G_DEFINE_TYPE_WITH_CODE(wjframe, wjframe, GTK_TYPE_BIN,
 
 static gboolean wjframe_draw(GtkWidget *widget, cairo_t *cr)
 {
-G_GNUC_BEGIN_IGNORE_DEPRECATIONS /* I know, I know, now be silent */
 	wjframe *frame = WJFRAME(widget);
 	/* !!! Using deprecated struct to avoid recalculating the colors */
 	GtkStyle *style = gtk_widget_get_style(widget);
@@ -2901,7 +2895,6 @@ G_GNUC_BEGIN_IGNORE_DEPRECATIONS /* I know, I know, now be silent */
 	GTK_WIDGET_CLASS(wjframe_parent_class)->draw(widget, cr);
 
 	return (FALSE);
-G_GNUC_END_IGNORE_DEPRECATIONS
 }
 
 static void wjframe_size_allocate(GtkWidget *widget, GtkAllocation *allocation)
@@ -5832,7 +5825,6 @@ int do_grab(int mode, GtkWidget *widget, GdkCursor *cursor)
 	if (gdk_device_get_source(dev) == GDK_SOURCE_KEYBOARD) // Missed the guess
 		mouse = kbd , kbd = dev;
 
-G_GNUC_BEGIN_IGNORE_DEPRECATIONS /* Running in a wheel is for hamsters */
 	if (gdk_device_grab(kbd, win, GDK_OWNERSHIP_APPLICATION, owner_events,
 		GDK_KEY_PRESS_MASK | GDK_KEY_RELEASE_MASK, NULL, time) != GDK_GRAB_SUCCESS)
 		return (FALSE);
@@ -5845,7 +5837,6 @@ G_GNUC_BEGIN_IGNORE_DEPRECATIONS /* Running in a wheel is for hamsters */
 	}
 	if (mode != GRAB_PROGRAM) gtk_device_grab_add(widget, mouse, TRUE);
 	g_object_set_data(G_OBJECT(widget), GRAB_KEY, mouse);
-G_GNUC_END_IGNORE_DEPRECATIONS
 #endif
 	return (TRUE);
 }

@@ -4,8 +4,8 @@
 
 echo
 
-MT_V="3.50.03"
-MT_DATE="2021-01-24"
+MT_V="3.50.04"
+MT_DATE="2021-02-06"
 
 MT_VERSION="mtPaint $MT_V"
 MT_LANG=NO
@@ -46,7 +46,7 @@ do
 	STATICLIBS="$STATICLIBS \$STATIC_$A"
 done
 GTK=
-GTK2VERSION=
+GTKVERSION=
 
 # Prevent nasty surprises from locale
 unset LC_ALL
@@ -77,10 +77,10 @@ do
 	"nolcms" )	NCMS=NO;;
 	"staticlcms" )	STATIC_CMS=LittleCMS;;
 	"gtk1" )	GTK=1;;
-	"gtk2"* )	GTK=2
-			# Override minor version of installed GTK+2
-			GTK2VERSION="`echo "$A" | sed -e 's/gtk2\.\?\([0-9]*\).*/\1/'`";;
-	"gtk3" )	GTK=3;;
+	"gtk"[23]* )	GTK=2
+			[ "$A" != "${A#gtk3}" ] && GTK=3
+			# Override minor version of installed GTK+
+			GTKVERSION="`echo "$A" | sed -e 's/gtk[23]\.\?\([0-9]*\).*/\1/'`";;
 	"intl" )	MT_LANG=YES;;
 	"man" )		MT_MAN=YES;;
 	"pod" )		MT_POD=YES;;
@@ -166,6 +166,7 @@ gtk1 ............. Configure for GTK+1
 gtk2 ............. Configure for GTK+2
 gtk2.VER ......... Configure for GTK+2, minor version VER
 gtk3 ............. Configure for GTK+3
+gtk3.VER ......... Configure for GTK+3, minor version VER
 gtkfilesel ....... Use GtkFileSelection file picker
 gtkcolsel ........ Use GtkColorSelection colour picker
 oldlists ......... Use GtkList and GtkCList lists
@@ -328,7 +329,7 @@ CCLD=${CCLD:-$CC -nostartfiles}
 CCNAME=gcc # by default
 $CC -v 2>&1 | grep -q "clang version" && CCNAME=clang
 # Get compiler version
-CCVER=`$CC -dumpversion`
+CCVER=`$CC -dumpfullversion -dumpversion`
 # Get target architecture
 CCARCH=`$CC -dumpmachine`
 # For eternally misconfigured, Windows-hosted MinGW
@@ -668,7 +669,8 @@ else # "$GTK" = 1
 fi
 
 # !!! It is assumed that the nondefault install prefix is the one GTK+ lives in
-if [ "$FOUND_GTK" = 3 ] && PKGCONFIG --atleast-version=3.12 gtk+-3.0
+if [ "$FOUND_GTK" = 3 ] && [ ${GTKVERSION:-12} -ge 12 ] &&
+	PKGCONFIG --atleast-version=3.12 gtk+-3.0
 then
 	GTKPREFIX=`PKGCONFIG gtk+-3.0 --variable=prefix`
 	INCLUDES="$INCLUDES `PKGCONFIG gtk+-3.0 $THREADS --cflags`"
@@ -725,8 +727,8 @@ fi
 [ "$GTK" = 2 ] && [ "$LIBS" != "${LIBS#*gdk-x11}" ] && LIBS="$LIBS -lX11"
 # Need the same on GTK+3/X systems even more
 [ "$GTK" = 3 ] && PKGCONFIG gtk+-x11-3.0 && LIBS="$LIBS -lX11"
-# GTK+2 version to use
-DEFS="$DEFS${GTK2VERSION:+ -DGTK2VERSION=$GTK2VERSION}"
+# GTK+ minor version to use
+DEFS="$DEFS${GTKVERSION:+ -DGTK${GTK}VERSION=$GTKVERSION}"
 # Widgets to use
 if [ "$GTK" = 3 ]
 then
@@ -734,7 +736,7 @@ then
 	MT_FPICK=mtpaint	# Neither is GtkFileSelection
 elif [ "$GTK" = 2 ]
 then # GTK+3 compatible things need some compatibility
-	[ ${GTK2VERSION:-18} -lt 18 ] && MT_LISTS=1
+	[ ${GTKVERSION:-18} -lt 18 ] && MT_LISTS=1
 	[ "$FOUND_GTK" != 2 ] || PKGCONFIG --atleast-version=2.18 gtk+-2.0 || MT_LISTS=1
 else # GTK+1
 	MT_LISTS=1
@@ -829,7 +831,7 @@ General
 
     Version             $MT_V
     System              $OS
-    Toolkit             GTK+$GTK${GTK2VERSION:+.$GTK2VERSION}
+    Toolkit             GTK+$GTK${GTKVERSION:+.$GTKVERSION}
     Lists               GTK+$MT_LISTS
     File Picker         $MT_FPICK
     Colour Picker       $MT_CPICK

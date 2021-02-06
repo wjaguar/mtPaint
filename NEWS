@@ -8,6 +8,7 @@ Here is a summary of the main changes in this release (see handbook for full det
 
 	* Kabyle translation added by Yacine Bouklif
 	* Czech translation updated by Pavel Fric
+	* Slovak translation updated by Jozef Riha
 	* Spanish translation updated by Adolfo Jayme
 	* Tagalog translation updated by Anjelo delCarmen
 	* GIF file format support now is builtin (does not use giflib anymore)
@@ -16,6 +17,7 @@ Here is a summary of the main changes in this release (see handbook for full det
 	* Multithreaded decompression enabled for OpenJPEG 2.2+ in Windows version too
 	* Support for multithreaded compression in OpenJPEG 2.4 added
 	* Support for compiling with libtiff 3 restored
+	* Support for compiling with gcc builds (mis)configured with --with-gcc-major-version-only added
 	* BUGFIX - RGB clipboard when used in Map effect now is padded with black if too small, as it should
 	* BUGFIX - Gradient editor now displays correct overlay colours for utility channels again
 	* BUGFIX - Saved GIF files are now properly labeled GIF89 if transparent and GIF87 if not
