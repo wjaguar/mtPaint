@@ -51,7 +51,7 @@
 #include <tiffio.h>
 #endif
 #ifdef U_WEBP
-#define NEED_FILE2MEM
+#define RGBA_FRAMES
 #include <webp/encode.h>
 #include <webp/decode.h>
 #endif
@@ -90,6 +90,7 @@ typedef struct {
 	/* Explode frames mode */
 	int desttype;
 	int error, miss, cnt;
+	int lastzero;
 	char *destdir;
 } ani_settings;
 
@@ -149,10 +150,7 @@ fformat file_formats[NUM_FTYPES] = {
 	{ "* PMM *", "pmm", "", FF_256 | FF_RGB | FF_ANIM | FF_ALPHA | FF_MULTI
 		| FF_LAYER | FF_PALETTE | FF_MEM, XF_TRANS },
 #ifdef U_WEBP
-/* !!! For later */
-//	{ "WEBP", "webp", "", FF_RGB | FF_ANIM | FF_ALPHA, XF_COMPW },
-/* For now */
-	{ "WEBP", "webp", "", FF_RGB | FF_ALPHA, XF_COMPW },
+	{ "WEBP", "webp", "", FF_RGB | FF_ANIM | FF_ALPHA, XF_COMPW },
 #else
 	{ "", "", "", 0},
 #endif
@@ -1129,6 +1127,9 @@ typedef struct {
 	int global_cols, newcols, newtrans;
 	png_color global_pal[256], newpal[256];
 	unsigned char xlat[513];
+	/* Extra fields for RGBA images */
+	int blend;
+	unsigned char bkg[4];
 } ani_status;
 
 /* Calculate new frame dimensions, and point-in-area bitmap */
@@ -1139,11 +1140,21 @@ static void ani_map_frame(ani_status *stat, ls_settings *settings)
 
 
 	/* Calculate the new dimensions */
-// !!! Offsets considered nonnegative (as in GIF)
+// !!! Offsets considered nonnegative (as in GIF and WebP)
 	w = settings->x + settings->width;
-	if (stat->defw < w) stat->defw = w;
 	h = settings->y + settings->height;
-	if (stat->defh < h) stat->defh = h;
+	if (!stat->prev_idx) // Resize screen to fit the first frame
+	{
+		if (w > MAX_WIDTH) w = MAX_WIDTH;
+		if (h > MAX_HEIGHT) h = MAX_HEIGHT;
+		if (stat->defw < w) stat->defw = w;
+		if (stat->defh < h) stat->defh = h;
+	}
+	else // Clip all frames past the first to screen size
+	{
+		if (stat->defw < w) w = stat->defw;
+		if (stat->defh < h) h = stat->defh;
+	}
 
 	/* The bitmap works this way: "Xth byte & (Yth byte >> 4)" tells which
 	 * area(s) the pixel (X,Y) is in: bit 0 is for image (the new one),
@@ -1152,10 +1163,8 @@ static void ani_map_frame(ani_status *stat, ls_settings *settings)
 	j = stat->defw > stat->defh ? stat->defw : stat->defh;
 	memset(lmap = stat->lmap, 0, j);
 	// Mark new frame
-	for (i = settings->x , j = i + settings->width; i < j; i++)
-		lmap[i] |= 0x01; // Image bit
-	for (i = settings->y , j = i + settings->height; i < j; i++)
-		lmap[i] |= 0x10; // Image mask bit
+	for (i = settings->x; i < w; i++) lmap[i] |= 0x01; // Image bit
+	for (i = settings->y; i < h; i++) lmap[i] |= 0x10; // Image mask bit
 	// Mark previous frame
 	if (stat->prev_idx)
 	{
@@ -1165,13 +1174,306 @@ static void ani_map_frame(ani_status *stat, ls_settings *settings)
 			lmap[i] |= 0x20; // Underlayer mask bit
 	}
 	// Mark disposal area
-	if ((stat->bk_rect[0] < stat->bk_rect[2]) &&
-		(stat->bk_rect[1] < stat->bk_rect[3])) // Add bkg rectangle
+	if (clip(stat->bk_rect, 0, 0, stat->defw, stat->defh, stat->bk_rect))
 	{
 		for (i = stat->bk_rect[0] , j = stat->bk_rect[2]; i < j; i++)
 			lmap[i] |= 0x04; // Background bit
 		for (i = stat->bk_rect[1] , j = stat->bk_rect[3]; i < j; i++)
 			lmap[i] |= 0x40; // Background mask bit
+	}
+}
+
+static int add_frame(ani_settings *ani, ani_status *stat, ls_settings *settings,
+	int bpp, int disposal)
+{
+	int cmask = !bpp ? CMASK_NONE : bpp > 3 ? CMASK_RGBA : CMASK_IMAGE;
+	int fbpp = !bpp ? settings->bpp : bpp > 3 ? 3 : bpp;
+	image_frame *frame;
+
+	/* Allocate a new frame */
+	if (!mem_add_frame(&ani->fset, stat->defw, stat->defh, fbpp, cmask,
+		stat->newpal)) return (FILE_MEM_ERROR);
+	frame = ani->fset.frames + (ani->fset.cnt - 1);
+	frame->cols = stat->newcols;
+	frame->trans = stat->newtrans;
+	frame->delay = settings->gif_delay;
+	frame->flags = disposal; // Pass to compositing
+	/* Tag zero-delay frame for deletion if requested */
+	if ((ani->lastzero = (stat->mode == ANM_NOZERO) &&
+		!settings->gif_delay)) frame->flags |= FM_NUKE;
+	if (!bpp) // Same bpp & dimensions - reassign the chanlist
+	{
+		memcpy(frame->img, settings->img, sizeof(chanlist));
+		memset(settings->img, 0, sizeof(chanlist));
+	}
+	return (0);
+}
+
+static int done_frame(char *file_name, ani_settings *ani, int last)
+{
+	int res = 1;
+
+	if ((ani->settings.mode == FS_EXPLODE_FRAMES) && (!last ^ ani->lastzero))
+		res = write_out_frame(file_name, ani, NULL);
+	return (res ? res : 1);
+}
+
+static void composite_indexed_frame(image_frame *frame, ani_status *stat,
+		ls_settings *settings)
+{
+	unsigned char *dest, *fg0, *bg0 = NULL, *lmap = stat->lmap;
+	image_frame *bkf = &stat->prev;
+	int w, fgw, bgw = 0, urgb = 0, tp = settings->xpm_trans;
+
+	w = frame->width;
+	dest = frame->img[CHN_IMAGE];
+	fgw = settings->width;
+	fg0 = settings->img[CHN_IMAGE] ? settings->img[CHN_IMAGE] -
+		(settings->y * fgw + settings->x) : dest; // Always indexed (1 bpp)
+	/* Pointer to absent underlayer is no problem - it just won't get used */
+	bgw = bkf->width;
+	bg0 = bkf->img[CHN_IMAGE] - (bkf->y * bgw + bkf->x) * bkf->bpp;
+	urgb = bkf->bpp != 1;
+
+	if (frame->bpp == 1) // To indexed
+	{
+		unsigned char *fg = fg0, *bg = bg0, *xlat = stat->xlat;
+		int x, y;
+
+		for (y = 0; y < frame->height; y++)
+		{
+			int bmask = lmap[y] >> 4;
+
+			for (x = 0; x < w; x++)
+			{
+				int c0, bflag = lmap[x] & bmask;
+
+				if ((bflag & 1) && ((c0 = fg[x]) != tp)) // New frame
+					c0 += 256;
+				else if ((bflag & 6) == 2) // Underlayer
+					c0 = bg[x];
+				else c0 = 512; // Background (transparent)
+				*dest++ = xlat[c0];
+			}
+			fg += fgw; bg += bgw;
+		}
+	}
+	else // To RGB
+	{
+		unsigned char rgb[513 * 3], *fg = fg0, *bg = bg0;
+		int x, y, bpp = urgb + urgb + 1;
+
+		/* Setup global palette map: underlayer, image, background */
+		if (bkf->pal) pal2rgb(rgb, bkf->pal, 256, 0);
+		pal2rgb(rgb + 256 * 3,
+			settings->colors ? settings->pal : stat->global_pal, 256, 257);
+		frame->trans = -1; // No color-key transparency
+
+		for (y = 0; y < frame->height; y++)
+		{
+			int bmask = lmap[y] >> 4;
+
+			for (x = 0; x < w; x++)
+			{
+				unsigned char *src;
+				int c0, bflag = lmap[x] & bmask;
+
+				if ((bflag & 1) && ((c0 = fg[x]) != tp)) // New frame
+					src = rgb + (256 * 3) + (c0 * 3);
+				else if ((bflag & 6) == 2) // Underlayer
+					src = urgb ? bg + x * 3 : rgb + bg[x] * 3;
+				else src = rgb + 512 * 3; // Background (black)
+				dest[0] = src[0];
+				dest[1] = src[1];
+				dest[2] = src[2];
+				dest += 3;
+			}
+			fg += fgw; bg += bgw * bpp;
+		}
+	}
+
+	if (frame->img[CHN_ALPHA]) // To alpha
+	{
+		unsigned char *fg = fg0, *bg = NULL;
+		int x, y, af = 0, utp = -1;
+
+		dest = frame->img[CHN_ALPHA];
+		utp = bkf->bpp == 1 ? bkf->trans : -1;
+		af = !!bkf->img[CHN_ALPHA]; // Underlayer has alpha
+		bg = bkf->img[af ? CHN_ALPHA : CHN_IMAGE] - (bkf->y * bgw + bkf->x);
+
+		for (y = 0; y < frame->height; y++)
+		{
+			int bmask = lmap[y] >> 4;
+
+			for (x = 0; x < w; x++)
+			{
+				int c0, bflag = lmap[x] & bmask;
+
+				if ((bflag & 1) && (fg[x] != tp)) // New frame
+					c0 = 255;
+				else if ((bflag & 6) == 2) // Underlayer
+				{
+					c0 = bg[x];
+					if (!af) c0 = c0 != utp ? 255 : 0;
+				}
+				else c0 = 0; // Background (transparent)
+				*dest++ = c0;
+			}
+			fg += fgw; bg += bgw;
+		}
+	}
+}
+
+#ifdef RGBA_FRAMES
+static void composite_rgba_frame(image_frame *frame, ani_status *stat,
+		ls_settings *settings)
+{
+	static unsigned char bkg0[4]; // Default transparent black
+	unsigned char mask[MAX_WIDTH], alpha[MAX_WIDTH];
+	unsigned char *dest, *src, *dsta, *srca, *bg, *bga, *lmap = stat->lmap;
+	image_frame *bkf = &stat->prev;
+	int rxy[4] = { 0, 0, frame->width, frame->height };
+	int x, y, w, bgw, bgoff, fgw, ww, fgoff, dstoff;
+
+	/* Do the mixing if source is present */
+	if (!settings->img[CHN_IMAGE]) return;
+
+	w = frame->width;
+	bgw = bkf->width;
+	bgoff = bkf->y * bgw + bkf->x;
+
+	/* First, generate the destination RGB */
+	dest = frame->img[CHN_IMAGE];
+	bg = bkf->img[CHN_IMAGE] - bgoff * 3; // Won't get used if not valid
+	for (y = 0; y < frame->height; y++)
+	{
+		int bmask = lmap[y] >> 4;
+
+		for (x = 0; x < w; x++)
+		{
+			unsigned char *rgb = bkg0; // Default black
+			int bflag = lmap[x] & bmask;
+
+			if (bflag & 2) rgb = bg + x * 3; // Underlayer
+			if (bflag & 4) rgb = stat->bkg; // Background in the hole
+			dest[0] = rgb[0];
+			dest[1] = rgb[1];
+			dest[2] = rgb[2];
+			dest += 3;
+		}
+		bg += bgw * 3;
+	}
+
+	/* Then, destination alpha */
+	dsta = frame->img[CHN_ALPHA];
+	bga = bkf->img[CHN_ALPHA] ? bkf->img[CHN_ALPHA] - bgoff : NULL;
+	if (dsta) for (y = 0; y < frame->height; y++)
+	{
+		int bmask = lmap[y] >> 4;
+
+		for (x = 0; x < w; x++)
+		{
+			int bflag = lmap[x] & bmask, a = 0; // Default transparent
+			if (bflag & 2) a = bga ? bga[x] : 255; // Underlayer
+			if (bflag & 4) a = stat->bkg[3]; // Background in the hole
+			*dsta++ = a;
+		}
+		if (bga) bga += bgw;
+	}
+
+	/* Then, check if the new frame is in bounds */
+	if (!clip(rxy, settings->x, settings->y,
+		settings->x + settings->width, settings->y + settings->height, rxy)) return;
+
+	/* Then, paste it over */
+	fgw = settings->width;
+	ww = rxy[2] - rxy[0];
+	fgoff = (rxy[1] - settings->y) * fgw + (rxy[0] - settings->x);
+	dstoff = rxy[1] * w + rxy[0];
+	memset(alpha, 255, ww);
+	for (y = rxy[1]; y < rxy[3]; y++)
+	{
+		dsta = frame->img[CHN_ALPHA] ? frame->img[CHN_ALPHA] + dstoff : NULL;
+		srca = settings->img[CHN_ALPHA] + fgoff;
+		dest = frame->img[CHN_IMAGE] + dstoff * 3;
+		src = settings->img[CHN_IMAGE] + fgoff * 3;
+
+		if (stat->blend) // Do alpha blend
+		{
+			memset(mask, 0, ww);
+			process_mask(0, 1, ww, mask, dsta, dsta, alpha, srca, 255, FALSE);
+			process_img(0, 1, ww, mask, dest, dest, src, NULL, 3, BLENDF_SET);
+		}
+		else // Do a copy
+		{
+			memcpy(dest, src, ww * 3); // Copy image
+			if (!dsta); // No alpha
+			else if (settings->img[CHN_ALPHA]) // Copy alpha
+				memcpy(dsta, srca, ww);
+			else memset(dsta, 255, ww); // Fill alpha
+		}
+		fgoff += fgw; dstoff += w;
+	}
+}
+#endif
+
+static void composite_frame(frameset *fset, ani_status *stat, ls_settings *settings)
+{
+	image_frame *frame = fset->frames + (fset->cnt - 1);
+	int disposal;
+
+
+	/* In raw mode, just store the offsets */
+	if (stat->mode <= ANM_RAW)
+	{
+		frame->x = settings->x;
+		frame->y = settings->y;
+	}
+	else
+	{
+		/* Read & clear disposal mode */
+		disposal = frame->flags & FM_DISPOSAL;
+		frame->flags ^= disposal ^ FM_DISP_REMOVE;
+
+#ifdef RGBA_FRAMES
+		if (settings->bpp == 3) composite_rgba_frame(frame, stat, settings);
+		else
+#endif
+		composite_indexed_frame(frame, stat, settings);
+
+		/* Prepare the disposal action */
+		memset(&stat->bk_rect, 0, sizeof(stat->bk_rect)); // Clear old
+		switch (disposal)
+		{
+		case FM_DISP_REMOVE: // Dispose to background
+			// Image-sized hole in underlayer
+			stat->bk_rect[2] = (stat->bk_rect[0] = settings->x) +
+				settings->width;
+			stat->bk_rect[3] = (stat->bk_rect[1] = settings->y) +
+				settings->height;
+			// Fallthrough
+		case FM_DISP_LEAVE: // Don't dispose
+			stat->prev = *frame; // Current frame becomes underlayer
+			if (!stat->prev.pal) stat->prev.pal = fset->pal;
+			if (stat->prev_idx &&
+				(fset->frames[stat->prev_idx - 1].flags & FM_NUKE))
+				/* Remove the unref'd frame */
+				mem_remove_frame(fset, stat->prev_idx - 1);
+			stat->prev_idx = fset->cnt;
+			break;
+		case FM_DISP_RESTORE: // Dispose to previous
+			// Underlayer stays unchanged
+			break;
+		}
+	}
+	if ((fset->cnt > 1) && (stat->prev_idx != fset->cnt - 1) &&
+		(fset->frames[fset->cnt - 2].flags & FM_NUKE))
+	{
+		/* Remove the next-to-last frame */
+		mem_remove_frame(fset, fset->cnt - 2);
+		if (stat->prev_idx > fset->cnt)
+			stat->prev_idx = fset->cnt;
 	}
 }
 
@@ -1204,9 +1506,11 @@ static int analyze_gif_frame(ani_status *stat, ls_settings *settings)
 		stat->defh = settings->height;
 		return (0);
 	}
+	else if ((stat->defw > MAX_WIDTH) || (stat->defh > MAX_HEIGHT))
+		return (-1); // Too large
 	ani_map_frame(stat, settings);
-	same_size = !((stat->defw ^ settings->width) |
-		(stat->defh ^ settings->height));
+	same_size = !(settings->x | settings->y |
+		(stat->defw ^ settings->width) | (stat->defh ^ settings->height));
 
 	for (i = 0; i < 256; i++) stat->xlat[i] = stat->xlat[i + 256] = i;
 	stat->xlat[512] = stat->newtrans;
@@ -1370,158 +1674,6 @@ RGB:	if (stat->global_cols > 0) // Use default palette if present
 		return (4);
 	// RGB otherwise
 	return (3);
-}
-
-static void composite_gif_frame(frameset *fset, ani_status *stat,
-	ls_settings *settings)
-{
-	unsigned char *dest, *fg0, *bg0 = NULL, *lmap = stat->lmap;
-	image_frame *frame = fset->frames + (fset->cnt - 1), *bkf = &stat->prev;
-	int disposal, w, fgw, bgw = 0, urgb = 0, tp = settings->xpm_trans;
-
-
-	frame->trans = stat->newtrans;
-	/* In raw mode, just store the offsets */
-	if (stat->mode <= ANM_RAW)
-	{
-		frame->x = settings->x;
-		frame->y = settings->y;
-		goto done;
-	}
-	/* Read & clear disposal mode */
-	disposal = frame->flags & FM_DISPOSAL;
-	frame->flags ^= disposal ^ FM_DISP_REMOVE;
-
-	w = frame->width;
-	dest = frame->img[CHN_IMAGE];
-	fgw = settings->width;
-	fg0 = settings->img[CHN_IMAGE] ? settings->img[CHN_IMAGE] -
-		(settings->y * fgw + settings->x) : dest; // Always indexed (1 bpp)
-	/* Pointer to absent underlayer is no problem - it just won't get used */
-	bgw = bkf->width;
-	bg0 = bkf->img[CHN_IMAGE] - (bkf->y * bgw + bkf->x) * bkf->bpp;
-	urgb = bkf->bpp != 1;
-
-	if (frame->bpp == 1) // To indexed
-	{
-		unsigned char *fg = fg0, *bg = bg0, *xlat = stat->xlat;
-		int x, y;
-
-		for (y = 0; y < frame->height; y++)
-		{
-			int bmask = lmap[y] >> 4;
-
-			for (x = 0; x < w; x++)
-			{
-				int c0, bflag = lmap[x] & bmask;
-
-				if ((bflag & 1) && ((c0 = fg[x]) != tp)) // New frame
-					c0 += 256;
-				else if ((bflag & 6) == 2) // Underlayer
-					c0 = bg[x];
-				else c0 = 512; // Background (transparent)
-				*dest++ = xlat[c0];
-			}
-			fg += fgw; bg += bgw;
-		}
-	}
-	else // To RGB
-	{
-		unsigned char rgb[513 * 3], *fg = fg0, *bg = bg0;
-		int x, y, bpp = urgb + urgb + 1;
-
-		/* Setup global palette map: underlayer, image, background */
-		if (bkf->pal) pal2rgb(rgb, bkf->pal, 256, 0);
-		pal2rgb(rgb + 256 * 3, settings->pal, 256, 257);
-		frame->trans = -1; // No color-key transparency
-
-		for (y = 0; y < frame->height; y++)
-		{
-			int bmask = lmap[y] >> 4;
-
-			for (x = 0; x < w; x++)
-			{
-				unsigned char *src;
-				int c0, bflag = lmap[x] & bmask;
-
-				if ((bflag & 1) && ((c0 = fg[x]) != tp)) // New frame
-					src = rgb + (256 * 3) + (c0 * 3);
-				else if ((bflag & 6) == 2) // Underlayer
-					src = urgb ? bg + x * 3 : rgb + bg[x] * 3;
-				else src = rgb + 512 * 3; // Background (black)
-				dest[0] = src[0];
-				dest[1] = src[1];
-				dest[2] = src[2];
-				dest += 3;
-			}
-			fg += fgw; bg += bgw * bpp;
-		}
-	}
-
-	if (frame->img[CHN_ALPHA]) // To alpha
-	{
-		unsigned char *fg = fg0, *bg = NULL;
-		int x, y, af = 0, utp = -1;
-
-		dest = frame->img[CHN_ALPHA];
-		utp = bkf->bpp == 1 ? bkf->trans : -1;
-		af = !!bkf->img[CHN_ALPHA]; // Underlayer has alpha
-		bg = bkf->img[af ? CHN_ALPHA : CHN_IMAGE] - (bkf->y * bgw + bkf->x);
-
-		for (y = 0; y < frame->height; y++)
-		{
-			int bmask = lmap[y] >> 4;
-
-			for (x = 0; x < w; x++)
-			{
-				int c0, bflag = lmap[x] & bmask;
-
-				if ((bflag & 1) && (fg[x] != tp)) // New frame
-					c0 = 255;
-				else if ((bflag & 6) == 2) // Underlayer
-				{
-					c0 = bg[x];
-					if (!af) c0 = c0 != utp ? 255 : 0;
-				}
-				else c0 = 0; // Background (transparent)
-				*dest++ = c0;
-			}
-			fg += fgw; bg += bgw;
-		}
-	}
-
-	/* Prepare the disposal action */
-	memset(&stat->bk_rect, 0, sizeof(stat->bk_rect)); // Clear old
-	switch (disposal)
-	{
-	case FM_DISP_REMOVE: // Dispose to background
-		// Image-sized hole in underlayer
-		stat->bk_rect[2] = (stat->bk_rect[0] = settings->x) +
-			settings->width;
-		stat->bk_rect[3] = (stat->bk_rect[1] = settings->y) +
-			settings->height;
-		// Fallthrough
-	case FM_DISP_LEAVE: // Don't dispose
-		stat->prev = *frame; // Current frame becomes underlayer
-		if (!stat->prev.pal) stat->prev.pal = fset->pal;
-		if (stat->prev_idx &&
-			(fset->frames[stat->prev_idx - 1].flags & FM_NUKE))
-			/* Remove the unref'd frame */
-			mem_remove_frame(fset, stat->prev_idx - 1);
-		stat->prev_idx = fset->cnt;
-		break;
-	case FM_DISP_RESTORE: // Dispose to previous
-		// Underlayer stays unchanged
-		break;
-	}
-done:	if ((fset->cnt > 1) && (stat->prev_idx != fset->cnt - 1) &&
-		(fset->frames[fset->cnt - 2].flags & FM_NUKE))
-	{
-		/* Remove the next-to-last frame */
-		mem_remove_frame(fset, fset->cnt - 2);
-		if (stat->prev_idx > fset->cnt)
-			stat->prev_idx = fset->cnt;
-	}
 }
 
 /* Macros for accessing values in Intel byte order */
@@ -1795,9 +1947,8 @@ static int load_gif_frames(char *file_name, ani_settings *ani)
 	unsigned char hdr[GIF_HDRLEN], buf[768];
 	png_color w_pal[256];
 	ani_status stat;
-	image_frame *frame;
 	ls_settings w_set, init_set;
-	int l, id, disposal, bpp, cmask, lastzero = FALSE, res = -1;
+	int l, id, disposal, bpp, res = -1;
 	FILE *fp;
 
 	if (!(fp = fopen(file_name, "rb"))) return (-1);
@@ -1845,6 +1996,7 @@ static int load_gif_frames(char *file_name, ani_settings *ani)
 	{
 		res = -1;
 		id = getc(fp);
+		if (!id) continue; // Extra end-blocks do happen sometimes
 		if (id == ';') break; // Trailer block
 		if (id == '!') // Extension block
 		{
@@ -1872,46 +2024,28 @@ static int load_gif_frames(char *file_name, ani_settings *ani)
 			res = load_gif_frame(fp, &w_set);
 			if (res != 1) goto fail;
 			/* Analyze how we can merge the frames */
+			res = TOO_BIG;
 			bpp = analyze_gif_frame(&stat, &w_set);
-			cmask = !bpp ? CMASK_NONE : bpp > 3 ? CMASK_RGBA : CMASK_IMAGE;
+			if (bpp < 0) goto fail;
+
 			/* Allocate a new frame */
-// !!! Currently, frames are allocated without checking any limits
-			res = FILE_MEM_ERROR;
-			if (!mem_add_frame(&ani->fset, stat.defw, stat.defh,
-				bpp > 1 ? 3 : 1, cmask, stat.newpal)) goto fail;
-			frame = ani->fset.frames + (ani->fset.cnt - 1);
-			frame->cols = stat.newcols;
-			frame->delay = w_set.gif_delay;
-			frame->flags = disposal; // Pass to compositing
-			/* Tag zero-delay frame for deletion if requested */
-			if ((lastzero = (stat.mode == ANM_NOZERO) &&
-				!w_set.gif_delay)) frame->flags |= FM_NUKE;
-			if (!bpp) // Same bpp & dimensions - reassign the chanlist
-			{
-				memcpy(frame->img, w_set.img, sizeof(chanlist));
-				memset(w_set.img, 0, sizeof(chanlist));
-			}
+			res = add_frame(ani, &stat, &w_set, bpp, disposal);
+			if (res) goto fail;
+
 			/* Do actual compositing, remember disposal method */
-			composite_gif_frame(&ani->fset, &stat, &w_set);
-			// !!! "frame" pointer may be invalid past this point
+			composite_frame(&ani->fset, &stat, &w_set);
 			mem_free_chanlist(w_set.img);
 			memset(w_set.img, 0, sizeof(chanlist));
+
 			/* Write out those frames worthy to be stored */
-			if ((ani->settings.mode == FS_EXPLODE_FRAMES) && !lastzero)
-			{
-				res = write_out_frame(file_name, ani, NULL);
-				if (res) goto fail;
-			}
+			res = done_frame(file_name, ani, FALSE);
+			if (res != 1) goto fail;
 		}
 		else goto fail; // Garbage or EOF
 	}
 	/* Write out the final frame if not written before */
-	if ((ani->settings.mode == FS_EXPLODE_FRAMES) && lastzero)
-	{
-		res = write_out_frame(file_name, ani, NULL);
-		if (res) goto fail;
-	}
-	res = 1;
+	res = done_frame(file_name, ani, TRUE);
+
 fail:	mem_free_chanlist(w_set.img);
 	fclose(fp);
 	return (res);
@@ -1947,6 +2081,7 @@ static int load_gif(char *file_name, ls_settings *settings)
 	{
 		res = frame ? FILE_LIB_ERROR : -1;
 		id = getc(fp);
+		if (!id) continue; // Extra end-blocks do happen sometimes
 		if (id == ';') break; // Trailer block
 		if (id == '!') // Extension block
 		{
@@ -3833,53 +3968,420 @@ static int save_tiff(char *file_name, ls_settings *settings, memFILE *mf)
 
 #ifdef U_WEBP
 
-static int load_webp(char *file_name, ls_settings *settings)
-{
-	WebPBitstreamFeatures ffs;
-	unsigned char *buf;
-	size_t len;
-	int res, wh, wbpp = 3, cmask = CMASK_IMAGE;
+/* *** PREFACE ***
+ * WebP Demux API is exceedingly cumbersome in case you don't feed the entire
+ * file to it in one single memory block. Stepping through the RIFF container to
+ * pick individual chunks is more manageable. */
 
-	if ((res = file2mem(file_name, &buf, &len, 0))) return (res);
-	res = -1;
-	if (WebPGetFeatures((void *)buf, len, &ffs) != VP8_STATUS_OK)
+static int analyze_webp_frame(ani_status *stat, ls_settings *settings)
+{
+	int same_size, holes, alpha0, alpha1, alpha;
+
+	if (stat->mode <= ANM_RAW) // Raw frame mode
+	{
+		stat->defw = settings->width;
+		stat->defh = settings->height;
+		return (0); // Output matches input
+	}
+	else if ((stat->defw > MAX_WIDTH) || (stat->defh > MAX_HEIGHT))
+		return (-1); // Too large
+	ani_map_frame(stat, settings);
+	same_size = !(settings->x | settings->y |
+		(stat->defw ^ settings->width) | (stat->defh ^ settings->height));
+	holes = !same_size || stat->blend;
+
+	if (same_size && !holes) return (0); // New replaces old
+
+	/* Transparency on underlayer */
+	alpha0 = !stat->prev_idx || stat->prev.img[CHN_ALPHA];
+	/* Transparency from disposal to background */
+	if ((stat->bk_rect[0] < stat->bk_rect[2]) &&
+		(stat->bk_rect[1] < stat->bk_rect[3]))
+		alpha0 |= stat->bkg[3] < 255;
+	/* Transparency from this layer */
+	alpha1 = !stat->blend && settings->img[CHN_ALPHA];
+	/* Result */
+	alpha = alpha1 | (alpha0 & holes);
+
+	return (3 + alpha);
+}
+
+/* !!! For now */
+#define F_LONG_MAX LONG_MAX /* What can be handled - including allocated */
+typedef long f_long;
+#define ftellX(A) ftell(A)
+#define fseekX(A,B,C) fseek(A, B, C)
+
+/* Macro for little-endian tags (RIFF) */
+#define TAG4(A,B,C,D) ((A) + ((B) << 8) + ((C) << 16) + ((D) << 24))
+
+#define GET24(buf) (((buf)[2] << 16) + ((buf)[1] << 8) + (buf)[0])
+#define PUT24(buf, v) (buf)[0] = (v) & 0xFF; (buf)[1] = ((v) >> 8) & 0xFF; \
+	(buf)[2] = ((v) >> 16) & 0xFF;
+
+/* !!! In documentation, bit fields are written in reverse; actual flag values
+ * used by libwebp are as if bits are numbered right to left instead - WJ */
+
+/* Macros for WEBP tags */
+#define TAG4_RIFF TAG4('R', 'I', 'F', 'F')
+#define TAG4_WEBP TAG4('W', 'E', 'B', 'P')
+#define TAG4_VP8X TAG4('V', 'P', '8', 'X')
+#define TAG4_ANIM TAG4('A', 'N', 'I', 'M')
+#define TAG4_ANMF TAG4('A', 'N', 'M', 'F')
+#define TAG4_VP8  TAG4('V', 'P', '8', ' ')
+#define TAG4_VP8L TAG4('V', 'P', '8', 'L')
+#define TAG4_ALPH TAG4('A', 'L', 'P', 'H')
+#define TAG4_ICCP TAG4('I', 'C', 'C', 'P')
+#define TAG4_EXIF TAG4('E', 'X', 'I', 'F')
+#define TAG4_XMP  TAG4('X', 'M', 'P', ' ')
+
+#define RIFF_TAGSIZE 4
+
+/* RIFF block header */
+#define RIFF_TAG    0 /* 32b */
+#define RIFF_SIZE   4 /* 32b */
+#define RIFF_HSIZE  8
+
+/* WEBP header block (VP8X tag) */
+#define VP8X_FLAGS  0 /*  8b */
+#define VP8X_W1     4 /* 24b */
+#define VP8X_H1     7 /* 24b */
+#define VP8X_SIZE  10
+
+/* VP8X flags (ignore on read) */
+#define VP8XF_ANIM   2
+#define VP8XF_ALPHA 16
+#define VP8XF_ICC   32
+
+/* ANIM block */
+/* !!! Background color & alpha are ignored by vwebp */
+#define ANIM_BKG_B  0 /* 8b */
+#define ANIM_BKG_G  1 /* 8b */
+#define ANIM_BKG_R  2 /* 8b */
+#define ANIM_BKG_A  3 /* 8b */
+#define ANIM_LOOP   4 /* 16b */
+#define ANIM_SIZE   6
+
+/* ANMF block header */
+#define ANMF_X2     0 /* 24b */
+#define ANMF_Y2     3 /* 24b */
+#define ANMF_W1     6 /* 24b */
+#define ANMF_H1     9 /* 24b */
+#define ANMF_DELAY 12 /* 24b */
+#define ANMF_FLAGS 15 /*  8b */
+#define ANMF_HSIZE 16
+
+/* ANMF flags */
+#define ANMF_F_NOBLEND 2
+#define ANMF_F_BKG     1 /* Dispose to background */
+
+#define HAVE_IMG  0x01
+#define HAVE_VP8X 0x02
+#define HAVE_ANIM 0x04
+#define HAVE_XTRA 0x08
+#define HAVE_ALPH 0x10
+#define HAVE_ANMF 0x20
+
+typedef struct {
+	FILE *f;
+	unsigned len;	// File data left unparsed
+	unsigned size;	// How much to read for this frame
+	int blocks;
+	unsigned char hdr[VP8X_SIZE], bkg[4];
+	unsigned char anmf[ANMF_HSIZE + RIFF_TAGSIZE];
+} webphead;
+
+static int load_webp_frame(webphead *wp, ls_settings *settings)
+{
+	WebPDecoderConfig dconf;
+	unsigned char *buf;
+	int wh, bpp, wbpp = 3, cmask = CMASK_IMAGE, res = -1;
+	
+
+	if (!WebPInitDecoderConfig(&dconf)) return (-1); // Wrong lib version
+	if (!(buf = malloc(wp->size))) return (FILE_MEM_ERROR);
+	if (fread(buf, 1, wp->size, wp->f) != wp->size) goto fail;
+	if (WebPGetFeatures((void *)buf, wp->size, &dconf.input) != VP8_STATUS_OK)
 		goto fail;
-	if (ffs.has_alpha) wbpp = 4 , cmask = CMASK_RGBA;
-	wh = ffs.width * ffs.height;
-	settings->width = ffs.width;
-	settings->height = ffs.height;
+
+	if (dconf.input.has_alpha) wbpp = 4 , cmask = CMASK_RGBA;
+	wh = dconf.input.width * dconf.input.height;
+	settings->width = dconf.input.width;
+	settings->height = dconf.input.height;
 	settings->bpp = wbpp;
+
+	/* Get the extras from frame header */
+	if (wp->blocks & HAVE_ANMF)
+	{
+		settings->x = GET24(wp->anmf + ANMF_X2) * 2;
+		settings->y = GET24(wp->anmf + ANMF_Y2) * 2;
+		/* Within mtPaint delays are 1/100s granular */
+		settings->gif_delay = (GET24(wp->anmf + ANMF_DELAY) + 9) / 10; // Round up
+	}
+
 	if ((res = allocate_image(settings, cmask))) goto fail;
+
+	bpp = settings->img[CHN_ALPHA] ? 4 : 3;
+	dconf.output.colorspace = bpp > 3 ? MODE_RGBA : MODE_RGB;
+	dconf.output.u.RGBA.rgba = settings->img[CHN_IMAGE];
+	dconf.output.u.RGBA.stride = settings->width * bpp;
+	dconf.output.u.RGBA.size = wh * bpp;
+	dconf.output.is_external_memory = 1;
+
 	if (!settings->silent) ls_init("WebP", 0);
 	res = FILE_LIB_ERROR;
-	if (settings->img[CHN_ALPHA]) /* Read RGBA and separate out alpha */
+	if (WebPDecode(buf, wp->size, &dconf) == VP8_STATUS_OK)
 	{
-		if (WebPDecodeRGBAInto((void *)buf, len,
-			(void *)settings->img[CHN_IMAGE], wh * 4,
-			settings->width * 4))
+		if (bpp == 4) /* Separate out alpha from RGBA */
 		{
 			copy_bytes(settings->img[CHN_ALPHA],
 				settings->img[CHN_IMAGE] + 3, wh, 1, 4);
 			copy_bytes(settings->img[CHN_IMAGE],
 				settings->img[CHN_IMAGE], wh, 3, 4);
-			res = 1;
 		}
+		if (wbpp > 3) /* Downsize image channel */
+		{
+			unsigned char *w = realloc(settings->img[CHN_IMAGE], wh * 3);
+			if (w) settings->img[CHN_IMAGE] = w;
+		}
+		res = 1;
 	}
-	else /* Read as RGB */
-	{
-		if (WebPDecodeRGBInto((void *)buf, len,
-			(void *)settings->img[CHN_IMAGE], wh * 3,
-			settings->width * 3)) res = 1;
-	}
-	/* Downsize image channel */
-	if ((wbpp > 3) && (res == 1))
-	{
-		unsigned char *w = realloc(settings->img[CHN_IMAGE], wh * 3);
-		if (w) settings->img[CHN_IMAGE] = w;
-	}
-	if ((res == 1) && ffs.has_animation) res = FILE_HAS_FRAMES;
 	if (!settings->silent) progress_end();
+	WebPFreeDecBuffer(&dconf.output);
+
 fail:	free(buf);
+	return (res);
+}
+
+static int webp_scan(webphead *wp, ls_settings *settings)
+{
+	unsigned char buf[256];
+	FILE *fp = wp->f;
+	unsigned tag, tl;
+	f_long alph = -1;
+
+	if (!settings) // Next-frame mode
+	{
+		/* If a regular image was first, believe there are no other frames */
+		if (!(wp->blocks & HAVE_ANMF)) return (FALSE);
+
+		wp->blocks &= ~(HAVE_ALPH | HAVE_IMG); // Prepare for new frame
+	}
+
+	/* Read block headers & see what we get */
+	while ((wp->len >= RIFF_HSIZE) && (fread(buf, 1, RIFF_HSIZE, fp) == RIFF_HSIZE))
+	{
+		tag = GET32(buf);
+		tl = GET32(buf + RIFF_SIZE);
+		if (tl > 0xFFFFFFFFU - 1 - RIFF_HSIZE) break; // MAX_CHUNK_PAYLOAD
+		if (tl >= F_LONG_MAX) break; // Limit for what can be handled
+		tl += tl & 1; // Pad
+		if (wp->len < tl + RIFF_HSIZE) break; // Does not fit in RIFF
+		wp->len -= tl + RIFF_HSIZE;
+
+		if (tag == TAG4_ANMF)
+		{
+			if (tl < ANMF_HSIZE + RIFF_HSIZE) break;
+			if (fread(wp->anmf, 1, ANMF_HSIZE + RIFF_TAGSIZE, fp) !=
+				ANMF_HSIZE + RIFF_TAGSIZE) break;
+			fseek(fp, -RIFF_TAGSIZE, SEEK_CUR);
+			wp->blocks |= HAVE_ANMF;
+			tag = GET32(wp->anmf + ANMF_HSIZE);
+			if (tag == TAG4_ALPH) wp->blocks |= HAVE_ALPH;
+			else if ((tag != TAG4_VP8) && (tag != TAG4_VP8L)) break; // Damaged?
+			wp->size = tl - ANMF_HSIZE;
+			wp->blocks |= HAVE_IMG;
+			break; // Done
+		}
+		/* Be extra accepting - skip duplicates of header chunks w/o failing */
+		else if (!settings && ((tag == TAG4_VP8X) || (tag == TAG4_ANIM) ||
+			(tag == TAG4_ICCP)));
+		/* Fail on encountering image chunk where a frame should be */
+		else if (!settings && ((tag == TAG4_VP8) || (tag == TAG4_VP8L) ||
+			(tag == TAG4_ALPH))) break;
+		else if (tag == TAG4_VP8X)
+		{
+			if (tl != VP8X_SIZE) break;
+			if (fread(wp->hdr, 1, VP8X_SIZE, fp) != VP8X_SIZE) break;
+			wp->blocks |= HAVE_VP8X;
+			continue;
+		}
+		else if (tag == TAG4_ANIM)
+		{
+			if (tl != ANIM_SIZE) break;
+			if (fread(buf, 1, ANIM_SIZE, fp) != ANIM_SIZE) break;
+			/* Rearrange the bytes the sane way */
+			wp->bkg[0] = buf[ANIM_BKG_R];
+			wp->bkg[1] = buf[ANIM_BKG_G];
+			wp->bkg[2] = buf[ANIM_BKG_B];
+			wp->bkg[3] = buf[ANIM_BKG_A];
+			wp->blocks |= HAVE_ANIM;
+			continue;
+		}
+#ifdef U_LCMS
+		else if (tag == TAG4_ICCP)
+		{
+			unsigned char *tmp = NULL;
+
+			wp->blocks |= HAVE_XTRA;
+			if (!settings->icc_size &&
+				(tl < INT_MAX) && // For sanity (and icc_size size)
+				(tmp = malloc(tl)) &&
+				(fread(tmp, 1, tl, fp) == tl))
+			{
+				settings->icc = tmp;
+				settings->icc_size = tl;
+				continue;
+			}
+			if (tmp) /* Failed to read */
+			{
+				free(tmp);
+				break;
+			}
+		}
+#endif
+		else if (tag == TAG4_ALPH)
+		{
+			wp->blocks |= HAVE_ALPH;
+			alph = ftellX(fp);
+			if (alph < 0) break;
+		}
+		else if ((tag == TAG4_VP8) || (tag == TAG4_VP8L))
+		{
+			fseek(fp, -RIFF_HSIZE, SEEK_CUR);
+			wp->size = tl + RIFF_HSIZE;
+			if (alph > 0) // Need to start with alpha
+			{
+				f_long here = ftellX(fp);
+				if (here < 0) break; // Too long for us
+				/* From ALPH header to this block's end */
+				wp->size += here - alph + RIFF_HSIZE;
+				fseek(fp, alph - RIFF_HSIZE, SEEK_SET);
+			}
+			wp->blocks |= HAVE_IMG;
+			break;
+		}
+		else wp->blocks |= HAVE_XTRA;
+		/* Default: skip (the rest of) tag data */
+		if (tl && fseek(fp, tl, SEEK_CUR)) break;
+	}
+	return (wp->blocks & HAVE_IMG);
+}
+
+static int webp_behead(FILE *fp, webphead *wp, ls_settings *settings)
+{
+	unsigned char buf[RIFF_HSIZE + RIFF_TAGSIZE];
+	unsigned tl;
+
+
+	memset(wp, 0, sizeof(webphead));
+	wp->f = fp;
+
+	/* Read the RIFF header & check signature */
+	if (fread(buf, 1, RIFF_HSIZE + RIFF_TAGSIZE, fp) < RIFF_HSIZE + RIFF_TAGSIZE)
+		return (FALSE);
+	if ((GET32(buf) != TAG4_RIFF) || (GET32(buf + RIFF_HSIZE) != TAG4_WEBP))
+		return (FALSE);
+
+	tl = GET32(buf + RIFF_SIZE);
+	if (tl < RIFF_TAGSIZE + RIFF_HSIZE) return (FALSE);
+	tl -= RIFF_TAGSIZE;
+	tl += tl & 1; // Pad
+	wp->len = tl;
+
+	webp_scan(wp, settings);
+	return (wp->blocks & HAVE_IMG);
+}
+
+static int load_webp_frames(char *file_name, ani_settings *ani)
+{
+	webphead wp;
+	ani_status stat;
+	ls_settings w_set, init_set;
+	FILE *fp;
+	int bpp, disposal, res = -1;
+
+
+	if (!(fp = fopen(file_name, "rb"))) return (-1);
+	memset(w_set.img, 0, sizeof(chanlist));
+
+	/* Init temp container */
+	init_set = ani->settings;
+	if (!webp_behead(fp, &wp, &init_set)) goto fail;
+
+	/* Need to have them to read them */
+	if ((wp.blocks & (HAVE_VP8X | HAVE_ANMF)) != (HAVE_VP8X | HAVE_ANMF))
+		goto fail;
+
+	/* Init state structure */
+	memset(&stat, 0, sizeof(stat));
+	stat.mode = ani->mode;
+	stat.defw = GET24(wp.hdr + VP8X_W1) + 1;
+	stat.defh = GET24(wp.hdr + VP8X_H1) + 1;
+	/* WebP has no palette of its own, use the default one */
+	mem_pal_copy(stat.newpal, ani->settings.pal);
+	stat.newcols = ani->settings.colors;
+	stat.newtrans = -1; // No color-key transparency
+	/* !!! vwebp ignores the value by default, and one example animation
+	 * expects transparency despite background set to opaque white - WJ */
+//	memcpy(stat.bkg, wp.bkg, 4); // RGBA background
+
+	/* Go through images */
+	while (TRUE)
+	{
+		res = FILE_TOO_LONG;
+		if (!check_next_frame(&ani->fset, ani->settings.mode, TRUE))
+			goto fail;
+		w_set = init_set;
+		res = load_webp_frame(&wp, &w_set);
+		if (res != 1) goto fail;
+		disposal = wp.anmf[ANMF_FLAGS] & ANMF_F_BKG ? FM_DISP_REMOVE :
+			FM_DISP_LEAVE;
+		delete_alpha(&w_set, 255);
+		stat.blend = !(wp.anmf[ANMF_FLAGS] & ANMF_F_NOBLEND) && w_set.img[CHN_ALPHA];
+		/* Analyze how we can merge the frames */
+		res = TOO_BIG;
+		bpp = analyze_webp_frame(&stat, &w_set);
+		if (bpp < 0) goto fail;
+
+		/* Allocate a new frame */
+		res = add_frame(ani, &stat, &w_set, bpp, disposal);
+		if (res) goto fail;
+
+		/* Do actual compositing, remember disposal method */
+		composite_frame(&ani->fset, &stat, &w_set);
+		mem_free_chanlist(w_set.img);
+		memset(w_set.img, 0, sizeof(chanlist));
+
+		/* Write out those frames worthy to be stored */
+		res = done_frame(file_name, ani, FALSE);
+		if (res != 1) goto fail;
+
+		/* Step to the next frame, if any */
+		if (!webp_scan(&wp, NULL)) break;
+	}
+	/* Write out the final frame if not written before */
+	res = done_frame(file_name, ani, TRUE);
+
+fail:	mem_free_chanlist(w_set.img);
+	fclose(fp);
+	return (res);
+}
+
+static int load_webp(char *file_name, ls_settings *settings)
+{
+	webphead wp;
+	FILE *fp;
+	int res = -1;
+
+
+	if (!(fp = fopen(file_name, "rb"))) return (-1);
+	if (webp_behead(fp, &wp, settings))
+	{
+		res = load_webp_frame(&wp, settings);
+		if ((res == 1) && webp_scan(&wp, NULL)) res = FILE_HAS_FRAMES;
+	}
+	fclose(fp);
 	return (res);
 }
 
@@ -8973,6 +9475,10 @@ static int load_frames_x(ani_settings *ani, int ani_mode, char *file_name,
 	ftype &= FTM_FTYPE;
 	ani->mode = ani_mode;
 	init_ls_settings(&ani->settings, NULL);
+#ifdef U_LCMS
+	/* Set size to -1 when we don't want color profile */
+	/* if (!apply_icc) */ ani->settings.icc_size = -1; // !!! Disable for now
+#endif
 	ani->settings.mode = mode;
 	ani->settings.ftype = ftype;
 	ani->settings.pal = pal;
@@ -8994,7 +9500,7 @@ static int load_frames_x(ani_settings *ani, int ani_mode, char *file_name,
 	case FT_TIFF: return (load_tiff_frames(file_name, ani));
 #endif
 #ifdef U_WEBP
-//	case FT_WEBP: res0 = load_webp_frames(file_name, ani); break;
+	case FT_WEBP: return (load_webp_frames(file_name, ani));
 #endif
 	case FT_PBM:
 	case FT_PGM:

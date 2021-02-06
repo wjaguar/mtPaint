@@ -731,7 +731,8 @@ double pal2B(png_color *c);		// Linear brightness for palette color
 void mem_greyscale(int gcor);		// Convert image to greyscale
 void do_convert_rgb(int start, int step, int cnt, unsigned char *dest,
 	unsigned char *src, png_color *pal);	// Convert image to RGB
-int mem_convert_indexed(int cols, png_color *pal);	// Convert image to Indexed Palette
+int mem_convert_indexed(unsigned char *dest, unsigned char *src, int cnt,
+	int cols, png_color *pal);	// Convert image to Indexed Palette
 //	Quantize image using Max-Min algorithm
 int maxminquan(unsigned char *inbuf, int width, int height, int quant_to,
 	png_color *userpal);

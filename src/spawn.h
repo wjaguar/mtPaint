@@ -1,5 +1,5 @@
 /*	spawn.h
-	Copyright (C) 2007-2020 Mark Tyler and Dmitry Groshev
+	Copyright (C) 2007-2021 Mark Tyler and Dmitry Groshev
 
 	This file is part of mtPaint.
 
@@ -40,7 +40,8 @@ enum {
 	DA_GIF_CREATE = 0,
 	DA_GIF_PLAY,
 	DA_GIF_EDIT,
-	DA_SVG_CONVERT
+	DA_SVG_CONVERT,
+	DA_WEBP_PLAY
 };
 
 //	Run some default action

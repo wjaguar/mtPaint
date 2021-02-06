@@ -737,8 +737,7 @@ static void create_frames_ani()
 	settings.silent = TRUE;
 	settings.ftype = ani_format;
 	/* Indexed */
-	if (!(file_formats[ani_format].flags & FF_RGB) ||
-		(ani_format == FT_XPM)) // XPM has FF_RGB but limited to 4096 cols
+	if (!(file_formats[ani_format].flags & FF_RGB))
 	{
 		settings.img[CHN_IMAGE] = irgb;
 		settings.bpp = 1;
@@ -778,12 +777,14 @@ static void create_frames_ani()
 			{
 				cols = 256;
 				if (wu_quant(layer_rgb, layer_w, layer_h, cols,
-					pngpal)) goto failure2;
+					pngpal)) goto failure2; // No memory
+				// Create new indexed image (cannot fail if no dither)
+				mem_dumb_dither(layer_rgb, irgb, pngpal,
+					layer_w, layer_h, cols, FALSE);
 			}
-
-			// Create new indexed image
-			if (mem_dumb_dither(layer_rgb, irgb, pngpal,
-				layer_w, layer_h, cols, FALSE)) goto failure2;
+			// Create new indexed image (cannot fail w/ exact palette)
+			else mem_convert_indexed(irgb, layer_rgb, layer_w * layer_h,
+				cols, pngpal);
 
 			settings.xpm_trans = -1;	// Default is no transparency
 			if (image->trans >= 0)	// Background has transparency

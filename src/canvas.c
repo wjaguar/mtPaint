@@ -1,5 +1,5 @@
 /*	canvas.c
-	Copyright (C) 2004-2020 Mark Tyler and Dmitry Groshev
+	Copyright (C) 2004-2021 Mark Tyler and Dmitry Groshev
 
 	This file is part of mtPaint.
 
@@ -1534,7 +1534,7 @@ typedef struct {
 int do_a_load_x(char *fname, int undo, void *v)
 {
 	char real_fname[PATHBUF];
-	int res, rres, ftype, mult = 0, w = 0, h = 0;
+	int res, ftype, mult = 0, w = 0, h = 0, got_frame1 = FALSE;
 
 
 	resolve_path(real_fname, PATHBUF, fname);
@@ -1563,13 +1563,15 @@ int do_a_load_x(char *fname, int undo, void *v)
 		res = load_image_scale(real_fname, FS_PNG_LOAD,
 			ftype | (undo ? FTM_UNDO : 0), w, h);
 	}
-	rres = res;
 
-loaded:
 	/* Multiframe file was loaded so tell user */
 	if ((res == FILE_HAS_FRAMES) || (res == FILE_HAS_ANIM))
 	{
 		int i, is_anim = res == FILE_HAS_ANIM;
+
+		/* First frame was loaded OK */
+		got_frame1 = TRUE;
+		res = 1;
 
 		/* Don't ask user in viewer mode */
 // !!! When implemented, load as frameset & run animation in that case instead
@@ -1596,7 +1598,6 @@ loaded:
 				layer_selected = 0;
 			}
 			mult = res = load_to_layers(real_fname, ftype, is_anim);
-			goto loaded;
 		}
 		else if (i == -1) /* Explode frames into preset directory */
 		{
@@ -1604,7 +1605,6 @@ loaded:
 			i = dt->ftypes[dt->ftype];
 			res = explode_frames(dt->ex_path, is_anim, real_fname,
 				ftype, i == FT_NONE ? ftype : i);
-			goto loaded;
 		}
 		else if (i == 1) /* Ask for directory to explode frames to */
 		{
@@ -1616,14 +1616,15 @@ loaded:
 			xdata[2] = (void *)is_anim;
 			file_selector_x(FS_EXPLODE_FRAMES, xdata);
 		}
-		else if (i == 2) run_def_action(DA_GIF_PLAY, real_fname, NULL, 0);
+		else if (i == 2) run_def_action(ftype == FT_WEBP ?
+			DA_WEBP_PLAY : DA_GIF_PLAY, real_fname, NULL, 0);
 	}
 
 	/* An error happened */
-	else if (res != 1)
+	if (res != 1)
 	{
 		handle_file_error(res);
-		if (res <= 0) // Hard error
+		if ((res <= 0) && !got_frame1) // Hard error
 		{
 			set_image(TRUE);
 			return (1);
@@ -1632,11 +1633,10 @@ loaded:
 
 	/* Whether we loaded something or failed to, old image is gone anyway */
 	if (!script_cmds) register_file(real_fname); // Ignore what scripts do
-	if (!mult) /* A single image */
+	if (mult <= 0) /* A single image */
 	{
 		/* To prevent 1st frame overwriting a multiframe file */
-		char *nm = g_strconcat(real_fname, rres == FILE_HAS_FRAMES ?
-			".000" : NULL, NULL);
+		char *nm = g_strconcat(real_fname, got_frame1 ? ".000" : NULL, NULL);
 		set_new_filename(layer_selected, nm);
 		g_free(nm);
 

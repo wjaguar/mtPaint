@@ -1,5 +1,5 @@
 /*	spawn.c
-	Copyright (C) 2007-2020 Mark Tyler and Dmitry Groshev
+	Copyright (C) 2007-2021 Mark Tyler and Dmitry Groshev
 
 	This file is part of mtPaint.
 
@@ -910,6 +910,9 @@ int run_def_action(int action, char *sname, char *dname, int delay)
 		command = g_strdup_printf("rsvg-convert %s -o \"%s\" \"%s\"",
 			c8, dname, sname);
 		free(c8);
+		break;
+	case DA_WEBP_PLAY:
+		command = g_strdup_printf("vwebp \"%s\"" CMD_DETACH, sname);
 		break;
 	}
 

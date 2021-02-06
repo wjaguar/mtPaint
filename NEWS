@@ -11,8 +11,10 @@ Here is a summary of the main changes in this release (see handbook for full det
 	* Slovak translation updated by Jozef Riha
 	* Spanish translation updated by Adolfo Jayme
 	* Tagalog translation updated by Anjelo delCarmen
+	* Animated WebP files now can be loaded into layers, or exploded into frames
 	* GIF file format support now is builtin (does not use giflib anymore)
-	* ICC colour profiles embedded in GIF images now can be applied on load
+	* GIF loader made yet more tolerant to malformed GIF files
+	* ICC colour profiles embedded in GIF and WebP images now can be applied on load
 	* Counting used colours and exact conversion to indexed now are 9-19 times faster
 	* Multithreaded decompression enabled for OpenJPEG 2.2+ in Windows version too
 	* Support for multithreaded compression in OpenJPEG 2.4 added
@@ -22,6 +24,11 @@ Here is a summary of the main changes in this release (see handbook for full det
 	* BUGFIX - Gradient editor now displays correct overlay colours for utility channels again
 	* BUGFIX - Saved GIF files are now properly labeled GIF89 if transparent and GIF87 if not
 	* BUGFIX - GIF files without any image blocks now properly fail to load (instead of producing a 0x0 image)
+	* BUGFIX - Composited GIF animation frames that use more than 256 colours now do not come out with wrong colours in certain cases
+	* BUGFIX - Exploding, or loading into layers, GIF animation files with screen size and/or frame position outside canvas size limit no longer causes crash
+	* BUGFIX - When first frame of GIF animation is loaded, ".000" is added to the filename, as it should be
+	* BUGFIX - Ctrl+N and Ctrl+P keys now work, or do nothing, properly when focus is on a list in GTK+2/3 mode
+	* BUGFIX - Problem with some scrollable areas in GTK+ 3.22 and later being smaller than they should be is now eliminated
 
 3.50	2020-12-31
 

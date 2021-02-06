@@ -775,7 +775,8 @@ void init_css(char *cssfile)
 		g_object_ref_sink(btn);
 		g_object_unref(btn);
 	}
-	s = g_strconcat((gtk3version < 20 ? ".spinbutton *" : "spinbutton button"),
+	s = g_strconcat((gtk3version < 20 ? ".spinbutton *,.grid-child" :
+		"spinbutton button,flowboxchild"),
 		" { padding:0; }"
 		".image-button { padding:4px; }"
 		".wjpixmap { padding:4px; outline-offset:-1px; }"
@@ -1496,6 +1497,8 @@ void gtk_init_bugfixes()
 		gtk_binding_entry_remove(bs, GDK_KP_Space, 0);
 		gtk_binding_entry_remove(bs, GDK_f, GDK_CONTROL_MASK); // Search
 		gtk_binding_entry_remove(bs, GDK_F, GDK_CONTROL_MASK);
+		gtk_binding_entry_remove(bs, GDK_p, GDK_CONTROL_MASK); // Up
+		gtk_binding_entry_remove(bs, GDK_n, GDK_CONTROL_MASK); // Down
 	}
 #endif
 }

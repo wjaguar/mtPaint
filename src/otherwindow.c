@@ -1942,7 +1942,8 @@ static void click_quantize_ok(quantize_dd *dt, void **wdata)
 	{
 	case QUAN_EXACT: /* Use image colours */
 		new_cols = quantize_cols;
-		if (have_image) err = mem_convert_indexed(new_cols, newpal);
+		if (have_image) err = mem_convert_indexed(mem_img[CHN_IMAGE],
+			old_image, mem_width * mem_height, new_cols, newpal);
 		dither = DITH_MAX;
 		break;
 	default:

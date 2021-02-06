@@ -2606,11 +2606,11 @@ typedef struct {
 } rgb_256_map;
 
 // Convert RGB image to Indexed Palette
-int mem_convert_indexed(int cols, png_color *pal)
+int mem_convert_indexed(unsigned char *dest, unsigned char *src, int cnt,
+	int cols, png_color *pal)
 {
 	rgb_256_map m;
 	unsigned char bx[256 * (0x100 / 32)], idx[256];
-	unsigned char *old_image, *new_image;
 	int i, j, k, l, n, v, vn, pix;
 
 	/* Put palette into bitmap */
@@ -2649,12 +2649,9 @@ int mem_convert_indexed(int cols, png_color *pal)
 		idx[j] = i;
 	}
 
-	old_image = mem_undo_previous(CHN_IMAGE);
-	new_image = mem_img[CHN_IMAGE];
-	j = mem_width * mem_height;
-	for (i = 0; i < j; i++)
+	for (i = 0; i < cnt; i++)
 	{
-		pix = MEM_2_INT(old_image, 0);
+		pix = MEM_2_INT(src, 0);
 		k = pix & 0xFF;
 		n = (pix >> 8) & 0x1F;
 		v = pix >> (8 + 5);
@@ -2667,8 +2664,8 @@ int mem_convert_indexed(int cols, png_color *pal)
 		/* Get index */
 		l = bx[l] + bitcount(m.b[l] & ((1U << (k & 0x1F)) - 1));
 		/* Map to palette */
-		*new_image++ = idx[l];
-		old_image += 3;
+		*dest++ = idx[l];
+		src += 3;
 	}
 
 	return (0);

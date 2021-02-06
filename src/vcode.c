@@ -2130,6 +2130,7 @@ static gboolean make_resizable(GtkWidget *widget, cairo_t *cr, gpointer user_dat
 	return (FALSE);
 }
 
+#if GTK3VERSION < 22 /* No gtk_scrolled_window_set_propagate_natural_*() */
 /* Try to avoid scrolling - request natural size of contents */
 static void do_wantmax(GtkWidget *widget, gint vert, gint *min, gint *nat,
 	gint for_width, gpointer user_data)
@@ -2146,6 +2147,7 @@ static void do_wantmax(GtkWidget *widget, gint vert, gint *min, gint *nat,
 		gtk_widget_get_preferred_width)(inside, &cmin, &cnat);
 	if (cnat > *nat) *nat = cnat;
 }
+#endif
 
 #else /* #if GTK_MAJOR_VERSION <= 2 */
 
@@ -2180,6 +2182,13 @@ GtkWidget *scrollw(int vh)
 	GtkWidget *widget = gtk_scrolled_window_new(NULL, NULL);
 	gtk_scrolled_window_set_policy(GTK_SCROLLED_WINDOW(widget),
 		scrollp[vh & 255], scrollp[vh >> 8]);
+#if GTK3VERSION >= 22
+	/* To fix newly-broken sizing */
+	if (!(vh & 255)) gtk_scrolled_window_set_propagate_natural_width(
+			GTK_SCROLLED_WINDOW(widget), TRUE);
+	if (!(vh >> 8)) gtk_scrolled_window_set_propagate_natural_height(
+			GTK_SCROLLED_WINDOW(widget), TRUE);
+#endif
 	return (widget);
 }
 
@@ -6444,11 +6453,22 @@ GtkWidget *do_prepare(GtkWidget *widget, int pk, pkmods *mods)
 	/* Make this scrolled window request max size */
 	if (mods->wantmax)
 	{
+#if GTK3VERSION >= 22
+		/* Use the new functions */
+		if (!((mods->wantmax - 1) & 1))
+			gtk_scrolled_window_set_propagate_natural_width(
+				GTK_SCROLLED_WINDOW(widget), TRUE);
+		if (!((mods->wantmax - 1) & 2))
+			gtk_scrolled_window_set_propagate_natural_height(
+				GTK_SCROLLED_WINDOW(widget), TRUE);
+#else
+		/* Add a wrapper doing it */
 		GtkWidget *wrap = wjsizebin_new(G_CALLBACK(do_wantmax), NULL,
 			(gpointer)(mods->wantmax - 1));
 		gtk_widget_show(wrap);
 		gtk_container_add(GTK_CONTAINER(wrap), widget);
 		widget = wrap;
+#endif
 	}
 #else /* #if GTK_MAJOR_VERSION <= 2 */
 	/* Set fixed width/height for this */
