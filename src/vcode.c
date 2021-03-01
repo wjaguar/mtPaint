@@ -2130,6 +2130,82 @@ static gboolean make_resizable(GtkWidget *widget, cairo_t *cr, gpointer user_dat
 	return (FALSE);
 }
 
+/* Reintroduce sanity to sizing wrapped labels */
+static void do_rewrap(GtkWidget *widget, gint vert, gint *min, gint *nat,
+	gint for_width, gpointer user_data)
+{
+	PangoLayout *layout;
+	PangoRectangle r;
+	GtkBorder pb;
+	gint xpad;
+	int wmax, w, h, ww, sw2, lines, w2l;
+
+//g_print("vert %d for_width %d min %d nat %d\n", vert, for_width, *min, *nat);
+	if (vert) return; // Do nothing for vertical size
+
+	/* Max wrap width */
+	layout = gtk_widget_create_pango_layout(widget,
+		/* Let wrap width be 65 chars */
+		"88888888888888888888888888888888"
+		"888888888888888888888888888888888");
+	pango_layout_get_size(layout, &ww, NULL);
+	sw2 = PANGO_SCALE * ((gdk_screen_get_width(gtk_widget_get_screen(widget)) + 1) / 2);
+	if (ww > sw2) ww = sw2;
+
+	/* Full text width */
+	pango_layout_set_text(layout, gtk_label_get_text(GTK_LABEL(widget)), -1);
+	pango_layout_set_alignment(layout, gtk_widget_get_direction(widget) ==
+		GTK_TEXT_DIR_RTL ? PANGO_ALIGN_RIGHT : PANGO_ALIGN_LEFT);
+	pango_layout_set_wrap(layout, PANGO_WRAP_WORD);
+	pango_layout_set_width(layout, -1);
+	pango_layout_get_extents(layout, NULL, &r);
+	wmax = r.width;
+
+	if (wmax > ww) /* Wrap need happen */
+	{
+		pango_layout_set_width(layout, ww);
+		pango_layout_get_extents(layout, NULL, &r);
+		w = r.width;
+		h = r.height;
+
+		/* Maybe make narrower, to rebalance lines */
+		lines = pango_layout_get_line_count(layout);
+		w2l = (wmax + lines - 1) / lines;
+		if (w2l < w)
+		{
+			pango_layout_set_width(layout, w2l);
+			pango_layout_get_extents(layout, NULL, &r);
+			if (r.height > h) // Extra line(s) got added - make wider
+			{
+				pango_layout_set_width(layout, (w2l + w) / 2);
+				pango_layout_get_extents(layout, NULL, &r);
+			}
+			if (r.height <= h) w = r.width; // No extra lines happened
+		}
+
+		/* Full width in pixels */
+		w = w / PANGO_SCALE + 1;
+		get_padding_and_border(gtk_widget_get_style_context(widget),
+			NULL, NULL, &pb);
+		gtk_misc_get_padding(GTK_MISC(widget), &xpad, NULL);
+		w += pb.left + pb.right + 2 * xpad;
+	}
+	else w = *nat; /* Take what label wants */
+
+//g_print("Want nat %d\n", w);
+	if (w > *nat) w = *nat; // If widget wants even less
+	if (w < *min) w = *min; // Respect the minsize
+
+	/* Reduce natural width to this */
+	/* !!! Make minimum and natural width the same: otherwise, bug in GTK+3
+	 * size negotiation causes labels be too tall; the longer the text, the
+	 * taller the label - WJ */
+	*min = *nat = w;
+//g_print("Now nat %d\n", *nat);
+
+	g_object_unref(layout);
+}
+
 #if GTK3VERSION < 22 /* No gtk_scrolled_window_set_propagate_natural_*() */
 /* Try to avoid scrolling - request natural size of contents */
 static void do_wantmax(GtkWidget *widget, gint vert, gint *min, gint *nat,
@@ -7568,8 +7644,6 @@ void **run_create_(void **ifcode, void *ddata, int ddsize, char **script)
 		{
 			int z = lp > 1 ? (int)pp[2] : 0;
 			widget = gtk_label_new(*(char *)v ? _(v) : v);
-			if (op == op_WLABEL)
-				gtk_label_set_line_wrap(GTK_LABEL(widget), TRUE);
 			if (z & 0xFFFF) gtk_misc_set_padding(GTK_MISC(widget),
 				(z >> 8) & 255, z & 255);
 			gtk_label_set_justify(GTK_LABEL(widget), GTK_JUSTIFY_LEFT);
@@ -7579,6 +7653,18 @@ void **run_create_(void **ifcode, void *ddata, int ddsize, char **script)
 			// Label-specific packing
 			if (pk == pk_TABLE1x) pk = pk_TABLE0p;
 			if (pk == pk_TABLE) pk = pk_TABLEp;
+			if (op == op_WLABEL)
+			{
+#if GTK_MAJOR_VERSION == 3
+				/* Code to keep wrapping width sane is absent in
+				 * GTK+3, need be re-added as a wrapper */
+				GtkWidget *wrap = wjsizebin_new(G_CALLBACK(do_rewrap), NULL, NULL);
+				gtk_widget_show(wrap);
+				gtk_container_add(GTK_CONTAINER(wrap), widget);
+				pk |= pkf_PARENT;
+#endif
+				gtk_label_set_line_wrap(GTK_LABEL(widget), TRUE);
+			}
 			break;
 		}
 		/* Add a helptext label */

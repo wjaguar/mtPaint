@@ -41,10 +41,23 @@ enum {
 	DA_GIF_PLAY,
 	DA_GIF_EDIT,
 	DA_SVG_CONVERT,
-	DA_WEBP_PLAY
+	DA_WEBP_PLAY,
+
+	DA_NCODES
 };
 
-//	Run some default action
+//	Run a regular default action
 int run_def_action(int action, char *sname, char *dname, int delay);
+
+/* All-in-one transport container for default actions */
+typedef struct {
+	char *sname;
+	char *dname;
+	int delay; // in 1/100s of a second
+	int width, height;
+} da_settings;
+
+//	Run any default action
+int run_def_action_x(int action, da_settings *settings);
 
 int show_html(char *browser, char *docs);

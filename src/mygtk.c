@@ -840,8 +840,8 @@ enum {
 	P_VSCP
 };
 
-static void get_padding_and_border(GtkStyleContext *ctx, GtkBorder *pad,
-	GtkBorder *bor, GtkBorder *both)
+void get_padding_and_border(GtkStyleContext *ctx, GtkBorder *pad, GtkBorder *bor,
+	GtkBorder *both)
 {
 	GtkStateFlags state = gtk_style_context_get_state(ctx);
 	GtkBorder tmp;

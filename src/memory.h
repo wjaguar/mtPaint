@@ -585,6 +585,7 @@ typedef struct {
 	int here; // current position
 	int size; // currently allocated
 } memx2;
+#define MEMX2_MAX INT_MAX /* How much it can hold */
 
 size_t getmemx2(memx2 *mem, size_t length);
 void addstr(memx2 *mem, char *s, int bk);

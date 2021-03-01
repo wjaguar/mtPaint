@@ -4,8 +4,8 @@
 
 echo
 
-MT_V="3.50.05"
-MT_DATE="2021-02-06"
+MT_V="3.50.06"
+MT_DATE="2021-03-01"
 
 MT_VERSION="mtPaint $MT_V"
 MT_LANG=NO
@@ -80,7 +80,7 @@ do
 	"gtk"[23]* )	GTK=2
 			[ "$A" != "${A#gtk3}" ] && GTK=3
 			# Override minor version of installed GTK+
-			GTKVERSION="`echo "$A" | sed -e 's/gtk[23]\.\?\([0-9]*\).*/\1/'`";;
+			GTKVERSION="`echo "$A" | sed -e 's/gtk[23]\.\{0,1\}\([0-9]*\).*/\1/'`";;
 	"intl" )	MT_LANG=YES;;
 	"man" )		MT_MAN=YES;;
 	"pod" )		MT_POD=YES;;

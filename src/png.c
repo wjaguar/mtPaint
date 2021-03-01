@@ -79,6 +79,19 @@
 #include "spawn.h"
 #include "thread.h"
 
+/* Make fseek() and ftell() on Win64 have the same limits as on 64-bit Unix */
+#ifdef _WIN64 /* LLP64 */
+#define F_LONG_MAX LLONG_MAX /* What can be handled - including allocated */
+typedef long long f_long;
+#define ftell(A) _ftelli64(A)
+#define fseek(A,B,C) _fseeki64(A, B, C)
+
+#else /* LP64 or ILP32 */
+#define F_LONG_MAX LONG_MAX /* What can be handled - including allocated */
+typedef long f_long;
+
+#endif
+
 /* Macro for big-endian tags (IFF and BMP) */
 #define TAG4B(A,B,C,D) (((A) << 24) + ((B) << 16) + ((C) << 8) + (D))
 
@@ -418,6 +431,11 @@ typedef struct {
 	memx2 m; // data
 	int top;  // end of data
 } memFILE;
+#define MEMFILE_MAX INT_MAX /* How much it can hold */
+
+#if MEMFILE_MAX != MEMX2_MAX
+#error "Mismatched max sizes"
+#endif
 
 static size_t mfread(void *ptr, size_t size, size_t nmemb, memFILE *mf)
 {
@@ -448,7 +466,7 @@ static size_t mfwrite(void *ptr, size_t size, size_t nmemb, memFILE *mf)
 	return (nmemb);
 }
 
-static int mfseek(memFILE *mf, long offset, int mode)
+static int mfseek(memFILE *mf, f_long offset, int mode)
 {
 // !!! For operating on tarballs, adjust fseek() params here
 	if (mf->file) return (fseek(mf->file, offset, mode));
@@ -457,6 +475,7 @@ static int mfseek(memFILE *mf, long offset, int mode)
 	else if (mode == SEEK_CUR) offset += mf->m.here;
 	else if (mode == SEEK_END) offset += mf->top;
 	else return (-1);
+	if ((offset < 0) || (offset > MEMFILE_MAX)) return (-1);
 	mf->m.here = offset;
 	return (0);
 }
@@ -512,6 +531,20 @@ static int mfputss(memFILE *mf, const char *s, ...)
 	return (m);
 }
 
+static void copy_run(unsigned char *dest, unsigned char *src, int len,
+	int dstep, int sstep, int bgr)
+{
+	if (bgr) bgr = 2;
+	while (len-- > 0)
+	{
+		dest[0] = src[bgr];
+		dest[1] = src[1];
+		dest[2] = src[bgr ^ 2];
+		dest += dstep;
+		src += sstep;
+	}
+}
+
 /* Fills temp buffer row, or returns image row if no buffer */
 static unsigned char *prepare_row(unsigned char *buf, ls_settings *settings,
 	int bpp, int y)
@@ -542,15 +575,7 @@ static unsigned char *prepare_row(unsigned char *buf, ls_settings *settings,
 			tmp[bgr ^ 2] = col->blue;
 		}
 	}
-	else // RGB
-	{
-		for (i = 0; i < w; tmp += bpp , tmi += 3 , i++)
-		{
-			tmp[0] = tmi[bgr];
-			tmp[1] = tmi[1];
-			tmp[2] = tmi[bgr ^ 2];
-		}
-	}
+	else copy_run(tmp, tmi, w, bpp, 3, bgr); // RGB
 
 	/* Add alpha to the mix */
 	tmp = buf + 3;
@@ -1678,7 +1703,9 @@ RGB:	if (stat->global_cols > 0) // Use default palette if present
 
 /* Macros for accessing values in Intel byte order */
 #define GET16(buf) (((buf)[1] << 8) + (buf)[0])
-#define GET32(buf) (((signed char)(buf)[3] * 0x1000000) + ((buf)[2] << 16) + \
+#define GET32(buf) (((unsigned)(buf)[3] << 24) + ((buf)[2] << 16) + \
+	((buf)[1] << 8) + (buf)[0])
+#define GET32s(buf) (((signed char)(buf)[3] * 0x1000000) + ((buf)[2] << 16) + \
 	((buf)[1] << 8) + (buf)[0])
 #define PUT16(buf, v) (buf)[0] = (v) & 0xFF; (buf)[1] = (v) >> 8;
 #define PUT32(buf, v) (buf)[0] = (v) & 0xFF; (buf)[1] = ((v) >> 8) & 0xFF; \
@@ -1740,12 +1767,12 @@ static int getblock(unsigned char *buf, FILE *fp)
 static int getgifdata(FILE *fp, char **res, int *len)
 {
 	unsigned char *src, *dest, *mem;
-	long r, p = ftell(fp);
+	f_long r, p = ftell(fp);
 	int l, size;
 
 	*res = NULL;
 	*len = 0;
-	if (p < 0) return (1); /* Leave 2Gb+ GIFs to systems where long is long */
+	if (p < 0) return (1); /* Leave 2Gb+ GIFs to systems with longer f_long */
 
 	/* Measure */
 	while ((l = getblock(NULL, fp)) > 0);
@@ -2589,13 +2616,13 @@ static int file2mem(char *file_name, unsigned char **where, size_t *len, size_t 
 {
 	FILE *fp;
 	unsigned char *buf;
-	long l;
+	f_long l;
 	int res = -1;
 
 	if (!(fp = fopen(file_name, "rb"))) return (-1);
 	fseek(fp, 0, SEEK_END);
 	l = ftell(fp);
-	/* Where a long is too short to hold the file's size, address space is
+	/* Where a f_long is too short to hold the file's size, address space is
 	 * too small to usefully hold the whole file anyway - WJ */
 	/* And when a hard limit is set, it should be honored */
 	if ((l > 0) && (!max || (l <= max)))
@@ -3777,7 +3804,7 @@ static tmsize_t mTIFFwrite(thandle_t fd, void* buf, tmsize_t size)
 
 static toff_t mTIFFlseek(thandle_t fd, toff_t off, int whence)
 {
-	return mfseek((memFILE *)fd, (long)off, whence) ? -1 : ((memFILE *)fd)->m.here;
+	return mfseek((memFILE *)fd, (f_long)off, whence) ? -1 : ((memFILE *)fd)->m.here;
 }
 
 static int mTIFFclose(thandle_t fd)
@@ -4005,12 +4032,6 @@ static int analyze_webp_frame(ani_status *stat, ls_settings *settings)
 
 	return (3 + alpha);
 }
-
-/* !!! For now */
-#define F_LONG_MAX LONG_MAX /* What can be handled - including allocated */
-typedef long f_long;
-#define ftellX(A) ftell(A)
-#define fseekX(A,B,C) fseek(A, B, C)
 
 /* Macro for little-endian tags (RIFF) */
 #define TAG4(A,B,C,D) ((A) + ((B) << 8) + ((C) << 16) + ((D) << 24))
@@ -4243,7 +4264,7 @@ static int webp_scan(webphead *wp, ls_settings *settings)
 		else if (tag == TAG4_ALPH)
 		{
 			wp->blocks |= HAVE_ALPH;
-			alph = ftellX(fp);
+			alph = ftell(fp);
 			if (alph < 0) break;
 		}
 		else if ((tag == TAG4_VP8) || (tag == TAG4_VP8L))
@@ -4252,7 +4273,7 @@ static int webp_scan(webphead *wp, ls_settings *settings)
 			wp->size = tl + RIFF_HSIZE;
 			if (alph > 0) // Need to start with alpha
 			{
-				f_long here = ftellX(fp);
+				f_long here = ftell(fp);
 				if (here < 0) break; // Too long for us
 				/* From ALPH header to this block's end */
 				wp->size += here - alph + RIFF_HSIZE;
@@ -4467,14 +4488,16 @@ ffail:	fclose(fp);
 #define BMP_YHOT      8		/* 16b */
 #define BMP_DATAOFS  10		/* 32b */
 #define BMP_HDR2SIZE 14		/* 32b */
-#define BMP_WIDTH    18		/* 32b */
-#define BMP_HEIGHT   22		/* 32b */
+#define BMP_WIDTH    18		/* s32b */
+#define BMP_HEIGHT   22		/* s32b */
 #define BMP_PLANES   26		/* 16b */
 #define BMP_BPP      28		/* 16b */
 #define BMP2_HSIZE   30
 /* Version 3 fields */
 #define BMP_COMPRESS 30		/* 32b */
 #define BMP_DATASIZE 34		/* 32b */
+#define BMP_XDPI     38		/* s32b */
+#define BMP_YDPI     42		/* s32b */
 #define BMP_COLORS   46		/* 32b */
 #define BMP_ICOLORS  50		/* 32b */
 #define BMP3_HSIZE   54
@@ -4492,12 +4515,24 @@ ffail:	fclose(fp);
 #define BMP5_HSIZE  138
 #define BMP_MAXHSIZE (BMP5_HSIZE + 256 * 4)
 
-/* OS/2 alternative fields */
+/* OS/2 1.x alternative fields */
 #define OS2BMP_WIDTH  18	/* 16b */
 #define OS2BMP_HEIGHT 20	/* 16b */
 #define OS2BMP_PLANES 22	/* 16b */
 #define OS2BMP_BPP    24	/* 16b */
 #define OS2BMP_HSIZE  26
+
+/* OS/2 2.x bitmap header is version 3 fields plus some extra */
+#define OS2BMP2_HSIZE 78
+/* Shortened header variant encountered in the wild */
+#define OS2BMP2_HSIZE_S 38
+
+/* OS/2 bitmap array fields */
+#define OS2BA_HDRSIZE  2	/* 32b */
+#define OS2BA_NEXT     6	/* 32b */
+#define OS2BA_HSIZE   14
+
+/* In OS/2 files, BMP_FILESIZE may instead contain header size */
 
 /* Colorspace tags */
 #define BMPCS_WIN   TAG4B('W', 'i', 'n', ' ')
@@ -4511,10 +4546,11 @@ static int load_bmp(char *file_name, ls_settings *settings, memFILE *mf)
 	unsigned char hdr[BMP5_HSIZE], xlat[256], *dest, *tmp, *buf = NULL;
 	memFILE fake_mf;
 	FILE *fp = NULL;
+	unsigned l, ofs;
 	int shifts[4], bpps[4];
-	int def_alpha = FALSE, cmask = CMASK_IMAGE, comp = 0, res = -1;
-	int i, j, k, n, ii, w, h, bpp;
-	int l, bl, rl, step, skip, dx, dy;
+	int def_alpha = FALSE, cmask = CMASK_IMAGE, comp = 0, ba = 0, rle = 0, res = -1;
+	int i, j, k, n, ii, w, h, bpp, wbpp;
+	int bl, rl, step, skip, dx, dy;
 
 
 	if (!mf)
@@ -4527,11 +4563,24 @@ static int load_bmp(char *file_name, ls_settings *settings, memFILE *mf)
 	/* Read the largest header */
 	k = mfread(hdr, 1, BMP5_HSIZE, mf);
 
+	/* Bitmap array? */
+	if ((k > OS2BA_HSIZE) && (hdr[0] == 'B') && (hdr[1] == 'A'))
+	{
+		/* Just skip the header to go for 1st bitmap: no example files
+		 * with more than one bitmap anyway */
+		ba = OS2BA_HSIZE;
+		memmove(hdr, hdr + ba, k -= ba);
+	}
 	/* Check general validity */
 	if (k < OS2BMP_HSIZE) goto fail; /* Least supported header size */
 	if ((hdr[0] != 'B') || (hdr[1] != 'M')) goto fail; /* Signature */
-	l = GET32(hdr + BMP_HDR2SIZE) + BMP_HDR2SIZE;
-	if (k < l) goto fail;
+	l = GET32(hdr + BMP_HDR2SIZE);
+	if (k - BMP_HDR2SIZE < l) goto fail;
+	l += BMP_HDR2SIZE;
+	if (ba && (l > OS2BMP2_HSIZE)) goto fail; /* Should not exist */
+	ofs = GET32(hdr + BMP_DATAOFS);
+	if (l + ba > ofs) goto fail; // Overlap
+	if (ofs > F_LONG_MAX) goto fail; // Cannot handle this length
 
 	/* Check format type: OS/2 or Windows */
 	if (l == OS2BMP_HSIZE)
@@ -4539,38 +4588,48 @@ static int load_bmp(char *file_name, ls_settings *settings, memFILE *mf)
 		w = GET16(hdr + OS2BMP_WIDTH);
 		h = GET16(hdr + OS2BMP_HEIGHT);
 		bpp = GET16(hdr + OS2BMP_BPP);
-		n = GET16(hdr + OS2BMP_PLANES);
 	}
 	else if (l >= BMP2_HSIZE)
 	{
-		w = GET32(hdr + BMP_WIDTH);
-		h = GET32(hdr + BMP_HEIGHT);
+		w = GET32s(hdr + BMP_WIDTH);
+		h = GET32s(hdr + BMP_HEIGHT);
 		bpp = GET16(hdr + BMP_BPP);
-		n = GET16(hdr + BMP_PLANES);
 	}
 	else goto fail;
 
 	/* Check format */
-	if (n != 1) goto fail; /* Only one plane */
 	if (l >= BMP3_HSIZE) comp = GET32(hdr + BMP_COMPRESS);
+	/* !!! Some 8bpp OS/2 BMPs in the wild have compression not marked */
+	if (!comp && (bpp == 8) && (h > 0) && (l == OS2BMP2_HSIZE_S))
+	{
+		unsigned fsize = GET32(hdr + BMP_DATASIZE);
+		if (fsize && (fsize != w * h)) comp = 1;
+	}
 	/* Only 1, 4, 8, 16, 24 and 32 bpp allowed */
+	rle = comp;
 	switch (bpp)
 	{
 	case 1: if (comp) goto fail; /* No compression */
 		break;
-	case 4: if (comp && ((comp != 2) || (h < 0))) goto fail; /* RLE4 */
+	case 4: if (comp && (comp != 2)) goto fail; /* RLE4 */
 		break;
-	case 8: if (comp && ((comp != 1) || (h < 0))) goto fail; /* RLE8 */
+	case 8: if (comp && (comp != 1)) goto fail; /* RLE8 */
 		break;
-	case 16: case 24: case 32:
+	case 24: if (comp == 4) /* RLE24 or JPEG */
+		{
+			/* If not definitely OS/2 header, consider it JPEG */
+			if ((l != OS2BMP2_HSIZE) && (l != OS2BMP2_HSIZE_S)) goto fail;
+			break;
+		}
+		// Fallthrough
+	case 16: case 32:
+		rle = 0;
 		if (comp && (comp != 3)) goto fail; /* Bitfields */
 		shifts[3] = bpps[3] = masks[3] = 0; /* No alpha by default */
 		if (comp == 3)
 		{
 			/* V3-style bitfields? */
-			if ((l == BMP3_HSIZE) &&
-				(GET32(hdr + BMP_DATAOFS) >= BMP_AMASK))
-				l = BMP_AMASK;
+			if ((l == BMP3_HSIZE) && (ofs >= BMP_AMASK)) l = BMP_AMASK;
 			if (l < BMP_AMASK) goto fail;
 			masks[0] = GET32(hdr + BMP_RMASK);
 			masks[1] = GET32(hdr + BMP_GMASK);
@@ -4615,22 +4674,27 @@ static int load_bmp(char *file_name, ls_settings *settings, memFILE *mf)
 		break;
 	default: goto fail;
 	}
+	if (rle && (h < 0)) goto fail; // Forbidden
 
 	/* Load palette if needed */
 	if (bpp < 16)
 	{
 		unsigned char tbuf[1024];
+		unsigned n, j = 0;
 
-		j = 0;
 		if (l >= BMP_COLORS + 4) j = GET32(hdr + BMP_COLORS);
 		if (!j) j = 1 << bpp;
-		n = GET32(hdr + BMP_DATAOFS) - l;
-		n /= k = l < BMP2_HSIZE ? 3 : 4;
+
+		n = ofs - l - ba;
+		k = l < BMP2_HSIZE ? 3 : 4;
+		/* !!! Some OS/2 2.x BMPs have 3-bpc palettes too */
+		if ((l == OS2BMP2_HSIZE) && (n < j * 4) && (n >= j * 3)) k = 3;
+		n /= k;
 		if (n < j) j = n;
-		if (j < 1) goto fail; /* Wrong palette size */
+		if (!j) goto fail; /* Wrong palette size */
 		if (j > 256) j = 256; /* Let overlarge palette be */
 		settings->colors = j;
-		mfseek(mf, l, SEEK_SET);
+		mfseek(mf, l + ba, SEEK_SET);
 		i = mfread(tbuf, 1, j * k, mf);
 		if (i < j * k) goto fail; /* Cannot read palette */
 		tmp = tbuf;
@@ -4646,19 +4710,22 @@ static int load_bmp(char *file_name, ls_settings *settings, memFILE *mf)
 		if ((settings->mode == FS_PALETTE_LOAD) ||
 			(settings->mode == FS_PALETTE_DEF)) goto fail;
 	}
+	res = -1;
 
 	/* Allocate buffer and image */
 	settings->width = w;
 	settings->height = abs(h);
-	settings->bpp = bpp < 16 ? 1 : 3;
+	settings->bpp = wbpp = bpp < 16 ? 1 : 3;
 	rl = ((w * bpp + 31) >> 3) & ~3; /* Row data length */
-	/* For RLE, load all image at once */
-	if (comp && (bpp < 16))
-		bl = GET32(hdr + BMP_FILESIZE) - GET32(hdr + BMP_DATAOFS);
-	/* Otherwise, only one row at a time */
-	else bl = rl;
+	bl = rl; /* By default, only one row at a time */
+	/* For RLE, load all compressed data at once */
+	if (rle)
+	{
+		unsigned fsize = GET32(hdr + BMP_DATASIZE);
+		if (fsize > INT_MAX - 1) goto fail;
+		bl = fsize;
+	}
 	/* Sanity check */
-	res = -1;
 	if (bl <= 0) goto fail;
 	/* To accommodate bitparser's extra step */
 	buf = malloc(bl + 1);
@@ -4672,11 +4739,13 @@ static int load_bmp(char *file_name, ls_settings *settings, memFILE *mf)
 		(GET32(hdr + BMP_CSPACE) == BMPCS_EMBED))
 	{
 		unsigned char *icc = NULL;
-		int n, size = GET32(hdr + BMP_ICCSIZE);
-		if (size <= 0) break; // Avoid the totally crazy
+		unsigned n, size = GET32(hdr + BMP_ICCSIZE), ofs = GET32(hdr + BMP_ICCOFS);
+
+		if (!size || (size > INT_MAX)) break; // Avoid the totally crazy
+		if (ofs > F_LONG_MAX - BMP_HDR2SIZE) break; // Too far
+		if (mfseek(mf, ofs + BMP_HDR2SIZE, SEEK_SET)) break; // Cannot go there
 		icc = malloc(size);
 		if (!icc) break;
-		mfseek(mf, GET32(hdr + BMP_ICCOFS) + BMP_HDR2SIZE, SEEK_SET);
 		n = mfread(icc, 1, size, mf);
 		if (n != size) free(icc); // Failed
 		else settings->icc_size = size , settings->icc = icc; // Got it
@@ -4686,7 +4755,7 @@ static int load_bmp(char *file_name, ls_settings *settings, memFILE *mf)
 
 	if (!settings->silent) ls_init("BMP", 0);
 
-	mfseek(mf, GET32(hdr + BMP_DATAOFS), SEEK_SET); /* Seek to data */
+	mfseek(mf, ofs, SEEK_SET); /* Seek to data */
 	if (h < 0) /* Prepare row loop */
 	{
 		step = 1;
@@ -4700,20 +4769,17 @@ static int load_bmp(char *file_name, ls_settings *settings, memFILE *mf)
 	}
 	res = FILE_LIB_ERROR;
 
-	if ((comp != 1) && (comp != 2)) /* No RLE */
+	if (!rle) /* No RLE */
 	{
 		for (n = 0; (i < h) && (i >= 0); n++ , i += step)
 		{
 			j = mfread(buf, 1, rl, mf);
 			if (j < rl) goto fail3;
+			dest = settings->img[CHN_IMAGE] + w * i * wbpp;
 			if (bpp < 16) /* Indexed */
-			{
-				dest = settings->img[CHN_IMAGE] + w * i;
 				stream_MSB(buf, dest, w, bpp, 0, bpp, 1);
-			}
 			else /* RGB */
 			{
-				dest = settings->img[CHN_IMAGE] + w * i * 3;
 				stream_LSB(buf, dest + 0, w, bpps[0],
 					shifts[0], bpp, 3);
 				stream_LSB(buf, dest + 1, w, bpps[1],
@@ -4751,10 +4817,10 @@ static int load_bmp(char *file_name, ls_settings *settings, memFILE *mf)
 	{
 		k = mfread(buf, 1, bl, mf);
 		if (k < bl) goto fail3;
-		memset(settings->img[CHN_IMAGE], 0, w * h);
+		memset(settings->img[CHN_IMAGE], 0, w * h * wbpp);
 		skip = j = 0;
 
-		dest = settings->img[CHN_IMAGE] + w * i;
+		dest = settings->img[CHN_IMAGE] + w * i * wbpp;
 		for (tmp = buf; tmp - buf + 1 < k; )
 		{
 			/* Don't fail on out-of-bounds writes */
@@ -4762,6 +4828,12 @@ static int load_bmp(char *file_name, ls_settings *settings, memFILE *mf)
 			{
 				dx = n = *tmp;
 				if (j + n > w) dx = j > w ? 0 : w - j;
+				if (bpp == 24) /* 24-bit */
+				{
+					copy_run(dest + j * 3, tmp + 1, dx, 3, 0, TRUE);
+					j += n; tmp += 4;
+					continue;
+				}
 				if (bpp == 8) /* 8-bit */
 				{
 					memset(dest + j, tmp[1], dx);
@@ -4783,6 +4855,12 @@ static int load_bmp(char *file_name, ls_settings *settings, memFILE *mf)
 				dx = n = tmp[1];
 				if (j + n > w) dx = j > w ? 0 : w - j;
 				tmp += 2;
+				if (bpp == 24)
+				{
+					copy_run(dest + j * 3, tmp, dx, 3, 3, TRUE);
+					j += n; tmp += (n * 3 + 1) & ~1;
+					continue;
+				}
 				if (bpp == 8) /* 8-bit */
 				{
 					memcpy(dest + j, tmp, dx);
@@ -4803,7 +4881,8 @@ static int load_bmp(char *file_name, ls_settings *settings, memFILE *mf)
 			{
 				dx = tmp[2] + j;
 				dy = tmp[3];
-				if ((dx > w) || (i - dy < 0)) goto fail3;
+				if (dx > w) goto fail3;
+				if (dy > i) dx = 0 , dy = i + 1; // To the end
 			}
 			else /* End-of-something block */
 			{
@@ -4836,12 +4915,13 @@ static int load_bmp(char *file_name, ls_settings *settings, memFILE *mf)
 			if (skip > 1) memset(settings->img[CHN_ALPHA] +
 				w * i + j, 0, dx - j);
 			j = dx;
-			if (tmp[1] == 1) /* End-of-file block */
+			/* No more rows left */
+			if (i < 0)
 			{
 				res = 1;
 				break;
 			}
-			dest = settings->img[CHN_IMAGE] + w * i;
+			dest = settings->img[CHN_IMAGE] + w * i * wbpp;
 			tmp += 2 + tmp[1];
 		}
 	}
@@ -5961,6 +6041,7 @@ static int load_lss(char *file_name, ls_settings *settings)
 {
 	unsigned char hdr[LSS_HSIZE], *dest, *tmp, *buf = NULL;
 	FILE *fp;
+	f_long l;
 	int i, j, k, w, h, bl, idx, last, cnt, res = -1;
 
 
@@ -5996,11 +6077,12 @@ static int load_lss(char *file_name, ls_settings *settings)
 
 	/* Load all image at once */
 	fseek(fp, 0, SEEK_END);
-	bl = ftell(fp) - LSS_HSIZE;
-	if (bl <= 0) goto fail; /* Too large or too small */
+	l = ftell(fp);
+	if (l <= LSS_HSIZE) goto fail; /* Too large or too small */
+	l -= LSS_HSIZE;
 	fseek(fp, LSS_HSIZE, SEEK_SET);
-	i = (w * h * 3) >> 1;
-	if (bl > i) bl = i; /* Cannot possibly be longer */
+	bl = (w * h * 3) >> 1; /* Cannot possibly be longer */
+	if (bl > l) bl = l;
 	buf = malloc(bl);
 	res = FILE_MEM_ERROR;
 	if (!buf) goto fail2;
@@ -6189,9 +6271,11 @@ static int load_tga(char *file_name, ls_settings *settings)
 	unsigned char *buf = NULL, *dest, *dsta, *src = NULL, *srca = NULL;
 	unsigned char *bstart, *bstop;
 	FILE *fp;
+	f_long fl;
+	unsigned fofs;
 	int i, k, w, h, bpp, ftype, ptype, ibpp, rbits, abits, itrans = FALSE;
 	int rle, real_alpha = FALSE, assoc_alpha = FALSE, wmode = 0, res = -1;
-	int fl, fofs, iofs, buflen;
+	int iofs, buflen;
 	int ix, ishift, imask, ax, ashift, amask;
 	int start, xstep, xstepb, ystep, ccnt, rcnt, strl, y;
 
@@ -6364,7 +6448,8 @@ static int load_tga(char *file_name, ls_settings *settings)
 		if (k < TGA_FSIZE) break;
 		if (strcmp(ftr + TGA_SIGN, "TRUEVISION-XFILE.")) break;
 		fofs = GET32(ftr + TGA_EXTOFS);
-		if ((fofs < iofs) || (fofs + TGA_EXTSIZE + TGA_FSIZE > fl))
+		if ((fofs > F_LONG_MAX - TGA_EXTSIZE - TGA_FSIZE) ||
+			(fofs < iofs) || (fofs + TGA_EXTSIZE + TGA_FSIZE > fl))
 			break; /* Invalid location */
 		fseek(fp, fofs, SEEK_SET);
 		k = fread(ext, 1, TGA_EXTSIZE, fp);
@@ -7079,8 +7164,9 @@ static int load_lbm(char *file_name, ls_settings *settings)
 	unsigned char *buf, *row, *dest, *mpp, *pr = NULL;
 	FILE *fp;
 	int y, ccnt, bstart, bstop, strl, np, ap, mp;
+	f_long ctbl = 0, pchg = 0;
 	unsigned tag, tl;
-	int pstart = 0, ctbl = 0, ctbll = 0, pchg = 0, pchgl = 0, pcnt = 0, sh2 = 0;
+	int pstart = 0, ctbll = 0, pchgl = 0, pcnt = 0, sh2 = 0;
 	int w, h, bpp, bits, mask, tbits, buflen, plen, half = 0, ham = 0;
 	int pbm, palsize = 0, blocks = 0, hx = 0, hy = 0, res = -1;
 	int i, j, l, p, pad, want_pal;
@@ -7101,7 +7187,7 @@ static int load_lbm(char *file_name, ls_settings *settings)
 	{
 		tag = GET32B(wbuf);
 		tl = GET32B(wbuf + 4);
-		if (tl >= LONG_MAX) break; // Sanity check
+		if (tl >= INT_MAX) break; // Sanity check
 		pad = tl & 1;
 		if (tag == TAG4B_BMHD)
 		{
@@ -7153,7 +7239,11 @@ static int load_lbm(char *file_name, ls_settings *settings)
 			ctbl = ftell(fp);
 			ctbll = tl;
 			// SHAM has "version" word at the beginning
-			if (tag == TAG4B_SHAM) ctbl += 2 , ctbll -= 2;
+			if (tag == TAG4B_SHAM)
+			{
+				if (tl < 2) break;
+				ctbl += 2 , ctbll -= 2;
+			}
 		}
 		else if (tag == TAG4B_PCHG)
 		{
@@ -7312,7 +7402,7 @@ static int load_lbm(char *file_name, ls_settings *settings)
 	/* Load color change table if any */
 	if (plen)
 	{
-		long b = ftell(fp);
+		f_long b = ftell(fp);
 		if (fseek(fp, ctbl + pchg, SEEK_SET) ||
 			(fread(mpp, 1, plen, fp) != plen)) goto fail2;
 		fseek(fp, b, SEEK_SET);
@@ -7488,10 +7578,11 @@ static int save_lbm(char *file_name, ls_settings *settings)
 {
 	unsigned char *buf, *wb, *src, *dest;
 	FILE *fp;
-	long bstart, fend;
+	f_long bstart, fend;
+	unsigned l;
 	int w = settings->width, h = settings->height, bpp = settings->bpp;
 	int pbm = settings->lbm_pbm && (bpp == 1), comp = !!settings->lbm_pack;
-	int i, j, l, rl, plane, st, cnt, np = 0, mask = 0;
+	int i, j, np1, rl, plane, st, cnt, np = 0, mask = 0;
 
 	/* Count bitplanes */
 	if (!pbm)
@@ -7571,12 +7662,12 @@ static int save_lbm(char *file_name, ls_settings *settings)
 	if (!settings->silent) ls_init("LBM", 1);
 	fwrite("BODY\0\0\0\0", 1, 8, fp);
 	bstart = ftell(fp);
-	l = np + (pbm || mask); // Total planes
+	np1 = np + (pbm || mask); // Total planes
 	for (i = 0; i < h; i++)
 	{
 		src = settings->img[CHN_IMAGE] + w * bpp * i;
 		dest = wb;
-		for (plane = 0; plane < l; plane++)
+		for (plane = 0; plane < np1; plane++)
 		{
 			unsigned char v, *d, *s = src + (plane >> 3);
 			int n = plane & 7, step = bpp;
@@ -8860,15 +8951,17 @@ fail:	g_object_unref(pbuf);
 
 static int import_svg(char *file_name, ls_settings *settings)
 {
+	da_settings ds;
 	char buf[PATHBUF];
 	int res = -1;
 
 	if (!get_tempname(buf, file_name, FT_PNG)) return (-1);
-#if (MAX_WIDTH | MAX_HEIGHT) > 0x7FFF
-#error "Height & width too large to pack both into 32-bit int"
-#endif
-	if (!run_def_action(DA_SVG_CONVERT, file_name, buf,
-		(settings->req_h << 16) + settings->req_w))
+	memset(&ds, 0, sizeof(ds));
+	ds.sname = file_name;
+	ds.dname = buf;
+	ds.width = settings->req_w;
+	ds.height = settings->req_h;
+	if (!run_def_action_x(DA_SVG_CONVERT, &ds))
 		res = load_png(buf, settings, NULL);
 	unlink(buf);
 
@@ -9744,7 +9837,7 @@ static int do_detect_format(char *name, FILE *fp)
 #endif
 	if (!memcmp(buf, "FORM", 4) && (!memcmp(buf + 8, "ILBM", 4) ||
 		!memcmp(buf + 8, "PBM ", 4))) return (FT_LBM);
-	if (!memcmp(buf, "BM", 2)) return (FT_BMP);
+	if (!memcmp(buf, "BM", 2) || !memcmp(buf, "BA", 2)) return (FT_BMP);
 
 	if (!memcmp(buf, "\x3D\xF3\x13\x14", 4)) return (FT_LSS);
 
@@ -9827,7 +9920,7 @@ int detect_file_format(char *name, int need_palette)
 		/* Check for PAL/ACT raw format */
 		if (!(f & (FF_16 | FF_256 | FF_PALETTE)))
 		{
-			int l;
+			f_long l;
 			fseek(fp, 0, SEEK_END);
 			l = ftell(fp);
 			i = (l > 0) && (l <= 768) && !(l % 3) ? FT_PAL : FT_NONE;

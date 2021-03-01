@@ -231,60 +231,99 @@ static char *get_temp_file(int type, int rgb)
 	return (remember_temp_file(buf, type, rgb));
 }
 
-static int escape_filename(char *buf, char *name)
+static int escape_filename(char *buf, char *name, int tail)
 {
+#define QF  1 /* Quote it */
+#define WF  2 /* Wildcard: quote or unquote */
+#define UF  4 /* Unquote it */
+#define EF  8 /* Escape it */
 	static char *spec = " !\"#$%&'()*+,:;<=>?@[]^`{|}~";
-	int cnt[256];
-	int i, lq = 0, l = 0, esc = 0, minus = 0;
-	char c, *p;
+	static char what[256];
+	char *p;
+	int i, l, v, q = QF, d = 0;
 
-	/* Let's just count everything, first */
-	memset(cnt, 0, sizeof(cnt));
-	while ((c = name[l++])) cnt[(unsigned char)c]++;
 
-	/* Let's be extra safe and quote most anything at all non-alphanumeric */
-	for (i = 0; i < ' '; i++) esc += cnt[i];
-	for (p = spec; *p; p++) esc += cnt[(unsigned char)*p];
-#ifndef WIN32
-	/* Backslashes need escaping too outside Windows */
-	esc += cnt['\\'];
-#endif
-	/* Minus sign as a first character is a special problem */
-	minus = name[0] == '-';
-
-	/* Shortest option is the unquoted string */
-	lq = l - 1;
-	/* Add to it quotes and what needs escaping within */
-#ifdef WIN32
-	/* !!! With delayed expansion '^' and '!' need extra '^' quoting them,
-	 * but I don't know how to detect if it's enabled globally, so if it is,
-	 * user is out of luck - WJ
-	 */
-	if (esc) esc = '"' , lq += cnt['%'] + 2; // Double quotes, escape '%'
-#else
-	if (esc) esc = '\'', lq += 3 * cnt['\''] + 2; // Single quotes, & escape them
-#endif
-	/* Add escaping initial minus */
-	lq += 2 * minus;
-
-	if (!buf) return (lq);
-
-	/* Do actual escaping - or not */
-	if (esc) *buf++ = esc;
-	if (minus) *buf++ = '.' , *buf++ = DIR_SEP;
-	while ((c = *name++))
+	/* Initialize char types table */
+	if (!what[0])
 	{
+		/* Let's be extra safe and quote most anything at all non-alphanumeric */
+		for (i = 0; i < ' '; i++) what[i] = QF;
+		for (p = spec; *p; p++) what[(unsigned char)*p] = QF;
+		/* Wildcards may need outquoting instead */
+		what['?'] = what['*'] = WF;
 #ifdef WIN32
-		/* Double percent sign */
-		if (c == '%') *buf++ = '%';
-#else		/* Quote single quote with outquotes and backslash */
-		if (c == '\'') *buf++ = '\'' , *buf++ = '\\' , *buf++ = '\'';
+		/* !!! With delayed expansion '^' and '!' need extra '^' quoting
+		 * them, but I don't know how to detect if it's enabled globally,
+		 * so if it is, user is out of luck - WJ
+		 */
+		what['%'] |= EF; // Escape '%'
+#define QUOTE '"'
+#define ESCAPE '%'
+#else
+		/* Backslashes need quoting or escaping too outside Windows */
+		what['\\'] = QF;
+		/* And single quotes need outquoting and escaping */
+		what['\''] = UF | EF;
+#define QUOTE '\''
+#define ESCAPE '\\'
 #endif
-		*buf++ = c;
 	}
-	if (esc) *buf++ = esc;
-	*buf = 0; // Terminate the string
-	return (lq);
+
+	l = strlen(name);
+	if (tail < 0) tail = l; // No outquoting wildcards at all
+
+	/* See if we need to quote it, or not, or what */
+	for (i = 0; i < l; i++) 
+		if ((v = what[(unsigned char)name[i]] & (QF | WF | UF))) break;
+	if (v & WF) v |= i >= tail ? UF : QF;
+
+	/* If we need quoting first, start from beginning for nicer look */
+	if (v & QF)
+	{
+		if (buf) buf[d] = QUOTE;
+		d++ , q = UF;
+	}
+
+	/* Minus sign as a first character is a special problem */
+	if (name[0] == '-')
+	{
+		if (buf) buf[d] = '.' , buf[d + 1] = DIR_SEP;
+		d += 2;
+	}
+
+	for (i = 0; i < l; i++) 
+	{
+		v = what[(unsigned char)name[i]];
+		if (v & WF) // Wildcard
+			v |= i >= tail ? UF : QF;
+		if (v & q) // Quote/outquote
+		{
+			if (buf) buf[d] = QUOTE;
+			q ^= QF | UF;
+			d++;
+		}
+		if (v & EF) // Escape
+		{
+			if (buf) buf[d] = ESCAPE;
+			d++;
+		}
+		if (buf) buf[d] = name[i];
+		d++;
+	}
+	if (q & UF) // Add end quote
+	{
+		if (buf) buf[d] = QUOTE;
+		d++;
+	}
+	if (buf) buf[d] = 0; // Terminate the string
+
+	return (d);
+#undef QUOTE
+#undef ESCAPE
+#undef QF
+#undef WF
+#undef UF
+#undef EF
 }
 
 static char *pat_chars = "%fNxywhXYWHCTBASM";
@@ -380,7 +419,7 @@ char *interpolate_line(char *pattern, int cmd)
 					if (!fname) return (NULL);
 				}
 				/* Add whatever quotes the filename needs */
-				j = escape_filename(line ? line + l : NULL, fname);
+				j = escape_filename(line ? line + l : NULL, fname, -1);
 				l += j;
 				continue;
 			/* Original filename, unquoted, for displaying &c. */
@@ -804,46 +843,6 @@ int spawn_process(char *argv[], char *directory)
 
 #endif
 
-// Copy string quoting space chars
-
-static char *quote_spaces(const char *src)
-{
-	char *tmp, *dest;
-	int n = 0;
-
-	for (*(const char **)&tmp = src; *tmp; tmp++)
-	{
-		if (*tmp == ' ')
-#ifdef WIN32
-			n += 2;
-#else
-			n++;
-#endif
-		n++;
-	}
-
-	dest = malloc(n + 1);
-	if (!dest) return ("");
-
-	for (tmp = dest; *src; src++)
-	{
-		if (*src == ' ')
-		{
-#ifdef WIN32
-			*tmp++ = '"';
-			*tmp++ = ' ';
-			*tmp++ = '"';
-#else
-			*tmp++ = '\\';
-			*tmp++ = ' ';
-#endif
-		}
-		else *tmp++ = *src;
-	}
-	*tmp = 0;
-	return (dest);
-}
-
 // Wrapper for animated GIF handling, or other builtin actions
 
 #ifdef U_ANIM_IMAGICK
@@ -851,17 +850,23 @@ static char *quote_spaces(const char *src)
 	 * because it is many times slower than Gifsicle, and less efficient */
 	/* !!! Image Magick version prior to 6.2.6-3 won't work properly */
 #define CMD_GIF_CREATE \
-	"convert %2$s -layers optimize -set delay %1$d -loop 0 \"%3$s\""
-#define CMD_GIF_PLAY "animate \"%s\" &"
+	"convert ((srcmask)) -layers optimize -set delay ((delay)) -loop 0 ((dest))"
+#define CMD_GIF_PLAY "animate ((src)) &"
 
 #else	/* Use Gifsicle; the default choice for animated GIFs */
 
 /*	global colourmaps, suppress warning, high optimizations, background
  *	removal method, infinite loops, ensure result works with Java & MS IE */
 #define CMD_GIF_CREATE \
-	"gifsicle --colors 256 -w -O2 -D 2 -l0 --careful -d %d %s -o \"%s\""
-#define CMD_GIF_PLAY "gifview -a \"%s\" &"
+	"gifsicle --colors 256 -w -O2 -D 2 -l0 --careful -d ((delay)) ((srcmask)) -o ((dest))"
+#define CMD_GIF_PLAY "gifview -a ((src)) &"
 
+#endif
+
+/* 'gifviev' and 'animate' both are X-only */
+#if (GTK_MAJOR_VERSION > 1) && !defined(GDK_WINDOWING_X11)
+#undef CMD_GIF_PLAY
+#define CMD_GIF_PLAY NULL
 #endif
 
 /* Windows shell does not know "&", nor needs it to run mtPaint detached */
@@ -878,43 +883,96 @@ static char *quote_spaces(const char *src)
 
 #endif
 
+static char *def_actions[DA_NCODES] = {
+	CMD_GIF_CREATE,
+	CMD_GIF_PLAY,
+	"mtpaint -g ((delay)) -w ((src)).\"???\" -w ((src)).\"????\"",
+	"rsvg-convert ((w)) ((h)) -o ((dest)) ((src))",
+	"vwebp ((src))" CMD_DETACH
+};
+
+static char *interpolate_action(char *pattern, da_settings *ds)
+{
+	char buf[64], *line = NULL;
+	int j, l, n;
+
+	while (TRUE)
+	{
+		char c, *res, *p = pattern;
+
+		l = 0;
+		while ((c = *p++))
+		{
+			/* Substitutions are ((var)) , copy everything else */
+			if ((c != '(') || (*p != '(') ||
+				(p[1] == '(') || !((res = strstr(p + 1, "))"))))
+			{
+				if (line) line[l] = c;
+				l++;
+				continue;
+			}
+			n = res - ++p; // Position & length of var name
+			j = 0;
+			if (!n); // Paranoia: skip if no name
+			/* Source file */
+			else if (!strncmp(p, "src", n))
+				j = escape_filename(line ? line + l : NULL, ds->sname, -1);
+			/* Source mask */
+			else if (!strncmp(p, "srcmask", n))
+			{
+				char *w = strrchr(ds->sname, DIR_SEP);
+				j = escape_filename(line ? line + l : NULL, ds->sname,
+					w ? w - ds->sname : 0);
+			}
+			/* Destination file */
+			else if (!strncmp(p, "dest", n))
+				j = escape_filename(line ? line + l : NULL, ds->dname, -1);
+			/* Delay in 1/100s */
+			else if (!strncmp(p, "delay", n))
+				j = sprintf(line ? line + l : buf, "%d", ds->delay);
+			/* Width */
+			else if (!strncmp(p, "w", n))
+			{
+				if (ds->width) j = sprintf(line ? line + l : buf,
+					"-w %d", ds->width);
+			}
+			/* Height */
+			else if (!strncmp(p, "h", n))
+			{
+				if (ds->height) j = sprintf(line ? line + l : buf,
+					"-h %d", ds->height);
+			}
+			/* Unknown vars are skipped */
+
+			l += j; // Add new part to output 
+			p += n + 2;
+		}
+		if (line) return (line);
+		line = calloc(l + 1, 1);
+		if (!line) return (NULL); // No memory to expand this pattern
+	}
+}
+
 int run_def_action(int action, char *sname, char *dname, int delay)
 {
-	char *msg, *c8, *command = NULL;
-	int res, code, w, h;
+	da_settings ds;
 
-	switch (action)
-	{
-	case DA_GIF_CREATE:
-		c8 = quote_spaces(sname);
-		command = g_strdup_printf(CMD_GIF_CREATE, delay, c8, dname);
-		free(c8);
-		break;
-	case DA_GIF_PLAY:
-#if (GTK_MAJOR_VERSION == 1) || defined GDK_WINDOWING_X11
-		/* 'gifviev' and 'animate' both are X-only */
-		command = g_strdup_printf(CMD_GIF_PLAY, sname);
-		break;
-#else
-		return (-1);
-#endif
-	case DA_GIF_EDIT:
-		command = g_strdup_printf("mtpaint -g %d -w \"%s.???\" -w \"%s.????\""
-			CMD_DETACH, delay, sname, sname);
-		break;
-	case DA_SVG_CONVERT:
-		w = delay & 0xFFFF;
-		h = delay >> 16;
-		c8 = w && h ? "-w %d -h %d" : w ? "-w %d" : h ? "-h %d" : "";
-		c8 = g_strdup_printf(c8, w ? w : h, h);
-		command = g_strdup_printf("rsvg-convert %s -o \"%s\" \"%s\"",
-			c8, dname, sname);
-		free(c8);
-		break;
-	case DA_WEBP_PLAY:
-		command = g_strdup_printf("vwebp \"%s\"" CMD_DETACH, sname);
-		break;
-	}
+	memset(&ds, 0, sizeof(ds));
+	ds.sname = sname;
+	ds.dname = dname;
+	ds.delay = delay;
+	return (run_def_action_x(action, &ds));
+}
+
+int run_def_action_x(int action, da_settings *settings)
+{
+	char *msg, *c8, *command = NULL;
+	int res, code;
+
+	if ((action >= 0) && (action < DA_NCODES)) // Paranoia
+		command = def_actions[action];
+	if (command) command = interpolate_action(command, settings);
+	if (!command) return (-1);
 
 	res = system(command);
 	if (res)
@@ -928,7 +986,7 @@ int run_def_action(int action, char *sname, char *dname, int delay)
 		g_free(msg);
 		g_free(c8);
 	}
-	g_free(command);
+	free(command);
 
 	return (res);
 }

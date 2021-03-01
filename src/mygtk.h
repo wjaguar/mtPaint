@@ -155,6 +155,8 @@ void add_css_class(GtkWidget *w, char *class);
 void init_css(char *cssfile);
 /* Find button widget of a GtkComboBox with entry */
 GtkWidget *combobox_button(GtkWidget *cbox);
+void get_padding_and_border(GtkStyleContext *ctx, GtkBorder *pad, GtkBorder *bor,
+	GtkBorder *both);
 /* Find out which set of bugs & breakages is active */
 int gtk3version;
 #else
