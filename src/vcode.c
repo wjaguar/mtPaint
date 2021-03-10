@@ -2206,6 +2206,14 @@ static void do_rewrap(GtkWidget *widget, gint vert, gint *min, gint *nat,
 	g_object_unref(layout);
 }
 
+/* Apply minimum width from the given widget to this one */
+static void do_shorten(GtkWidget *widget, gint vert, gint *min, gint *nat,
+	gint for_width, gpointer user_data)
+{
+	if (vert) return; // Do nothing for vertical size
+	gtk_widget_get_preferred_width(user_data, min, NULL);
+}
+
 #if GTK3VERSION < 22 /* No gtk_scrolled_window_set_propagate_natural_*() */
 /* Try to avoid scrolling - request natural size of contents */
 static void do_wantmax(GtkWidget *widget, gint vert, gint *min, gint *nat,
@@ -7568,17 +7576,24 @@ void **run_create_(void **ifcode, void *ddata, int ddsize, char **script)
 		/* Add a statusbar box */
 		case op_STATUSBAR:
 		{
-			GtkWidget *label;
+			GtkWidget *w, *label = gtk_label_new("");
 			GtkRequisition req;
 
-			widget = hbox_new(0);
+			w = widget = hbox_new(0);
+#if GTK_MAJOR_VERSION == 3
+			/* Do not let statusbar crowd anything else (unnecessary
+			 * on GTK+1&2 due to different sizing method there) */
+			w = wjsizebin_new(G_CALLBACK(do_shorten), NULL, label);
+			gtk_widget_show(w);
+			gtk_container_add(GTK_CONTAINER(w), widget);
+#endif
 		/* !!! The following is intended to give enough height to the bar
 		 * even in case no items are shown. It depends on GTK+ setting
 		 * proper height (and zero width) for a label containing an empty
 		 * string. And size fixing isn't sure to set the right value if
 		 * the toplevel isn't yet realized (unlike MAINWINDOW) - WJ */
-			if (do_pack(widget, wp, pp, pk, tpad)) CT_POP(wp);
-			label = pack(widget, gtk_label_new(""));
+			if (do_pack(w, wp, pp, pk, tpad)) CT_POP(wp);
+			pack(widget, label);
 			gtk_widget_show(label);
 			/* To prevent statusbar wobbling */
 #if GTK_MAJOR_VERSION == 3 /* !!! May need keepsize or maxsize */

@@ -3635,7 +3635,7 @@ static void move_marquee(int action, int *xy, int change, int dir)
 ///	SCRIPTING
 
 /* Number of args is ((char **)res[0] - res - 1); res[] is NULL-terminated */
-static char **wj_parse_argv(char *src)
+char **wj_parse_argv(char *src)
 {
 	char c, q, q0, *dest, *tmp, **v;
 	int n = 0, l = strlen(src);

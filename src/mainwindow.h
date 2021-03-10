@@ -1,5 +1,5 @@
 /*	mainwindow.h
-	Copyright (C) 2004-2020 Mark Tyler and Dmitry Groshev
+	Copyright (C) 2004-2021 Mark Tyler and Dmitry Groshev
 
 	This file is part of mtPaint.
 
@@ -324,6 +324,7 @@ void var_init();			// Load INI variables
 void string_init();			// Translate static strings
 void main_init();			// Initialise and display the main window
 
+char **wj_parse_argv(char *src);	// Parse string into commands
 int run_script(char **res);		// Interpret parsed sequence of commands
 
 void draw_dash(int c0, int c1, int ofs, int x, int y, int w, int h, rgbcontext *ctx);

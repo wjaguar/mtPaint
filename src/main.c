@@ -1,5 +1,5 @@
 /*	main.c
-	Copyright (C) 2004-2020 Mark Tyler and Dmitry Groshev
+	Copyright (C) 2004-2021 Mark Tyler and Dmitry Groshev
 
 	This file is part of mtPaint.
 
@@ -339,8 +339,23 @@ static void add_filelist(char *name, int nf)
 	printf("%s: %s\n", err, name);
 }
 
+static gboolean run_init_script()
+{
+	char **res = NULL, *env = getenv("MTPAINT_INIT");
+
+	if (env && *env) res = wj_parse_argv(env);
+	if (res)
+	{
+		run_script(res);
+		free(res);
+	}
+
+	return (FALSE); // Do not run again (if idle handler)
+}
+
 int main( int argc, char *argv[] )
 {
+	char *env;
 	glob_t globdata;
 	int file_arg_start = argc, new_empty = TRUE, get_screenshot = FALSE;
 	int i, j, l, nf, nw, nl, w0, pass, fmode, dosort = FALSE;
@@ -399,7 +414,8 @@ int main( int argc, char *argv[] )
 	/* Enable threading for GLib, but NOT for GTK+ (at least, not yet) */
 	g_thread_init(NULL);
 #endif
-	inifile_init("/etc/mtpaint/mtpaintrc", "~/.mtpaint");
+	env = getenv("MTPAINT_INI");
+	inifile_init("/etc/mtpaint/mtpaintrc", env ? env : "~/.mtpaint");
 
 #ifdef U_NLS
 #if GTK_MAJOR_VERSION == 1
@@ -599,6 +615,15 @@ int main( int argc, char *argv[] )
 		run_script(script_cmds);
 	else // GUI
 	{
+		/* !!! GTK+1 hangs if error messagebox is displayed from idle
+		 * handler; GTK+3 has no gtk_init_add(); GTK+2 works OK with
+		 * both methods - WJ */
+#if GTK_MAJOR_VERSION == 3
+		threads_idle_add_priority(G_PRIORITY_HIGH,
+			(GtkFunction)run_init_script, NULL);
+#else /* if GTK_MAJOR_VERSION <= 2 */
+		gtk_init_add((GtkFunction)run_init_script, NULL);
+#endif
 		THREADS_ENTER();
 		gtk_main();
 		THREADS_LEAVE();

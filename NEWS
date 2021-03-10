@@ -11,6 +11,8 @@ Here is a summary of the main changes in this release (see handbook for full det
 	* Slovak translation updated by Jozef Riha
 	* Spanish translation updated by Adolfo Jayme
 	* Tagalog translation updated by Anjelo delCarmen
+	* Environment variable MTPAINT_INIT to hold a script to be run at initializing the GUI
+	* Environment variable MTPAINT_INI to use a nondefault user settings file
 	* Animated WebP files now can be loaded into layers, or exploded into frames
 	* GIF file format support now is builtin (does not use giflib anymore)
 	* GIF loader made yet more tolerant to malformed GIF files
