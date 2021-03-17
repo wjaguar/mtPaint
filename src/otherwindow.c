@@ -134,7 +134,7 @@ static int clip_to_layer(int layer)
 }
 
 typedef struct {
-	int type, w, h, c, undo, im_type;
+	int type, w, h, c, undo, delay, im_type;
 } newwin_dd;
 
 static void create_new(newwin_dd *dt, void **wdata)
@@ -155,6 +155,8 @@ static void create_new(newwin_dd *dt, void **wdata)
 	{
 		// Ensure that both this window and the main one are offscreen
 		cmd_setv(wdata, (void *)(TRUE), WINDOW_DISAPPEAR);
+
+		if (dt->delay) sleep(dt->delay);
 
 		// Use current layer
 		if (!new_window_type)
@@ -250,6 +252,7 @@ static void *newwin_code[] = {
 	UNLESSv(cmd_mode), RPACK(newwin_txt, 5, 0, im_type),
 	IFv(cmd_mode), RPACK(newwin_txt, 4, 0, im_type),
 	OPNAME(""),
+	uSPIN(delay, 0, 100), OPNAME("Delay"), // For screenshots from scripts
 	UNLESS(type), CHECK(_("Undoable"), undo),
 	HSEPl(200),
 	OKBOXB(_("Create"), create_new, _("Cancel"), NULL),
@@ -259,7 +262,7 @@ static void *newwin_code[] = {
 
 void generic_new_window(int type)	// 0=New image, 1=New layer
 {
-	newwin_dd tdata = { type, mem_width, mem_height, mem_cols, undo_load };
+	newwin_dd tdata = { type, mem_width, mem_height, mem_cols, undo_load, 0 };
 	int im_type = 3 - mem_img_bpp;
 
 	if (!type)

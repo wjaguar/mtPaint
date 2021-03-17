@@ -1536,6 +1536,8 @@ void gtk_init_bugfixes()
 	gtk_binding_entry_remove(bs, KEY(KP_Space), 0);
 	gtk_binding_entry_remove(bs, KEY(f), GDK_CONTROL_MASK); // Search
 	gtk_binding_entry_remove(bs, KEY(F), GDK_CONTROL_MASK);
+	gtk_binding_entry_remove(bs, KEY(p), GDK_CONTROL_MASK); // Up
+	gtk_binding_entry_remove(bs, KEY(n), GDK_CONTROL_MASK); // Down
 }
 
 #endif /* GTK+3 */
@@ -2170,20 +2172,21 @@ gpointer toggle_updates(GtkWidget *widget, gpointer unlock)
 
 #endif
 
-// Maximized state
+// Maximized & iconified states
 
 #if GTK_MAJOR_VERSION == 1
 
-static Atom netwm[3];
+static Atom netwm[4];
 static int netwm_set;
 
 static int init_netwm(GdkWindow *w)
 {
-	static char *nm[3] = {
+	static char *nm[4] = {
 		"_NET_WM_STATE",
 		"_NET_WM_STATE_MAXIMIZED_VERT",
-		"_NET_WM_STATE_MAXIMIZED_HORZ" };
-	return (XInternAtoms(GDK_WINDOW_XDISPLAY(w), nm, 3, FALSE, netwm));
+		"_NET_WM_STATE_MAXIMIZED_HORZ",
+		"_NET_WM_STATE_HIDDEN" };
+	return (XInternAtoms(GDK_WINDOW_XDISPLAY(w), nm, 4, FALSE, netwm));
 }
 
 int is_maximized(GtkWidget *window)
@@ -2212,10 +2215,9 @@ int is_maximized(GtkWidget *window)
 	return (vh == 3);
 }
 
-void set_maximized(GtkWidget *window)
+static void do_wm_state(GdkWindow *w, int add, int i1, int i2)
 {
 	XEvent xev;
-	GdkWindow *w = window->window;
 
 	if (!netwm_set) netwm_set = init_netwm(w);
 
@@ -2225,14 +2227,40 @@ void set_maximized(GtkWidget *window)
 	xev.xclient.window = GDK_WINDOW_XWINDOW(w);
 	xev.xclient.message_type = netwm[0];
 	xev.xclient.format = 32;
-	xev.xclient.data.l[0] = 1; /* _NET_WM_STATE_ADD */
-	xev.xclient.data.l[1] = netwm[1];
-	xev.xclient.data.l[2] = netwm[2];
+	xev.xclient.data.l[0] = add ? 1 : 0; /* _NET_WM_STATE_ADD : _REMOVE */
+	xev.xclient.data.l[1] = netwm[i1];
+	xev.xclient.data.l[2] = i2 ? netwm[i2] : 0;
 	xev.xclient.data.l[3] = 0;
 	xev.xclient.data.l[4] = 0;
 
 	XSendEvent(GDK_WINDOW_XDISPLAY(w), DefaultRootWindow(GDK_WINDOW_XDISPLAY(w)),
 		False, SubstructureRedirectMask | SubstructureNotifyMask, &xev);
+}
+
+void set_maximized(GtkWidget *window)
+{
+	do_wm_state(window->window, TRUE, 1, 2);
+}
+
+void set_iconify(GtkWidget *window, int state)
+{
+	GdkWindow *w = window->window;
+
+	if (!GTK_WIDGET_MAPPED(window)) return;
+	if (state) XIconifyWindow(GDK_WINDOW_XDISPLAY(w), GDK_WINDOW_XWINDOW(w),
+		DefaultScreen(GDK_WINDOW_XDISPLAY(w)));
+	else
+	{
+		gdk_window_show(w);
+		do_wm_state(w, FALSE, 3, 0);
+	}
+}
+
+#else /* if GTK_MAJOR_VERSION >= 2 */
+
+void set_iconify(GtkWidget *window, int state)
+{
+	(state ? gdk_window_iconify : gdk_window_deiconify)(gtk_widget_get_window(window));
 }
 
 #endif

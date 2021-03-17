@@ -888,7 +888,8 @@ static char *def_actions[DA_NCODES] = {
 	CMD_GIF_PLAY,
 	"mtpaint -g ((delay)) -w ((src)).\"???\" -w ((src)).\"????\"",
 	"rsvg-convert ((w)) ((h)) -o ((dest)) ((src))",
-	"vwebp ((src))" CMD_DETACH
+	"vwebp ((src))" CMD_DETACH,
+	"ffplay -loop 0 ((src))" CMD_DETACH,
 };
 
 static char *interpolate_action(char *pattern, da_settings *ds)

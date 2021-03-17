@@ -1389,7 +1389,7 @@ static int populate_channel(char *filename)
 
 ///	FILE SELECTION WINDOW
 
-static int anim_mode = ANM_COMP;
+static int anim_mode = ANM_COMP - ANM_RAW;
 
 typedef struct {
 	int is_anim;
@@ -1584,7 +1584,7 @@ int do_a_load_x(char *fname, int undo, void *v)
 		}
 		else if (script_cmds) i = 0;
 		else i = anim_file_dialog(ftype, is_anim);
-		is_anim = is_anim ? anim_mode : ANM_PAGE;
+		is_anim = is_anim ? anim_mode + ANM_RAW : ANM_PAGE;
 
 		if (i == 3)
 		{
@@ -1616,8 +1616,8 @@ int do_a_load_x(char *fname, int undo, void *v)
 			xdata[2] = (void *)is_anim;
 			file_selector_x(FS_EXPLODE_FRAMES, xdata);
 		}
-		else if (i == 2) run_def_action(ftype == FT_WEBP ?
-			DA_WEBP_PLAY : DA_GIF_PLAY, real_fname, NULL, 0);
+		else if (i == 2) run_def_action(ftype == FT_WEBP ? DA_WEBP_PLAY :
+			ftype == FT_PNG ? DA_APNG_PLAY : DA_GIF_PLAY, real_fname, NULL, 0);
 	}
 
 	/* An error happened */

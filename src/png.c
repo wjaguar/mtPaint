@@ -51,7 +51,6 @@
 #include <tiffio.h>
 #endif
 #ifdef U_WEBP
-#define RGBA_FRAMES
 #include <webp/encode.h>
 #include <webp/decode.h>
 #endif
@@ -92,6 +91,11 @@ typedef long f_long;
 
 #endif
 
+#if F_LONG_MAX > SIZE_MAX
+#error "File offset limit exceeds allocation limit"
+#endif
+
+
 /* Macro for big-endian tags (IFF and BMP) */
 #define TAG4B(A,B,C,D) (((A) << 24) + ((B) << 16) + ((C) << 8) + (D))
 
@@ -116,8 +120,8 @@ int apply_icc;
 
 fformat file_formats[NUM_FTYPES] = {
 	{ "", "", "", 0},
-	{ "PNG", "png", "", FF_256 | FF_RGB | FF_ALPHA | FF_MULTI | FF_MEM,
-		XF_TRANS | XF_COMPZ },
+	{ "PNG", "png", "apng", FF_256 | FF_RGB | FF_ANIM | FF_ALPHA | FF_MULTI
+		| FF_MEM, XF_TRANS | XF_COMPZ },
 #ifdef U_JPEG
 	{ "JPEG", "jpg", "jpeg", FF_RGB, XF_COMPJ },
 #else
@@ -692,11 +696,12 @@ static void png_memflush(png_structp png_ptr)
 }
 
 #define PNG_BYTES_TO_CHECK 8
+#define PNG_HANDLE_CHUNK_NEVER  1
 #define PNG_HANDLE_CHUNK_ALWAYS 3
 
 static const char *chunk_names[NUM_CHANNELS] = { "", "alPh", "seLc", "maSk" };
 
-static int load_png(char *file_name, ls_settings *settings, memFILE *mf)
+static int load_png(char *file_name, ls_settings *settings, memFILE *mf, int frame)
 {
 	/* Description of PNG interlacing passes as X0, DX, Y0, DY */
 	static const unsigned char png_interlace[8][4] = {
@@ -720,7 +725,7 @@ static int load_png(char *file_name, ls_settings *settings, memFILE *mf)
 	long dest_len;
 	FILE *fp = NULL;
 	int i, j, k, bit_depth, color_type, interlace_type, num_uk, res = -1;
-	int maxpass, x0, dx, y0, dy, n, nx, height, width, itrans = FALSE;
+	int maxpass, x0, dx, y0, dy, n, nx, height, width, itrans = FALSE, anim = FALSE;
 
 	if (!mf)
 	{
@@ -744,17 +749,33 @@ static int load_png(char *file_name, ls_settings *settings, memFILE *mf)
 		goto fail2;
 	}
 
+	/* Frame pseudo-files have wrong CRCs */
+	if (frame) png_set_crc_action(png_ptr, PNG_CRC_QUIET_USE, PNG_CRC_QUIET_USE);
 	/* !!! libpng 1.2.17-1.2.24 needs this to read extra channels */
-	png_set_read_user_chunk_fn(png_ptr, NULL, buggy_libpng_handler);
+	else png_set_read_user_chunk_fn(png_ptr, NULL, buggy_libpng_handler);
 
 	if (!mf) png_init_io(png_ptr, fp);
 	else png_set_read_fn(png_ptr, mf, png_memread);
 	png_set_sig_bytes(png_ptr, PNG_BYTES_TO_CHECK);
 
 	/* Stupid libpng handles private chunks on all-or-nothing basis */
-	png_set_keep_unknown_chunks(png_ptr, PNG_HANDLE_CHUNK_ALWAYS, NULL, 0);
+	png_set_keep_unknown_chunks(png_ptr, frame ? PNG_HANDLE_CHUNK_NEVER :
+		PNG_HANDLE_CHUNK_ALWAYS, NULL, 0);
 
 	png_read_info(png_ptr, info_ptr);
+
+	/* Check whether the file is APNG */
+	num_uk = png_get_unknown_chunks(png_ptr, info_ptr, &uk_p);
+	for (i = 0; i < num_uk; i++)
+	{
+		if (strcmp(uk_p[i].name, "acTL")) continue;
+		anim = TRUE;
+		/* mtPaint does not write APNGs with extra channels, and
+		 * no reason to waste memory on APNG frames now */
+		png_set_keep_unknown_chunks(png_ptr, PNG_HANDLE_CHUNK_NEVER, NULL, 0);
+		png_set_read_user_chunk_fn(png_ptr, NULL, NULL);
+	}
+
 	png_get_IHDR(png_ptr, info_ptr, &pwidth, &pheight, &bit_depth, &color_type,
 		&interlace_type, NULL, NULL);
 	if (png_get_valid(png_ptr, info_ptr, PNG_INFO_PLTE))
@@ -944,7 +965,7 @@ static int load_png(char *file_name, ls_settings *settings, memFILE *mf)
 		/* !!! Is this call really needed? */
 		png_free_data(png_ptr, info_ptr, PNG_FREE_UNKN, -1);
 	}
-	if (!res) res = 1;
+	if (!res) res = anim ? FILE_HAS_FRAMES : 1;
 
 #ifdef U_LCMS
 #ifdef PNG_iCCP_SUPPORTED
@@ -1146,6 +1167,7 @@ typedef struct {
 	unsigned char lmap[MAX_DIM];
 	image_frame prev;
 	int prev_idx; // Frame index+1, so that 0 means None
+	int have_frames; // Set after first
 	int defw, defh, bk_rect[4];
 	int mode;
 	/* Extra fields for paletted images */
@@ -1157,6 +1179,15 @@ typedef struct {
 	unsigned char bkg[4];
 } ani_status;
 
+/* Initialize palette remapping table */
+static void ani_init_xlat(ani_status *stat)
+{
+	int i;
+
+	for (i = 0; i < 256; i++) stat->xlat[i] = stat->xlat[i + 256] = i;
+	stat->xlat[512] = stat->newtrans;
+}
+
 /* Calculate new frame dimensions, and point-in-area bitmap */
 static void ani_map_frame(ani_status *stat, ls_settings *settings)
 {
@@ -1165,15 +1196,16 @@ static void ani_map_frame(ani_status *stat, ls_settings *settings)
 
 
 	/* Calculate the new dimensions */
-// !!! Offsets considered nonnegative (as in GIF and WebP)
+// !!! Offsets considered nonnegative (as in GIF, WebP and APNG)
 	w = settings->x + settings->width;
 	h = settings->y + settings->height;
-	if (!stat->prev_idx) // Resize screen to fit the first frame
+	if (!stat->have_frames) // Resize screen to fit the first frame
 	{
 		if (w > MAX_WIDTH) w = MAX_WIDTH;
 		if (h > MAX_HEIGHT) h = MAX_HEIGHT;
 		if (stat->defw < w) stat->defw = w;
 		if (stat->defh < h) stat->defh = h;
+		stat->have_frames = TRUE;
 	}
 	else // Clip all frames past the first to screen size
 	{
@@ -1208,6 +1240,8 @@ static void ani_map_frame(ani_status *stat, ls_settings *settings)
 	}
 }
 
+/* Allowed bpp: 0 - move, 1 - indexed, 3 - RGB, 4 - RGBA
+ * Indexed+alpha not supported nor should be: cannot be saved as standard PNG */
 static int add_frame(ani_settings *ani, ani_status *stat, ls_settings *settings,
 	int bpp, int disposal)
 {
@@ -1350,16 +1384,16 @@ static void composite_indexed_frame(image_frame *frame, ani_status *stat,
 	}
 }
 
-#ifdef RGBA_FRAMES
 static void composite_rgba_frame(image_frame *frame, ani_status *stat,
 		ls_settings *settings)
 {
 	static unsigned char bkg0[4]; // Default transparent black
-	unsigned char mask[MAX_WIDTH], alpha[MAX_WIDTH];
+	unsigned char mask[MAX_WIDTH], alpha[MAX_WIDTH], pal[768];
 	unsigned char *dest, *src, *dsta, *srca, *bg, *bga, *lmap = stat->lmap;
 	image_frame *bkf = &stat->prev;
 	int rxy[4] = { 0, 0, frame->width, frame->height };
-	int x, y, w, bgw, bgoff, fgw, ww, fgoff, dstoff;
+	int x, y, w, bgw, bgoff, fgw, ww, fgoff, dstoff, bpp, tr;
+
 
 	/* Do the mixing if source is present */
 	if (!settings->img[CHN_IMAGE]) return;
@@ -1367,10 +1401,12 @@ static void composite_rgba_frame(image_frame *frame, ani_status *stat,
 	w = frame->width;
 	bgw = bkf->width;
 	bgoff = bkf->y * bgw + bkf->x;
+	bpp = bkf->bpp;
+	if (bpp == 1) pal2rgb(pal, bkf->pal, bkf->cols, 256);
 
 	/* First, generate the destination RGB */
 	dest = frame->img[CHN_IMAGE];
-	bg = bkf->img[CHN_IMAGE] - bgoff * 3; // Won't get used if not valid
+	bg = bkf->img[CHN_IMAGE] - bgoff * bpp; // Won't get used if not valid
 	for (y = 0; y < frame->height; y++)
 	{
 		int bmask = lmap[y] >> 4;
@@ -1380,14 +1416,15 @@ static void composite_rgba_frame(image_frame *frame, ani_status *stat,
 			unsigned char *rgb = bkg0; // Default black
 			int bflag = lmap[x] & bmask;
 
-			if (bflag & 2) rgb = bg + x * 3; // Underlayer
 			if (bflag & 4) rgb = stat->bkg; // Background in the hole
+			else if (bflag & 2) // Underlayer
+				rgb = bpp == 1 ? pal + bg[x] * 3 : bg + x * 3;
 			dest[0] = rgb[0];
 			dest[1] = rgb[1];
 			dest[2] = rgb[2];
 			dest += 3;
 		}
-		bg += bgw * 3;
+		bg += bgw * bpp;
 	}
 
 	/* Then, destination alpha */
@@ -1417,16 +1454,18 @@ static void composite_rgba_frame(image_frame *frame, ani_status *stat,
 	fgoff = (rxy[1] - settings->y) * fgw + (rxy[0] - settings->x);
 	dstoff = rxy[1] * w + rxy[0];
 	memset(alpha, 255, ww);
+	tr = settings->rgb_trans;
 	for (y = rxy[1]; y < rxy[3]; y++)
 	{
 		dsta = frame->img[CHN_ALPHA] ? frame->img[CHN_ALPHA] + dstoff : NULL;
-		srca = settings->img[CHN_ALPHA] + fgoff;
+		srca = settings->img[CHN_ALPHA] ? settings->img[CHN_ALPHA] + fgoff : NULL;
 		dest = frame->img[CHN_IMAGE] + dstoff * 3;
 		src = settings->img[CHN_IMAGE] + fgoff * 3;
 
 		if (stat->blend) // Do alpha blend
 		{
 			memset(mask, 0, ww);
+			if (tr >= 0) mem_mask_colors(mask, src, 255, ww, 1, 3, tr, tr);
 			process_mask(0, 1, ww, mask, dsta, dsta, alpha, srca, 255, FALSE);
 			process_img(0, 1, ww, mask, dest, dest, src, NULL, 3, BLENDF_SET);
 		}
@@ -1434,14 +1473,16 @@ static void composite_rgba_frame(image_frame *frame, ani_status *stat,
 		{
 			memcpy(dest, src, ww * 3); // Copy image
 			if (!dsta); // No alpha
-			else if (settings->img[CHN_ALPHA]) // Copy alpha
-				memcpy(dsta, srca, ww);
-			else memset(dsta, 255, ww); // Fill alpha
+			else if (srca) memcpy(dsta, srca, ww); // Copy alpha
+			else
+			{
+				memset(dsta, 255, ww); // Fill alpha
+				if (tr >= 0) mem_mask_colors(dsta, src, 0, ww, 1, 3, tr, tr);
+			}
 		}
 		fgoff += fgw; dstoff += w;
 	}
 }
-#endif
 
 static void composite_frame(frameset *fset, ani_status *stat, ls_settings *settings)
 {
@@ -1461,24 +1502,49 @@ static void composite_frame(frameset *fset, ani_status *stat, ls_settings *setti
 		disposal = frame->flags & FM_DISPOSAL;
 		frame->flags ^= disposal ^ FM_DISP_REMOVE;
 
-#ifdef RGBA_FRAMES
+		/* For WebP and RGB[A] APNG */
 		if (settings->bpp == 3) composite_rgba_frame(frame, stat, settings);
+		/* For GIF & indexed[+T] APNG */
 		else
-#endif
-		composite_indexed_frame(frame, stat, settings);
+		{
+			/* No blend means ignoring transparent color */
+			if (!stat->blend) settings->xpm_trans = -1;
+			composite_indexed_frame(frame, stat, settings);
+		}
+
+		/* Drop alpha if not used */
+		if (frame->img[CHN_ALPHA] && is_filled(frame->img[CHN_ALPHA], 255,
+			frame->width * frame->height))
+		{
+			free(frame->img[CHN_ALPHA]);
+			frame->img[CHN_ALPHA] = NULL;
+		}
+
+		/* If transparent color and alpha are both present, convert the
+		 * color into alpha, as PNG does not allow combining them */
+		if ((frame->trans >= 0) && frame->img[CHN_ALPHA])
+		{
+			/* RGBA: indexed+alpha blocked elsewhere for same reason */
+			/* Use palette that add_frame() assigns */
+			int tr = PNG_2_INT(stat->newpal[frame->trans]);
+			mem_mask_colors(frame->img[CHN_ALPHA], frame->img[CHN_IMAGE],
+				0, frame->width, frame->height, 3, tr, tr);
+			frame->trans = -1;
+		}
 
 		/* Prepare the disposal action */
-		memset(&stat->bk_rect, 0, sizeof(stat->bk_rect)); // Clear old
-		switch (disposal)
+		if (disposal == FM_DISP_REMOVE) // Dispose to background
 		{
-		case FM_DISP_REMOVE: // Dispose to background
 			// Image-sized hole in underlayer
 			stat->bk_rect[2] = (stat->bk_rect[0] = settings->x) +
 				settings->width;
 			stat->bk_rect[3] = (stat->bk_rect[1] = settings->y) +
 				settings->height;
-			// Fallthrough
-		case FM_DISP_LEAVE: // Don't dispose
+		}
+		if (disposal == FM_DISP_LEAVE) // Don't dispose
+			memset(&stat->bk_rect, 0, sizeof(stat->bk_rect)); // Clear old
+		if ((disposal == FM_DISP_REMOVE) || (disposal == FM_DISP_LEAVE))
+		{
 			stat->prev = *frame; // Current frame becomes underlayer
 			if (!stat->prev.pal) stat->prev.pal = fset->pal;
 			if (stat->prev_idx &&
@@ -1486,11 +1552,9 @@ static void composite_frame(frameset *fset, ani_status *stat, ls_settings *setti
 				/* Remove the unref'd frame */
 				mem_remove_frame(fset, stat->prev_idx - 1);
 			stat->prev_idx = fset->cnt;
-			break;
-		case FM_DISP_RESTORE: // Dispose to previous
-			// Underlayer stays unchanged
-			break;
 		}
+		/* if (disposal == FM_DISP_RESTORE); // Dispose to previous
+			// Underlayer and hole stay unchanged */
 	}
 	if ((fset->cnt > 1) && (stat->prev_idx != fset->cnt - 1) &&
 		(fset->frames[fset->cnt - 2].flags & FM_NUKE))
@@ -1500,6 +1564,402 @@ static void composite_frame(frameset *fset, ani_status *stat, ls_settings *setti
 		if (stat->prev_idx > fset->cnt)
 			stat->prev_idx = fset->cnt;
 	}
+}
+
+static int analyze_rgba_frame(ani_status *stat, ls_settings *settings)
+{
+	int same_size, holes, alpha0, alpha1, alpha, bpp;
+
+	if (stat->mode <= ANM_RAW) // Raw frame mode
+	{
+		stat->defw = settings->width;
+		stat->defh = settings->height;
+		return (0); // Output matches input
+	}
+	else if ((stat->defw > MAX_WIDTH) || (stat->defh > MAX_HEIGHT))
+		return (-1); // Too large
+
+	ani_map_frame(stat, settings);
+	same_size = !(settings->x | settings->y |
+		(stat->defw ^ settings->width) | (stat->defh ^ settings->height));
+	holes = !same_size || stat->blend;
+
+	if (same_size && !holes) return (0); // New replaces old
+
+	/* Indexed with transparent color (from APNG) stay as they were:
+	 * no local palettes there, upgrade to RGB/RGBA never needed */
+	if ((settings->bpp == 1) && (settings->xpm_trans >= 0))
+		return (same_size ? 0 : 1);
+
+	/* Alpha transparency on underlayer */
+	alpha0 = !stat->prev_idx || stat->prev.img[CHN_ALPHA];
+	/* Transparency from disposal to background */
+	if ((stat->bk_rect[0] < stat->bk_rect[2]) &&
+		(stat->bk_rect[1] < stat->bk_rect[3]))
+		alpha0 |= stat->bkg[3] < 255;
+	/* Alpha transparency from this layer */
+	alpha1 = !stat->blend && settings->img[CHN_ALPHA];
+	/* Result */
+	alpha = alpha1 | (alpha0 & holes);
+
+	/* Output bpp is max of underlayer & image */
+	bpp = (stat->prev.bpp == 3) || (settings->bpp == 3) ? 3 : 1;
+	/* Do not produce indexed+alpha as regular PNG does not support that */
+	if (alpha) bpp = 4;
+
+	/* !!! composite_rgba_frame() as of now cannot handle frame == dest, so
+	 * do not return 0 even if same size, bpp & alpha, w/o rewriting that */
+	return (bpp);
+}
+
+/* In absence of library support, APNG files are read through building in memory
+ * a regular PNG file for a frame, and then feeding that to libpng - WJ */
+
+/* Macros for accessing values in Motorola byte order */
+#define GET16B(buf) (((buf)[0] << 8) + (buf)[1])
+#define GET32B(buf) (((unsigned)(buf)[0] << 24) + ((buf)[1] << 16) + \
+	((buf)[2] << 8) + (buf)[3])
+#define PUT16B(buf, v) (buf)[0] = (v) >> 8; (buf)[1] = (v) & 0xFF;
+#define PUT32B(buf, v) (buf)[0] = (v) >> 24; (buf)[1] = ((v) >> 16) & 0xFF; \
+	(buf)[2] = ((v) >> 8) & 0xFF; (buf)[3] = (v) & 0xFF;
+
+/* Macros for relevant PNG tags; big-endian */
+#define TAG4B_IHDR TAG4B('I', 'H', 'D', 'R')
+#define TAG4B_IDAT TAG4B('I', 'D', 'A', 'T')
+#define TAG4B_IEND TAG4B('I', 'E', 'N', 'D')
+#define TAG4B_acTL TAG4B('a', 'c', 'T', 'L')
+#define TAG4B_fcTL TAG4B('f', 'c', 'T', 'L')
+#define TAG4B_fdAT TAG4B('f', 'd', 'A', 'T')
+
+/* PNG block header */
+#define PNG_SIZE    0 /* 32b */
+#define PNG_TAG     4 /* 32b */
+#define PNG_HSIZE   8
+
+/* IHDR block */
+#define IHDR_W      0 /* 32b */
+#define IHDR_H      4 /* 32b */
+#define IHDR_SIZE  13
+
+/* acTL block */
+#define acTL_FCNT   0 /* 32b */
+#define acTL_SIZE   8
+
+/* fcTL block */
+#define fcTL_SEQ    0 /* 32b */
+#define fcTL_W      4 /* 32b */
+#define fcTL_H      8 /* 32b */
+#define fcTL_X     12 /* 32b */
+#define fcTL_Y     16 /* 32b */
+#define fcTL_DN    20 /* 16b */
+#define fcTL_DD    22 /* 16b */
+#define fcTL_DISP  24 /*  8b */
+#define fcTL_BLEND 25 /*  8b */
+#define fcTL_SIZE  26
+
+typedef struct {
+	int w, h, disp;
+	f_long ihdr, idat0, fdat0, fdat1;
+	unsigned frames;
+	unsigned char fctl[fcTL_SIZE];
+	int phase;
+	unsigned char *png;	// Buffer for fake file
+	size_t sz;		// Buffer size
+	memFILE mf;
+} pnghead;
+
+/* Build in-memory PNG from file header and frame data, ignoring CRCs */
+static int assemble_png(FILE *fp, pnghead *pg)
+{
+	size_t l = pg->idat0 + (pg->fdat1 - pg->fdat0) + PNG_HSIZE + 4;
+	unsigned char *src, *dest, *wrk = pg->png;
+	unsigned tag, tl, u, seq;
+
+
+	/* Enlarge the buffer if needed */
+	if (l > pg->sz)
+	{
+		if (l > MEMFILE_MAX) return (FILE_MEM_ERROR);
+		dest = realloc(pg->png, l);
+		if (!dest) return (FILE_MEM_ERROR);
+		pg->png = dest;
+		pg->sz = l;
+	}
+	/* Read in the header on first pass */
+	if (!wrk)
+	{
+		fseek(fp, 0, SEEK_SET);
+		if (!fread(pg->png, pg->idat0, 1, fp)) return (-1);
+	}
+	/* Modify the header */
+	wrk = pg->png + pg->ihdr;
+	memcpy(wrk + IHDR_W, pg->fctl + fcTL_W, 4);
+	memcpy(wrk + IHDR_H, pg->fctl + fcTL_H, 4);
+	/* Read in body */
+	wrk = pg->png + pg->idat0;
+	fseek(fp, pg->fdat0, SEEK_SET);
+	l = pg->fdat1 - pg->fdat0;
+	if (!fread(wrk, l, 1, fp)) return (-1);
+	/* Reformat the body blocks if needed */
+	seq = GET32B(pg->fctl + fcTL_SEQ);
+	src = dest = wrk;
+	while (l)
+	{
+		tag = GET32B(src + PNG_TAG);
+		tl = GET32B(src + PNG_SIZE);
+		if (tl > l - PNG_HSIZE - 4) return (-1); // Paranoia
+		l -= u = PNG_HSIZE + tl + 4;
+		if (tag == TAG4B_fdAT)
+		{
+			if (tl < 4) return (-1); // Paranoia
+			if (GET32B(src + PNG_HSIZE) != ++seq) return (-1); // Sequence
+			tl -= 4;
+			PUT32B(dest + PNG_SIZE, tl);
+			memcpy(dest + PNG_TAG, "IDAT", 4);
+			memmove(dest + PNG_HSIZE, src + PNG_HSIZE + 4, tl);
+		}
+		else if (src != dest) memmove(dest, src, u);
+		src += u;
+		dest += PNG_HSIZE + tl + 4;
+	}
+	/* Add IEND */
+	PUT32B(dest + PNG_SIZE, 0);
+	memcpy(dest + PNG_TAG, "IEND", 4);
+	/* Prepare file buffer */
+	memset(&pg->mf, 0, sizeof(pg->mf));
+	pg->mf.m.buf = pg->png;
+	pg->mf.top = pg->mf.m.size = dest + PNG_HSIZE + 4 - pg->png;
+	return (0);
+}
+
+static int png_scan(FILE *fp, pnghead *pg)
+{
+	/* APNG disposal codes mapping */
+	static const unsigned short apng_disposal[3] = {
+		FM_DISP_LEAVE, FM_DISP_REMOVE, FM_DISP_RESTORE };
+	unsigned char buf[256];
+	unsigned tag, tl, w, h;
+	f_long p = ftell(fp);
+
+	if (p <= 0) return (-1); // Sanity check
+
+	/* Read block headers & see what we get */
+	pg->phase = 0;
+	while (TRUE)
+	{
+		if (fread(buf, 1, PNG_HSIZE, fp) < PNG_HSIZE)
+		{
+			if (pg->phase != 2) break; // Fail
+			pg->phase = 4; // Improper end
+			return (0); // Done
+		}
+		tag = GET32B(buf + PNG_TAG);
+		tl = GET32B(buf + PNG_SIZE);
+		if (tl > 0x7FFFFFFFU) break; // Limit
+		if (p > F_LONG_MAX - tl - PNG_HSIZE - 4) break; // File too large
+
+		if (tag == TAG4B_IHDR)
+		{
+			if (tl < IHDR_SIZE) break; // Bad
+			if (pg->ihdr) break; // There must be only one
+			pg->ihdr = p + PNG_HSIZE;
+			/* Get canvas dimensions */
+			if (!fread(buf, IHDR_SIZE, 1, fp)) break; // Fail
+			w = GET32B(buf + IHDR_W);
+			h = GET32B(buf + IHDR_H);
+			if ((w > 0x7FFFFFFFU) || (h > 0x7FFFFFFFU)) break; // Limit
+			pg->w = w;
+			pg->h = h;
+		}
+		else if (tag == TAG4B_IDAT)
+		{
+			if (!pg->ihdr) break; // Fail
+			if (!pg->idat0) pg->idat0 = p;
+			if (pg->phase == 1) // Had a fcTL
+			{
+				pg->fdat0 = p;
+				pg->phase = 2;
+			}
+			if (pg->phase > 1)
+			{
+				if (pg->fdat0 != pg->idat0) break; // Mixed IDAT & fdAT
+				pg->fdat1 = p + PNG_HSIZE + tl + 4;
+			}
+		}
+		else if (tag == TAG4B_acTL)
+		{
+			if (tl < acTL_SIZE) break; // Bad
+			if (!fread(buf, acTL_SIZE, 1, fp)) break; // Fail
+			/* Store frames count */
+			if (!pg->frames) pg->frames = GET32B(buf + acTL_FCNT);
+			if (pg->frames > 0x7FFFFFFFU) break; // Limit
+			if (!pg->frames) break; // Fail
+		}
+		else if (tag == TAG4B_fcTL)
+		{
+			if (pg->phase > 1)
+			{
+				/* End of frame data - step back & return */
+				fseek(fp, p, SEEK_SET);
+				return (0); 
+			}
+			if (tl < fcTL_SIZE) break; // Bad
+			/* Store for later use */
+			if (!fread(pg->fctl, fcTL_SIZE, 1, fp)) break; // Fail
+			if (pg->fctl[fcTL_DISP] > 2) break; // Unknown value
+			pg->disp = apng_disposal[pg->fctl[fcTL_DISP]];
+			pg->phase = 1; // Ready for a new frame
+		}
+		else if (tag == TAG4B_fdAT)
+		{
+			if (!pg->ihdr) break; // Fail
+			if (!pg->phase) break; // Fail - no fcTL
+			if (pg->phase == 1) // Had a fcTL
+			{
+				pg->fdat0 = p;
+				pg->phase = 2;
+			}
+			if (pg->fdat0 == pg->idat0) break; // Mixed IDAT & fdAT
+			pg->fdat1 = p + PNG_HSIZE + tl + 4;
+		}
+		else if (tag == TAG4B_IEND)
+		{
+			if (pg->phase != 2) break; // Fail
+			pg->phase = 3; // End
+			return (0); // Done
+		}
+		/* Skip tag header, data, & CRC field */
+		p += PNG_HSIZE + tl + 4;
+		if (fseek(fp, p, SEEK_SET)) break;
+	}
+	return (-1); // Failed
+}
+
+static int load_apng_frame(FILE *fp, pnghead *pg, ls_settings *settings)
+{
+	unsigned char *w;
+	int l, res;
+
+	/* Try scanning the frame */
+	res = png_scan(fp, pg);
+	/* Prepare fake PNG */
+	if (!res) res = assemble_png(fp, pg);
+	/* Load the frame */
+	if (!res) res = load_png(NULL, settings, &pg->mf, TRUE);
+	if (res != 1) return (res); // Fail on any error
+	/* Convert indexed+alpha to RGBA, to let it be regular PNG */
+	w = settings->img[CHN_ALPHA];
+	if ((settings->bpp == 1) && w)
+	{
+		l = settings->width * settings->height;
+		w = malloc((size_t)l * 3);
+		if (!w) return (FILE_MEM_ERROR); // No memory
+		do_convert_rgb(0, 1, l, w, settings->img[CHN_IMAGE], settings->pal);
+		free(settings->img[CHN_IMAGE]);
+		settings->img[CHN_IMAGE] = w;
+		settings->bpp = 3;
+	}
+	/* Ensure transparent color is in palette */
+	else map_rgb_trans(settings);
+	return (res);
+}
+
+static int load_apng_frames(char *file_name, ani_settings *ani)
+{
+	char buf[PNG_BYTES_TO_CHECK + 1];
+	pnghead pg;
+	ani_status stat;
+	ls_settings w_set;
+	unsigned wx, wy;
+	int n, d, bpp, frames = 0, res = -1;
+	FILE *fp;
+
+
+	if (!(fp = fopen(file_name, "rb"))) return (-1);
+	memset(w_set.img, 0, sizeof(chanlist));
+	memset(&pg, 0, sizeof(pg));
+
+	if (fread(buf, 1, PNG_BYTES_TO_CHECK, fp) != PNG_BYTES_TO_CHECK) goto fail;
+	if (png_sig_cmp(buf, 0, PNG_BYTES_TO_CHECK)) goto fail;
+
+	w_set = ani->settings;
+	res = load_apng_frame(fp, &pg, &w_set);
+	if (res != 1) goto fail;
+
+	/* Init state structure */
+	memset(&stat, 0, sizeof(stat));
+	stat.mode = ani->mode;
+	stat.defw = pg.w;
+	stat.defh = pg.h;
+	/* Use whatever palette we read */
+	mem_pal_copy(stat.newpal, w_set.pal);
+	stat.newcols = w_set.colors;
+	stat.newtrans = w_set.xpm_trans;
+	ani_init_xlat(&stat); // Init palette remapping to 1:1 and leave at that
+
+	/* Init frameset - palette in APNG is global */
+	res = FILE_MEM_ERROR;
+	if (!(ani->fset.pal = malloc(SIZEOF_PALETTE))) goto fail;
+	mem_pal_copy(ani->fset.pal, stat.newpal);
+
+	/* Go through images */
+	while (frames++ < pg.frames)
+	{
+		res = FILE_TOO_LONG;
+		if (!check_next_frame(&ani->fset, ani->settings.mode, TRUE))
+			goto fail;
+
+		/* Get the next frame, after the first */
+		if (frames > 1)
+		{
+			w_set = ani->settings;
+			res = load_apng_frame(fp, &pg, &w_set);
+			if (res != 1) goto fail;
+		}
+		delete_alpha(&w_set, 255);
+
+		stat.blend = pg.fctl[fcTL_BLEND] && (w_set.img[CHN_ALPHA] ||
+			(stat.newtrans >= 0));
+		/* Within mtPaint delays are 1/100s granular */
+		n = GET16B(pg.fctl + fcTL_DN);
+		d = GET16B(pg.fctl + fcTL_DD);
+		if (!d) d = 100;
+		w_set.gif_delay = (n * 100 + d - 1) / d; // Round up
+
+		wx = GET32B(pg.fctl + fcTL_X);
+		wy = GET32B(pg.fctl + fcTL_Y);
+		if (wx > MAX_WIDTH) wx = MAX_WIDTH; // Out is out
+		if (wy > MAX_HEIGHT) wy = MAX_HEIGHT; // Same
+		w_set.x = wx;
+		w_set.y = wy;
+
+		/* Analyze how we can merge the frames */
+		res = TOO_BIG;
+		bpp = analyze_rgba_frame(&stat, &w_set);
+		if (bpp < 0) goto fail;
+
+		/* Allocate a new frame */
+		res = add_frame(ani, &stat, &w_set, bpp, pg.disp);
+		if (res) goto fail;
+
+		/* Do actual compositing, remember disposal method */
+		composite_frame(&ani->fset, &stat, &w_set);
+		mem_free_chanlist(w_set.img);
+		memset(w_set.img, 0, sizeof(chanlist));
+
+		/* Write out those frames worthy to be stored */
+		res = done_frame(file_name, ani, FALSE);
+		if (res != 1) goto fail;
+
+		if (pg.phase > 2) break; // End of file
+	}
+	/* Write out the final frame if not written before */
+	res = done_frame(file_name, ani, TRUE);
+
+fail:	free(pg.png);
+	mem_free_chanlist(w_set.img);
+	fclose(fp);
+	return (res);
 }
 
 static int analyze_gif_frame(ani_status *stat, ls_settings *settings)
@@ -1537,8 +1997,7 @@ static int analyze_gif_frame(ani_status *stat, ls_settings *settings)
 	same_size = !(settings->x | settings->y |
 		(stat->defw ^ settings->width) | (stat->defh ^ settings->height));
 
-	for (i = 0; i < 256; i++) stat->xlat[i] = stat->xlat[i + 256] = i;
-	stat->xlat[512] = stat->newtrans;
+	ani_init_xlat(stat); // Init palette remapping to 1:1
 
 	/* First frame is exceptional */
 	if (!stat->prev_idx)
@@ -2001,6 +2460,7 @@ static int load_gif_frames(char *file_name, ani_settings *ani)
 		if (fread(buf, 3, cols, fp) < cols) goto fail;
 		rgb2pal(stat.global_pal, buf, stat.global_cols = cols);
 	}
+	stat.blend = TRUE; // No other case in GIF
 
 	/* Init temp container */
 	init_set = ani->settings;
@@ -4000,39 +4460,6 @@ static int save_tiff(char *file_name, ls_settings *settings, memFILE *mf)
  * file to it in one single memory block. Stepping through the RIFF container to
  * pick individual chunks is more manageable. */
 
-static int analyze_webp_frame(ani_status *stat, ls_settings *settings)
-{
-	int same_size, holes, alpha0, alpha1, alpha;
-
-	if (stat->mode <= ANM_RAW) // Raw frame mode
-	{
-		stat->defw = settings->width;
-		stat->defh = settings->height;
-		return (0); // Output matches input
-	}
-	else if ((stat->defw > MAX_WIDTH) || (stat->defh > MAX_HEIGHT))
-		return (-1); // Too large
-	ani_map_frame(stat, settings);
-	same_size = !(settings->x | settings->y |
-		(stat->defw ^ settings->width) | (stat->defh ^ settings->height));
-	holes = !same_size || stat->blend;
-
-	if (same_size && !holes) return (0); // New replaces old
-
-	/* Transparency on underlayer */
-	alpha0 = !stat->prev_idx || stat->prev.img[CHN_ALPHA];
-	/* Transparency from disposal to background */
-	if ((stat->bk_rect[0] < stat->bk_rect[2]) &&
-		(stat->bk_rect[1] < stat->bk_rect[3]))
-		alpha0 |= stat->bkg[3] < 255;
-	/* Transparency from this layer */
-	alpha1 = !stat->blend && settings->img[CHN_ALPHA];
-	/* Result */
-	alpha = alpha1 | (alpha0 & holes);
-
-	return (3 + alpha);
-}
-
 /* Macro for little-endian tags (RIFF) */
 #define TAG4(A,B,C,D) ((A) + ((B) << 8) + ((C) << 16) + ((D) << 24))
 
@@ -4362,7 +4789,7 @@ static int load_webp_frames(char *file_name, ani_settings *ani)
 		stat.blend = !(wp.anmf[ANMF_FLAGS] & ANMF_F_NOBLEND) && w_set.img[CHN_ALPHA];
 		/* Analyze how we can merge the frames */
 		res = TOO_BIG;
-		bpp = analyze_webp_frame(&stat, &w_set);
+		bpp = analyze_rgba_frame(&stat, &w_set);
 		if (bpp < 0) goto fail;
 
 		/* Allocate a new frame */
@@ -7091,14 +7518,6 @@ static int save_pcx(char *file_name, ls_settings *settings)
  * in the wild remain unsupported. If you encounter some such curiosity failing
  * to load or loading wrong, send a bugreport with the file attached to it. */
 
-/* Macros for accessing values in Motorola byte order */
-#define GET16B(buf) (((buf)[0] << 8) + (buf)[1])
-#define GET32B(buf) (((unsigned)(buf)[0] << 24) + ((buf)[1] << 16) + \
-	((buf)[2] << 8) + (buf)[3])
-#define PUT16B(buf, v) (buf)[0] = (v) >> 8; (buf)[1] = (v) & 0xFF;
-#define PUT32B(buf, v) (buf)[0] = (v) >> 24; (buf)[1] = ((v) >> 16) & 0xFF; \
-	(buf)[2] = ((v) >> 8) & 0xFF; (buf)[3] = (v) & 0xFF;
-
 /* Macros for IFF tags; big-endian too */
 #define TAG4B_FORM TAG4B('F', 'O', 'R', 'M')
 #define TAG4B_ILBM TAG4B('I', 'L', 'B', 'M')
@@ -8962,7 +9381,7 @@ static int import_svg(char *file_name, ls_settings *settings)
 	ds.width = settings->req_w;
 	ds.height = settings->req_h;
 	if (!run_def_action_x(DA_SVG_CONVERT, &ds))
-		res = load_png(buf, settings, NULL);
+		res = load_png(buf, settings, NULL, FALSE);
 	unlink(buf);
 
 	/* Delete all-set "alpha" */
@@ -9352,7 +9771,7 @@ static int load_image_x(char *file_name, memFILE *mf, int mode, int ftype,
 	switch (ftype)
 	{
 	default:
-	case FT_PNG: res0 = load_png(file_name, &settings, mf); break;
+	case FT_PNG: res0 = load_png(file_name, &settings, mf, FALSE); break;
 	case FT_GIF: res0 = load_gif(file_name, &settings); break;
 #ifdef U_JPEG
 	case FT_JPEG: res0 = load_jpeg(file_name, &settings); break;
@@ -9587,7 +10006,7 @@ static int load_frames_x(ani_settings *ani, int ani_mode, char *file_name,
 
 	switch (ftype)
 	{
-//	case FT_PNG: return (load_apng_frames(file_name, ani));
+	case FT_PNG: return (load_apng_frames(file_name, ani));
 	case FT_GIF: return (load_gif_frames(file_name, ani));
 #ifdef U_TIFF
 	case FT_TIFF: return (load_tiff_frames(file_name, ani));

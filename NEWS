@@ -14,6 +14,7 @@ Here is a summary of the main changes in this release (see handbook for full det
 	* Environment variable MTPAINT_INIT to hold a script to be run at initializing the GUI
 	* Environment variable MTPAINT_INI to use a nondefault user settings file
 	* Animated WebP files now can be loaded into layers, or exploded into frames
+	* Animated PNG (APNG) files now can be loaded into layers, or exploded into frames
 	* GIF file format support now is builtin (does not use giflib anymore)
 	* GIF loader made yet more tolerant to malformed GIF files
 	* ICC colour profiles embedded in GIF and WebP images now can be applied on load
@@ -29,8 +30,10 @@ Here is a summary of the main changes in this release (see handbook for full det
 	* BUGFIX - Saved GIF files are now properly labeled GIF89 if transparent and GIF87 if not
 	* BUGFIX - GIF files without any image blocks now properly fail to load (instead of producing a 0x0 image)
 	* BUGFIX - Composited GIF animation frames that use more than 256 colours now do not come out with wrong colours in certain cases
+	* BUGFIX - Composited GIF animation frames now do not come out wrong in certain cases (after restore to previous that follows restore to background)
 	* BUGFIX - Exploding, or loading into layers, GIF animation files with screen size and/or frame position outside canvas size limit no longer causes crash
 	* BUGFIX - When first frame of GIF animation is loaded, ".000" is added to the filename, as it should be
+	* BUGFIX - When loading animation, raw/composited/nonzero-delay selection now works correctly again
 	* BUGFIX - Loading certain broken BMP files no longer causes crash
 	* BUGFIX - Ctrl+N and Ctrl+P keys now work, or do nothing, properly when focus is on a list in GTK+2/3 mode
 	* BUGFIX - Problem with some scrollable areas in GTK+ 3.22 and later being smaller than they should be is now eliminated

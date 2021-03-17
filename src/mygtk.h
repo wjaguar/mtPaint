@@ -296,7 +296,7 @@ GtkWidget *wj_size_box();
 
 gpointer toggle_updates(GtkWidget *widget, gpointer unlock);
 
-// Maximized state
+// Maximized & iconified states
 
 #if GTK_MAJOR_VERSION == 1
 int is_maximized(GtkWidget *window);
@@ -309,6 +309,7 @@ void set_maximized(GtkWidget *window);
 #define is_maximized(W) gtk_window_is_maximized(GTK_WINDOW(W))
 #define set_maximized(W) gtk_window_maximize(W)
 #endif
+void set_iconify(GtkWidget *window, int state);
 
 // Drawable to RGB
 

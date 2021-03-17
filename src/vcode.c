@@ -3936,7 +3936,7 @@ void listcc_toggled(GtkCellRendererToggle *ren, gchar *path, gpointer user_data)
 
 static void listcc_reset(void **slot, int row)
 {
-	GtkWidget *w = slot[0];
+	GtkTreeView *tree = GTK_TREE_VIEW(slot[0]);
 	listcc_data *ld = slot[2];
 	GtkListStore *ls;
 	GtkTreeIter it;
@@ -3947,7 +3947,7 @@ static void listcc_reset(void **slot, int row)
 	if (row >= 0) // specific row, not whole list
 	{
 		GtkTreePath *tp;
-		GtkTreeModel *tm = gtk_tree_view_get_model(GTK_TREE_VIEW(w));
+		GtkTreeModel *tm = gtk_tree_view_get_model(tree);
 		int l = gtk_tree_model_iter_n_children(tm, NULL);
 
 		ls = GTK_LIST_STORE(tm);
@@ -4006,8 +4006,11 @@ static void listcc_reset(void **slot, int row)
 
 	if (row < 0)
 	{
-		gtk_tree_view_set_model(GTK_TREE_VIEW(w), GTK_TREE_MODEL(ls));
+		gtk_tree_view_set_model(tree, GTK_TREE_MODEL(ls));
 		listcc_select_item(slot); // only when full reset
+
+		/* !!! Sometimes it shows the wrong part and redraw doesn't help */
+		gtk_adjustment_value_changed(gtk_tree_view_get_vadjustment(tree));
 	}
 	ld->lock = FALSE;
 }
@@ -10515,6 +10518,13 @@ void cmd_peekv(void **slot, void *res, int size, int idx)
 	op_TEXT
  * Others can, if need be */
 
+/* If window manager does not support iconifying, you can try to make do with
+ * lowering mtPaint's windows instead, enabling NO_ICONIFY.
+ * However, the windows do not then reappear back on their own if you switched
+ * focus to something else (as in preparing that something for the delayed
+ * screenshot being taken). And it only works with GTK+1 */
+//#define NO_ICONIFY
+
 void cmd_setv(void **slot, void *res, int idx)
 {
 // !!! Support only what actually used on
@@ -10573,33 +10583,52 @@ void cmd_setv(void **slot, void *res, int idx)
 			if (!res) /* Show again */
 			{
 				if (!w) break; // Paranoia
-#if GTK_MAJOR_VERSION >= 2
-				gdk_window_deiconify(gtk_widget_get_window(w));
+#if (GTK_MAJOR_VERSION >= 2) || !defined(NO_ICONIFY)
+				set_iconify(w, FALSE);
 #endif
 				gdk_window_raise(gtk_widget_get_window(w));
 				break;
 			}
 			if (w == main_window) w = NULL;
 			/* Hide from view, to allow a screenshot */
-#if GTK_MAJOR_VERSION == 1
+#if (GTK_MAJOR_VERSION == 1) && defined(NO_ICONIFY)
+			/* For gdk_window_lower() to clear the screen of all
+			 * mtPaint's windows, the window being lowered must be a
+			 * visible (mapped) transient. If none such is given, try
+			 * to find one; if not found, hope it means mainwindow
+			 * is the only one visible - WJ */
+			if (!w)
+			{
+				GList *top = gtk_container_get_toplevels();
+				for (; top; top = top->next)
+				{
+					GtkWidget *tw = top->data;
+					if (!tw || (tw == main_window) ||
+						!GTK_WIDGET_MAPPED(tw) ||
+						!GTK_WINDOW(tw)->transient_parent)
+						continue;
+					w = tw;
+					break;
+				}
+			}
+
 			gdk_window_lower(main_window->window);
 			if (w) gdk_window_lower(w->window);
-
-			gdk_flush();
-			handle_events();	// Wait for minimize
-
-			sleep(1);	// Wait a second for screen to redraw
-#else /* #if GTK_MAJOR_VERSION >= 2 */
+#else /* Iconify */
 			if (w)
 			{
 				gtk_window_set_transient_for(slot[0], NULL);
-				gdk_window_iconify(gtk_widget_get_window(w));
+				set_iconify(w, TRUE);
 			}
-			gdk_window_iconify(gtk_widget_get_window(main_window));
+			set_iconify(main_window, TRUE);
+#endif
 
 			gdk_flush();
 			handle_events(); 	// Wait for minimize
 
+#if GTK_MAJOR_VERSION == 1
+			sleep(1);	// Wait a second for screen to redraw
+#else /* #if GTK_MAJOR_VERSION >= 2 */
 			g_usleep(400000);	// Wait 0.4 s for screen to redraw
 #endif
 		}
