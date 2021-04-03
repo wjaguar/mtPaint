@@ -91,6 +91,7 @@ typedef long f_long;
 
 #endif
 
+#include <stdint.h>
 #if F_LONG_MAX > SIZE_MAX
 #error "File offset limit exceeds allocation limit"
 #endif

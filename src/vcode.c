@@ -9709,87 +9709,116 @@ static char **unchain_p(char **strs)
  * List may continue in next script positions */
 static multi_ext *multi_parse(char *s0)
 {
-	multi_ext *mx;
-	char c, *ss, *tmp, **strs;
-	int w = 0, mw = INT_MAX, fp = -1;
-	int n, l, cnt, sc, err, *ix, **rows;
+	multi_ext *mx = NULL;
+	char st, *ss, *tmp, **strs;
+	int sc = 0, n = 0, cnt = 0, w = 0, mw = INT_MAX, fp = -1;
+	int v, *uninit_(ix), **uninit_(rows);
 
-	/* Crudely count the parts */
+
 	if (s0[0] != '(') return (NULL); // Wrong
-	ss = s0 + 1;
-	cnt = sc = 0;
 	strs = script_cmds;
+	ss = s0 + 1;
+	st = '(';
 	while (TRUE)
 	{
-		c = *ss++;
-		if (c == ')') break;
-		if (c == ',') cnt++;
-		if (!c)
+		if (!ss[0]) // End of string - get next part
 		{
+			if (st == '1') st = ' '; // After a number - is whitespace
 			strs = unchain_p(strs);
 			ss = *strs++;
-			if (!ss) return (NULL); // Unterminated
-			sc++;
+			if (!ss) return (NULL); // Unterminated - fail
+			continue;
 		}
-	}
 
-	/* Allocate */
-	mx = calloc(1, sizeof(multi_ext) + sizeof(int *) * (sc + 2 - 1) +
-		sizeof(int) * (cnt + sc * 2 + 2 + 1));
-	if (!mx) return (NULL);
-	ix = (void *)(mx->rows + sc + 2);
-	// Extremely unlikely, but why not make sure
-	if (ALIGNOF(int) > ALIGNOF(int *)) ix = ALIGNED(ix, ALIGNOF(int));
-
-	/* Parse & fill */
-	sc = l = err = 0;
-	rows = mx->rows;
-	strs = script_cmds;
-	for (ss = s0 + 1; ss; strs = unchain_p(strs) , ss = *strs++)
-	{
-		if (!ss[0]) continue; // Empty
-		if ((ss[0] == ')') && !ss[1]) break; // Lone ')'
-		rows[l++] = ix++;
-		n = 0; err = 1;
-		while (TRUE)
+		if ((ss[0] == ')') && !ss[1]) // Lone ')' - done
 		{
-			ix[n] = strtol(ss, &tmp, 10);
-			if (tmp == ss) break; // Error
-			if (*tmp == '.') // Maybe floating - use fixedpoint
+			if (mx) // 2nd pass - return the struct
 			{
-				// !!! Only one fixedpoint column allowed for now
-				if ((fp >= 0) && (fp != n)) break;
-
-				ix[fp = n] = (int)(g_strtod(ss, &tmp) *
-					MAX_PRESSURE + 0.5);
+				/* Finalize */
+				script_cmds = strs;
+				return (mx);
 			}
-			n++;
-			ss = tmp + 1;
-			if (*tmp == ',') continue;
-			if (*tmp && ((*tmp != ')') || tmp[1])) break; // Error
-			err = 0; // Valid tuple
-			*(ix - 1) = n; // Store count
-			ix += n; // Skip over
-			if (w < n) w = n; // Update max
-			if (mw > n) mw = n; // Update min
-			break;
+			if (!cnt) return (NULL); // Empty - fail
+			if (st == ',') return (NULL); // After comma - fail
+
+			if (mw > n) mw = n; // Min columns
+			sc++; // Total rows
+
+			/* Allocate the struct, now that we know what it'll hold */
+			mx = calloc(1, sizeof(multi_ext) +
+				sizeof(int *) * (sc + 1) +
+				sizeof(int) * (cnt + sc + 1));
+			if (!mx) return (NULL); // No memory - fail
+			/* Init the struct */
+			mx->nrows = sc;
+			mx->ncols = w;
+			mx->mincols = mw;
+			mx->fractcol = fp;
+
+			/* Prepare */
+			rows = mx->rows;
+			ix = (void *)(rows + sc + 1);
+			// Extremely unlikely, but why not make sure
+			if (ALIGNOF(int) > ALIGNOF(int *)) ix = ALIGNED(ix, ALIGNOF(int));
+
+			/* Restart */
+			sc = n = cnt = 0; // Row, column, count
+			strs = script_cmds;
+			ss = s0 + 1;
+			st = '('; // State
+			continue;
 		}
-		if (err || *tmp) break;
-	}
-	if (err || !ss || (l <= 0))
-	{
-		free(mx);
-		return (NULL);
-	}
 
-	/* Finalize */
-	script_cmds = strs;
+		if ((ss[0] == ' ') || (ss[0] == '\t') || (ss[0] == '\n')) // Whitespace - skip
+		{
+			if (st == '1') st = ' '; // After a number - remember
+			ss++;
+			continue;
+		}
 
-	mx->nrows = l;
-	mx->ncols = w;
-	mx->mincols = mw;
-	mx->fractcol = fp;
-	return (mx);
+		if (ss[0] == ',') // Comma - remember
+		{
+			if ((st == '(') || (st == ','))
+				return (NULL); // After a marker - fail
+			st = ',';
+			ss++;
+			continue;
+		}
+
+		// Something else - must be a number
+		if (cnt == INT_MAX) return (NULL); // Paranoia
+		if (st == '1') return (NULL); // Right after a number - fail
+		if (st == ' ') // After whitespace - new row
+		{
+			if (mw > n) mw = n; // Min columns
+			sc++;
+			n = 0;
+		}
+		// !!! Only one fixedpoint column allowed for now
+		if (n != fp) // Regular integer column
+		{
+			v = strtol(ss, &tmp, 10); // Try parsing as int
+			if (*tmp == '.') // Maybe floating
+			{
+				if (fp >= 0) return (NULL); // Wrong column - fail
+				fp = n;
+			}
+		}
+		if (n == fp) // Fixedpoint column
+			v = (int)(g_strtod(ss, &tmp) * MAX_PRESSURE + 0.5);
+		if (tmp == ss) return (NULL); // Error - fail
+		ss = tmp; // Skip the parsed chars
+		if (mx) // Store the number we got
+		{
+			if (!n) rows[sc] = ix++;
+			rows[sc][0] = n + 1;
+			*ix++ = v;
+		}
+		st = '1'; // It was a number
+		n++; // Next column
+		if (n > w) w = n; // Max column
+		cnt++; // One more number
+	}
 }
 
 int cmd_setstr(void **slot, char *s)
