@@ -1055,13 +1055,6 @@ char *gtkxncpy(char *dest, const char *src, int cnt, int u)
 	return (dest);
 }
 
-// Generic wrapper for strncpy(), ensuring NUL termination
-
-char *strncpy0(char *dest, const char *src, size_t size) {
-	g_strlcpy(dest, src, size);
-	return dest;
-}
-
 // A more sane replacement for strncat()
 
 char *strnncat(char *dest, const char *src, int max)
