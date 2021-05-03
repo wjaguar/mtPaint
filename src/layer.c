@@ -383,7 +383,7 @@ int check_layers_for_changes()		// 1=STOP, 2=IGNORE, -10=NOT CHANGED
 
 static void layer_update_filename( char *name )
 {
-	strncpy(layers_filename, name, PATHBUF);
+	strncpy0(layers_filename, name, PATHBUF);
 	layers_changed = 1;		// Forces update of titlebar
 	layers_notify_unchanged();
 }
@@ -679,7 +679,7 @@ static void parse_filename(char *dest, char *prefix, char *file, int len)
 	for (i = 0; (i < len) && (prefix[i] == file[i]); i++);
 
 	if (!i || (i == len)) /* Complete match, or no match at all */
-		strncpy(dest, file + i, PATHBUF);
+		strncpy0(dest, file + i, PATHBUF);
 	else	/* Partial match */
 	{
 		dest[0] = 0;

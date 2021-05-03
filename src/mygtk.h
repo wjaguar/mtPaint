@@ -207,7 +207,7 @@ char *gtkxncpy(char *dest, const char *src, int cnt, int u);
 
 // Generic wrapper for strncpy(), ensuring NUL termination
 
-#define strncpy0(A,B,C) (strncpy((A), (B), (C))[(C) - 1] = 0)
+char *strncpy0(char *dest, const char *src, size_t size);
 
 // A more sane replacement for strncat()
 
