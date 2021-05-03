@@ -1131,7 +1131,7 @@ static int save_png(char *file_name, ls_settings *settings, memFILE *mf)
 		res_len = dest_len;
 		if (compress2(tmp, &res_len, settings->img[i], w,
 			settings->png_compression) != Z_OK) continue;
-		strcpy(unknown0.name, chunk_names[i]);
+		strncpy(unknown0.name, chunk_names[i], 5);
 		unknown0.data = tmp;
 		unknown0.size = res_len;
 		unknown0.location = PNG_AFTER_IDAT;
