@@ -2189,7 +2189,7 @@ void file_selector_x(int action_type, void **xdata)
 	case FS_PNG_SAVE:
 		tdata.fmask = FF_SAVE_MASK;
 		tdata.title = _("Save Image File");
-		if (mem_filename) strncpy(tdata.filename, mem_filename, PATHBUF);
+		if (mem_filename) strncpy0(tdata.filename, mem_filename, PATHBUF);
 		tdata.need_save = TRUE;
 		break;
 	case FS_PALETTE_LOAD:
