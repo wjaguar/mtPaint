@@ -7,13 +7,15 @@ mtPaint is free software; you can redistribute it and/or modify it under the ter
 
 mtPaint is distributed in the hope that it will be useful, but WITHOUT ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License for more details.
 
-mtPaint is a simple GTK+1/2/3 painting program designed for creating icons and pixel based artwork. It can edit indexed palette or 24 bit RGB images and offers basic painting and palette manipulation tools. It also has several other more powerful features such as channels, layers and animation. Due to its simplicity and lack of dependencies it runs well on GNU/Linux, Windows and older PC hardware.
+mtPaint is a simple GTK+1/2/3 painting program designed for creating icons and pixel based artwork. It can edit indexed palette or 24-bit RGB images and offers basic painting and palette manipulation tools. It also has several other more powerful features such as channels, layers and animation. Due to its simplicity and lack of dependencies it runs well on GNU/Linux, Windows and older PC hardware.
 
-There is full documentation of mtPaint's features contained in a handbook.  If you don't already have this, you can download it from the mtPaint website.
+There is full documentation of mtPaint's features contained in a [handbook].  If you don't already have this, you can download it from the mtPaint [website].
 
 If you like mtPaint and you want to keep up to date with new releases, or you want to give some feedback, then the [mailing lists] may be of interest to you:
 
-[mailing lists]: http://sourceforge.net/mail/?group_id=155874
+[mailing lists]: https://sourceforge.net/p/mtpaint/mailman/
+[handbook]: http://mtpaint.sourceforge.net/handbook/
+[website]: http://mtpaint.sourceforge.net/
 [Credits]: #credits 
 
 Compilation
@@ -68,15 +70,15 @@ Another alternative is doing a manual build with MinGW on GNU/Linux, for which y
     PATH=/usr/i586-mingw32/bin:$PATH ./configure --host=i586-mingw32 [options]
     make
 
-It should also still be possible to compile mtPaint for Windows the old way, using MinGW/MSYS on a Windows system. However this wasn't done for quite some time, so the description below still refers to older versions of MinGW, MSYS and library packages. mtpaint.exe compiled according to it, will only be compatible with runtime libraries packaged with mtPaint 3.31 or older; to use the newer runtime (of version 3.40+), you'll need to use library and header files produced while cross-compiling the runtime (see above).
+It should also still be possible to compile mtPaint for Windows the old way, using MinGW/MSYS on a Windows system. However this wasn't done for quite some time, so the description below still refers to older versions of MinGW, MSYS and library packages. `mtpaint.exe` compiled according to it, will only be compatible with runtime libraries packaged with mtPaint 3.31 or older; to use the newer runtime (of version 3.40+), you'll need to use library and header files produced while cross-compiling the runtime (see above).
 
-If you want to do this you must first download the mtPaint 3.31 setup program and install the files to `C:/Program Files/mtPaint/` and then:
+If you want to do this you must first [download] the mtPaint 3.31 setup program and install the files to `C:/Program Files/mtPaint/` and then:
 
 1. Install [MinGW] and MSYS
    - MinGW-3.1.0-1.exe - to `c:/MinGW/`
    - MSYS-1.0.10.exe - to `c:/msys/`
 
-2. Install the [GTK+2] developer [packages] (and dependencies like libpng)
+2. Install the [GTK]+2 developer [packages] (and dependencies like libpng)
 
    For GTK+2 you will need to download and extract the following zip files to `c:/msys`: 
    - gtk+-dev-2.6.4.zip
@@ -91,14 +93,14 @@ If you want to do this you must first download the mtPaint 3.31 setup program an
    - jpeg-6b-3-lib.zip
    - tiff-3.6.1-2-lib.zip
 
-   - If you want to compile the internationlized version you will need to download and extract to `c:/msys` the following zip files from [gettext]: 
+   If you want to compile the internationlized version you will need to download and extract to `c:/msys` the following zip files from [gettext]: 
    - gettext-runtime-0.13.1.bin.woe32.zip
    - gettext-tools-0.13.1.bin.woe32.zip
    - libiconv-1.9.1.bin.woe32.zip
 
    For some reason I needed to move `c:/msys/bin/msgfmt` & xgettext to `c:/msys/local/bin/` in order to get it to run properly. If you have trouble running `msgfmt` you may need to do the same. 
 
-3. Download the latest mtPaint sources and unpack them to `c:/msys`. 
+3. Download the latest mtPaint [sources] and unpack them to `c:/msys`. 
 
 4. To compile the code you must then use MSYS to `./configure`, then `make` and `make install` 
 
@@ -106,10 +108,12 @@ If you want to do this you must first download the mtPaint 3.31 setup program an
  
    Because I very rarely use Windows, I am sadly unable to support any other version of GTK+ but the one in the official package. That is, while mtPaint should in principle be able to compile and run with any version of GTK+2, only the packaged version has undergone real testing on Windows, and has been patched to fix all known Windows-specific bugs in it.
 
-[MinGW]: http://www.mingw.org/
-[GTK+2]: ftp://ftp.gtk.org/pub/gtk/v2.6/win32/
+[download]: http://mtpaint.sourceforge.net/download.html
+[MinGW]: https://osdn.net/projects/mingw/
+[GTK]: ftp://ftp.gtk.org/pub/gtk/v2.6/win32/
 [packages]: http://gnuwin32.sourceforge.net/packages.html
-[gettext]: http://sourceforge.net/projects/gettext
+[gettext]: https://sourceforge.net/projects/gettext
+[sources]: https://github.com/wjaguar/mtPaint
 
 Credits
 =======
@@ -117,7 +121,7 @@ Credits
 mtPaint is maintained by [Dmitry Groshev].
 
 [Dmitry Groshev]: mailto:wjaguar@users.sourceforge.net
-http://mtpaint.sourceforge.net/
+[http://mtpaint.sourceforge.net/][website]
 
 The following people (in alphabetical order) have contributed directly to the project, and are therefore worthy of gracious thanks for their generosity and hard work:
 
@@ -126,7 +130,7 @@ Authors
 
 - Dmitry Groshev - Contributing developer for version 2.30. Lead developer and maintainer from version 3.00 to the present.
 - Mark Tyler - Original author and maintainer up to version 3.00, occasional contributor thereafter.
-- Xiaolin Wu - Wrote the Wu quantizing method - see wu.c for more information.
+- Xiaolin Wu - Wrote the Wu quantizing method - see [wu.c] for more information.
 
 
 General Contributions (Feedback and Ideas for improvements unless otherwise stated)
@@ -150,8 +154,6 @@ General Contributions (Feedback and Ideas for improvements unless otherwise stat
 - Victor Copovi
 - Vlastimil Krejcir
 - William Kern
-
-[Gifsicle]: http://www.lcdf.org/gifsicle/
 
 
 Translations
@@ -177,3 +179,5 @@ Translations
 - Taiwanese Chinese - Wei-Lun Chao
 - Turkish - Muhammet Kara, Tutku Dalmaz
 
+[wu.c]: src/wu.c
+[Gifsicle]: http://www.lcdf.org/gifsicle/
