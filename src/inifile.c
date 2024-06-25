@@ -101,7 +101,7 @@ static void unescape_string(char *buf)
 {
 #define NUM_ESCAPES 5
 	static const char escapes[] = "bfnrt01234567";
-	static const char escaped[] = { 7, 12, 10, 13, 8, 0, 1, 2, 3, 4, 5, 6, 7 };
+	static const char escaped[] = { 7, 12, 10, 13, 9, 0, 1, 2, 3, 4, 5, 6, 7 };
 	char c, cc, *tmp, *src = buf;
 	int v;
 

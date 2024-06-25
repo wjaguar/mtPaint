@@ -1,5 +1,5 @@
 /*	vcode.c
-	Copyright (C) 2013-2021 Dmitry Groshev
+	Copyright (C) 2013-2024 Dmitry Groshev
 
 	This file is part of mtPaint.
 
@@ -794,6 +794,14 @@ static gboolean get_evt_mmouse(GtkWidget *widget, GdkEventMotion *event,
 	gpointer user_data)
 {
 	mouse_ext mouse;
+	int res;
+#if GTK_MAJOR_VERSION == 3
+	static int recurse;
+	GdkEventMotion *e0 = event, *e1 = NULL;
+	GdkEvent *e2 = NULL;
+	int ate = 0;
+again:
+#endif
 
 	mouse.pressure = MAX_PRESSURE;
 #if GTK_MAJOR_VERSION == 1
@@ -844,7 +852,56 @@ static gboolean get_evt_mmouse(GtkWidget *widget, GdkEventMotion *event,
 
 	mouse.count = 0; // motion
 
-	return (do_evt_mouse(user_data, event, &mouse));
+	res = do_evt_mouse(user_data, event, &mouse);
+
+#if GTK_MAJOR_VERSION == 3
+	/* In GTK+1&2, side effect of enable_events() is enabling motion hints,
+	 * so motion events cannot queue up; and the code is lean enough for it
+	 * to never matter in normal operation anyway.
+	 * In GTK+3 I keep its event compression disabled for canvas, and queuing
+	 * up sometimes can become an issue, with it being slower overall.
+	 * Therefore, limited event compression is done here instead (and what
+	 * remains is handled by twos at once, which seems to help too) - WJ */
+#define ATE_MAX 2 /* Dropping 2 in 4 seems to be enough */
+
+	if (e1)
+	{
+		gdk_event_free((GdkEvent *)e1);
+		e1 = NULL;
+	}
+	else while (!recurse && !e2 && gdk_events_pending())
+	{
+		e2 = gdk_event_get();
+		if (e2 && (e2->any.type == GDK_MOTION_NOTIFY) &&
+			(e2->any.window == e0->window) &&
+			(e2->motion.state == e0->state) &&
+			(e2->motion.device == e0->device))
+		{
+			if (e1)
+			{
+				ate++;
+				gdk_event_free((GdkEvent *)e1);
+			}
+			e1 = (GdkEventMotion *)e2;
+			e2 = NULL;
+			if (ate >= ATE_MAX) break;
+		}
+		else break;
+	}
+	if (e1)
+	{
+		event = e1;
+		goto again;
+	}
+	if (e2)
+	{
+		recurse = TRUE;
+		gtk_main_do_event(e2);
+		gdk_event_free(e2);
+		recurse = FALSE;
+	}
+#endif
+	return (res);
 }
 
 static void enable_events(void **slot, int op)
@@ -2594,14 +2651,19 @@ GtkWidget *canvasimg(void **r, int w, int h, int bkg)
 
 #if GTK_MAJOR_VERSION == 3
 
+typedef struct {
+	int expose;
+} canvas_data;
+
 static void expose_canvas_(GtkWidget *widget, cairo_region_t *clip_r,
 	gpointer user_data)
 {
-	void **slot = user_data;
+	void **slot = user_data, **wslot = PREV_SLOT(slot);
 	void **base = slot[0], **desc = slot[1];
+	canvas_data *cd = wslot[2];
 	cairo_rectangle_int_t re, rex;
 	rgbcontext ctx;
-	int m, s, sz, cost = (int)GET_DESCV(PREV_SLOT(slot), 2);
+	int m, s, sz, cost = (int)GET_DESCV(wslot, 2);
 	int i, n, wh, r1 = 0;
 
 	/* Analyze what we got */
@@ -2617,6 +2679,7 @@ static void expose_canvas_(GtkWidget *widget, cairo_region_t *clip_r,
 	/* Only bother with regions if worth it */
 	if (wh - sz <= cost * (n - 1)) r1 = n = 1 , m = wh , re = rex;
 
+	cd->expose++;
 	ctx.rgb = malloc(m * 3);
 	for (i = 0; i < n; i++)
 	{
@@ -2632,6 +2695,7 @@ static void expose_canvas_(GtkWidget *widget, cairo_region_t *clip_r,
 				ctx.rgb, (ctx.xy[2] - ctx.xy[0]) * 3, 0, FALSE);
 	}
 	free(ctx.rgb);
+	cd->expose--;
 }
 
 #else /* if GTK_MAJOR_VERSION <= 2 */
@@ -6813,6 +6877,9 @@ void predict_size(sizedata *sz, void **ifcode, char *ddata, char **script)
 }
 
 static cmdef cmddefs[] = {
+#if GTK_MAJOR_VERSION == 3
+	{ op_CANVAS,	sizeof(canvas_data) },
+#endif
 	{ op_RGBIMAGE,	sizeof(rgbimage_data) },
 	{ op_RGBIMAGEP,	sizeof(rgbimage_data) },
 	{ op_CANVASIMG,	sizeof(rgbimage_data) },
@@ -9454,8 +9521,7 @@ void cmd_reset(void **slot, void *ddata)
 			rd->h = xp[1];
 			rd->bkg = xp[2];
 			if (nw) wjcanvas_size(*wdata, xp[0], xp[1]);
-			wjcanvas_uncache(*wdata, NULL);
-			gtk_widget_queue_draw(*wdata);
+			wjcanvas_redraw(*wdata, NULL);
 			break;
 		}
 		case op_FCIMAGEP:
@@ -10812,16 +10878,13 @@ void cmd_setv(void **slot, void *res, int idx)
 			wjcanvas_size(w, v[0], v[1]);
 			break;
 		}
-		wjcanvas_get_vport(w, vport);
 		if (idx == CANVAS_REPAINT)
 		{
-			wjcanvas_uncache(w, v);
-			if (clip(rxy, v[0], v[1], v[2], v[3], vport))
-				gtk_widget_queue_draw_area(w,
-					rxy[0] - vport[0], rxy[1] - vport[1],
-					rxy[2] - rxy[0], rxy[3] - rxy[1]);
+			wjcanvas_redraw(w, v);
+			break;
 		}
-		else if (idx == CANVAS_PAINT)
+		wjcanvas_get_vport(w, vport);
+		if (idx == CANVAS_PAINT)
 		{
 			rgbcontext *ctx = res;
 			/* Paint */
@@ -10833,8 +10896,6 @@ void cmd_setv(void **slot, void *res, int idx)
 					ctx->xy[3] - ctx->xy[1],
 					ctx->rgb, (ctx->xy[2] - ctx->xy[0]) * 3,
 					0, TRUE);
-// !!! Remains to be seen if the below is needed - might be, in some cases
-//				gdk_window_process_updates(gtk_widget_get_window(w), FALSE);
 #else /* if GTK_MAJOR_VERSION <= 2 */
 				gdk_draw_rgb_image(w->window, w->style->black_gc,
 					ctx->xy[0] - vport[0],
@@ -10846,6 +10907,11 @@ void cmd_setv(void **slot, void *res, int idx)
 #endif
 				free(ctx->rgb);
 			}
+#if GTK_MAJOR_VERSION == 3
+			/* Handle as repaint if outside expose */
+			else if (!((canvas_data *)slot[2])->expose)
+				wjcanvas_redraw(w, ctx->xy);
+#endif
 			/* Prepare */
 			else if (clip(ctx->xy, vport[0], vport[1],
 				vport[2], vport[3], ctx->xy))
@@ -10976,7 +11042,10 @@ void cmd_repaint(void **slot)
 	/* Tell cached widgets to drop cache */
 	if (op == op_RGBIMAGE) reset_rgb(slot[0], slot[2]);
 	else if ((op == op_CANVASIMG) || (op == op_CANVASIMGB) || (op == op_CANVAS))
-		wjcanvas_uncache(slot[0], NULL);
+	{
+		wjcanvas_redraw(slot[0], NULL);
+		return;
+	}
 #endif
 #ifdef U_LISTS_GTK1
 	op = GET_OP(slot);

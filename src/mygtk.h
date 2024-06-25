@@ -1,5 +1,5 @@
 /*	mygtk.h
-	Copyright (C) 2004-2021 Mark Tyler and Dmitry Groshev
+	Copyright (C) 2004-2024 Mark Tyler and Dmitry Groshev
 
 	This file is part of mtPaint.
 
@@ -222,6 +222,10 @@ char *wjstrcat(char *dest, int max, const char *s0, int l, ...);
 char *file_in_dir(char *dest, const char *dir, const char *file, int cnt);
 char *file_in_homedir(char *dest, const char *file, int cnt);
 
+// Add extension to filename, making sure result is not the same file
+
+char *tailed_name(char *dest, const char *file, const char *tail, int max);
+
 // Set minimum size for a widget
 
 void widget_set_minsize(GtkWidget *widget, int width, int height);
@@ -376,14 +380,12 @@ GtkWidget *wjcanvas_new();
 void wjcanvas_set_expose(GtkWidget *widget, GtkSignalFunc handler, gpointer user_data);
 void wjcanvas_size(GtkWidget *widget, int width, int height);
 void wjcanvas_get_vport(GtkWidget *widget, int *vport);
+void wjcanvas_redraw(GtkWidget *widget, int *rxy); // Rectangle, or entire
 int wjcanvas_scroll_in(GtkWidget *widget, int x, int y);
 int wjcanvas_bind_mouse(GtkWidget *widget, GdkEventMotion *event, int x, int y);
 #if GTK_MAJOR_VERSION == 3
-void wjcanvas_uncache(GtkWidget *widget, int *rxy);
 void wjcanvas_draw_rgb(GtkWidget *widget, int x, int y, int w, int h,
 	unsigned char *rgb, int step, int fill, int repaint);
-#else /* if GTK_MAJOR_VERSION <= 2 */
-#define wjcanvas_uncache(A,B)
 #endif
 
 // Focusable pixmap widget

@@ -1,5 +1,5 @@
 /*	layer.c
-	Copyright (C) 2005-2017 Mark Tyler and Dmitry Groshev
+	Copyright (C) 2005-2024 Mark Tyler and Dmitry Groshev
 
 	This file is part of mtPaint.
 
@@ -533,7 +533,7 @@ fail:
 
 int load_to_layers(char *file_name, int ftype, int ani_mode)
 {
-	char *buf, *tail;
+	char tail[32], *buf;
 	image_frame *frm;
 	image_info *image;
 	image_state *state;
@@ -541,15 +541,8 @@ int load_to_layers(char *file_name, int ftype, int ani_mode)
 	layer_image *lim;
 	frameset fset;
 	int anim = ani_mode > ANM_PAGE;
-	int i, j, l, res, res0, lname;
+	int i, j, l, res, res0;
 
-
-	/* Create buffer for name mangling */
-	lname = strlen(file_name);
-	buf = malloc(lname + 64);
-	if (!buf) return (FILE_MEM_ERROR);
-	strcpy(buf, file_name);
-	tail = buf + lname;
 
 	/* !!! Can use lock field instead, but this is the original way */
 	cmd_sensitive(GET_WINDOW(layers_box_), FALSE);
@@ -625,7 +618,7 @@ int load_to_layers(char *file_name, int ftype, int ani_mode)
 			/* Create a name for this frame */
 			sprintf(tail, ".%03d", i);
 			// !!! No old name so no fuss with saving it
-			image->filename = strdup(buf);
+			image->filename = tailed_name(NULL, file_name, tail, PATHBUF);
 
 			init_istate(state, image);
 			if (!l) layer_copy_to_main(0); // Update everything
@@ -663,7 +656,7 @@ int load_to_layers(char *file_name, int ftype, int ani_mode)
 	cmd_sensitive(GET_WINDOW(layers_box_), TRUE);
 
 	/* Name change so that layers file would not overwrite the source */
-	strcpy(tail, ".txt");
+	buf = tailed_name(NULL, file_name, ".txt", PATHBUF);
 	layer_update_filename(buf);
 
 	free(buf);

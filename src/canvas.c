@@ -1,5 +1,5 @@
 /*	canvas.c
-	Copyright (C) 2004-2021 Mark Tyler and Dmitry Groshev
+	Copyright (C) 2004-2024 Mark Tyler and Dmitry Groshev
 
 	This file is part of mtPaint.
 
@@ -1635,10 +1635,11 @@ int do_a_load_x(char *fname, int undo, void *v)
 	if (!script_cmds) register_file(real_fname); // Ignore what scripts do
 	if (mult <= 0) /* A single image */
 	{
+		char *nm = NULL;
 		/* To prevent 1st frame overwriting a multiframe file */
-		char *nm = g_strconcat(real_fname, got_frame1 ? ".000" : NULL, NULL);
-		set_new_filename(layer_selected, nm);
-		g_free(nm);
+		if (got_frame1) nm = tailed_name(NULL, real_fname, ".000", PATHBUF);
+		set_new_filename(layer_selected, nm ? nm : real_fname);
+		free(nm);
 
 		if ( layers_total>0 )
 			layers_notify_changed(); // We loaded an image into the layers, so notify change

@@ -1,5 +1,5 @@
 /*	mygtk.c
-	Copyright (C) 2004-2021 Mark Tyler and Dmitry Groshev
+	Copyright (C) 2004-2024 Mark Tyler and Dmitry Groshev
 
 	This file is part of mtPaint.
 
@@ -1115,6 +1115,22 @@ char *file_in_homedir(char *dest, const char *file, int cnt)
 	return (file_in_dir(dest, get_home_directory(), file, cnt));
 }
 
+// Add extension to filename, making sure result is not the same file
+
+/* !!! tail must be significantly shorter than the buffer */
+char *tailed_name(char *dest, const char *file, const char *tail, int max)
+{
+	int nl = strlen(file), tl = strlen(tail), d = nl + tl + 1 - max;
+//	if (nl <= d) abort(); // Should never happen
+	if (d > 0) /* Pare down the name to make space for tail */
+	{
+		nl -= d;
+		nl -= file[nl - 1] == '.'; // Drop a trailing dot
+		nl -= !strcmp(file + nl, tail); // Drop another char if old extension was the same
+	}
+	return wjstrcat(dest, max, file, nl, tail, NULL);
+}
+
 #if GTK_MAJOR_VERSION <= 2
 
 // Set minimum size for a widget
@@ -1509,6 +1525,25 @@ void gtk_init_bugfixes()
 #error "GTK+3/Win32 not supported yet"
 #endif
 
+/* Drawing in GTK+ is done in an idle handler, so is prone to stalling when the
+ * main thread is busy handling input. Before GTK+3, drawing directly to widgets
+ * worked around the problem where it mattered; with GTK+3, the only solution is
+ * detecting a stall and forcing a drawing cycle soonish - WJ */
+
+#define DOOM_DELAY (1000 / 20)
+static int doom_tick;
+
+static gboolean doom_timer_call(gpointer data)
+{
+	if (doom_tick > 1)
+	{
+		gdk_window_process_all_updates();
+		doom_tick = 0;
+	}
+	doom_tick += doom_tick;
+	return (TRUE);
+}
+
 int gtk3version;
 
 void gtk_init_bugfixes()
@@ -1538,6 +1573,8 @@ void gtk_init_bugfixes()
 	gtk_binding_entry_remove(bs, KEY(F), GDK_CONTROL_MASK);
 	gtk_binding_entry_remove(bs, KEY(p), GDK_CONTROL_MASK); // Up
 	gtk_binding_entry_remove(bs, KEY(n), GDK_CONTROL_MASK); // Down
+
+	threads_timeout_add(DOOM_DELAY, doom_timer_call, NULL);
 }
 
 #endif /* GTK+3 */
@@ -3602,6 +3639,8 @@ static gboolean wjcanvas_draw(GtkWidget *widget, cairo_t *cr)
 	wcache ncache;
 	int i;
 
+	doom_tick = 0; // Redraw is happening
+
 	/* Check if anything useful remains in cache */
 	if (canvas->r)
 	{
@@ -4047,14 +4086,17 @@ void wjcanvas_draw_rgb(GtkWidget *widget, int x, int y, int w, int h,
 		// The two rectangle types documented as identical in GTK+3 docs
 		gdk_window_invalidate_rect(gtk_widget_get_window(widget),
 			(GdkRectangle*)&re, FALSE);
+
+		doom_tick |= 1; // Awaiting redraw
 	}
 }
 
-// !!! To be called from CANVAS_REPAINT w/area, & from cmd_repaint() with NULL
-void wjcanvas_uncache(GtkWidget *widget, int *rxy)
+void wjcanvas_redraw(GtkWidget *widget, int *rxy)
 {
 	wjcanvas *canvas = WJCANVAS(widget);
-	if (!canvas->r); // Nothing more to do
+	int wxy[4];
+
+	if (!canvas->r); // Nothing in cache
 	else if (!rxy) // Total clear
 	{
 		cairo_region_destroy(canvas->r);
@@ -4066,6 +4108,14 @@ void wjcanvas_uncache(GtkWidget *widget, int *rxy)
 			rxy[0], rxy[1], rxy[2] - rxy[0], rxy[3] - rxy[1] };
 		cairo_region_subtract_rectangle(canvas->r, &re);
 	}
+
+	if (!rxy) gtk_widget_queue_draw(widget);
+	else if (!clip(wxy, rxy[0], rxy[1], rxy[2], rxy[3], canvas->xy)) return;
+	else gtk_widget_queue_draw_area(widget,
+		wxy[0] - canvas->xy[0], wxy[1] - canvas->xy[1],
+		wxy[2] - wxy[0], wxy[3] - wxy[1]);
+
+	doom_tick |= 1; // Awaiting redraw
 }
 
 void wjcanvas_set_expose(GtkWidget *widget, GCallback handler, gpointer user_data)
@@ -4595,6 +4645,18 @@ static GtkType wjcanvas_get_type()
 	}
 
 	return (wjcanvas_type);
+}
+
+void wjcanvas_redraw(GtkWidget *widget, int *rxy)
+{
+	wjcanvas *canvas = WJCANVAS(widget);
+	int wxy[4];
+
+	if (!rxy) gtk_widget_queue_draw(widget);
+	else if (clip(wxy, rxy[0], rxy[1], rxy[2], rxy[3], canvas->xy))
+		gtk_widget_queue_draw_area(widget,
+			wxy[0] - canvas->xy[0], wxy[1] - canvas->xy[1],
+			wxy[2] - wxy[0], wxy[3] - wxy[1]);
 }
 
 void wjcanvas_set_expose(GtkWidget *widget, GtkSignalFunc handler, gpointer user_data)

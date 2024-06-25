@@ -1,5 +1,5 @@
 /*	memory.h
-	Copyright (C) 2004-2021 Mark Tyler and Dmitry Groshev
+	Copyright (C) 2004-2024 Mark Tyler and Dmitry Groshev
 
 	This file is part of mtPaint.
 
@@ -167,7 +167,7 @@ typedef struct {
 	int trans;		// Transparent colour index (-1 if none)
 	int width, height;	// Image geometry
 	undo_stack undo_;	// Image's undo stack
-	char *filename;		// File name of file loaded/saved
+	char *filename;		// File name of file loaded/saved (must be shorter than PATHBUF)
 	void *tempfiles;	// List of up-to-date temp files
 	int changed;		// Changed since last load/save flag
 } image_info;

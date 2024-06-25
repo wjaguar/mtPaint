@@ -4,8 +4,8 @@
 
 echo
 
-MT_V="3.50.09"
-MT_DATE="2021-04-03"
+MT_V="3.50.10"
+MT_DATE="2024-06-25"
 
 MT_VERSION="mtPaint $MT_V"
 MT_LANG=NO
@@ -608,15 +608,25 @@ then
 	DEFS="$DEFS -DU_FREETYPE"
 	if [ "$OS" = "GNU/Linux" ] && which freetype-config > /dev/null 2>&1
 	then # Do it the old way, for native builds on *very* old distros
-		INCLUDES="$INCLUDES `freetype-config --cflags`"
+		FT_INCLUDES="`freetype-config --cflags`"
 		LIB_NAME "" "$STATIC_FT" "`freetype-config --libs`"
 	elif [ "$OS" != "${OS%/MSYS}" ]
 	then # pkg-config may be missing on Windows - hardcode its results
-		INCLUDES="$INCLUDES -I/include/freetype2"
+		FT_INCLUDES="-I/include/freetype2"
 		LIB_NAME "" "$STATIC_FT" "-lfreetype -lz"
 	else # Use pkg-config
-		INCLUDES="$INCLUDES `PKGCONFIG freetype2 --cflags`"
+		FT_INCLUDES="`PKGCONFIG freetype2 --cflags`"
 		LIB_NAME "" "$STATIC_FT" "`PKGCONFIG freetype2 --libs`"
+	fi
+	# Remove irrelevant GLib2 headers when compiling for GTK+1
+	if [ "$GTK" = 1 ]
+	then
+		for ZAD in $FT_INCLUDES
+		do
+			[ "$ZAD" = "${ZAD#*/glib-2.0}" ] && INCLUDES="$INCLUDES $ZAD"
+		done
+	else
+		INCLUDES="$INCLUDES $FT_INCLUDES"
 	fi
 	# libiconv may be separate, or part of libc
 	HAVE_FUNC "iconv_open" || LIB_NAME iconv "$STATIC_FT"

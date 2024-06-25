@@ -41,6 +41,9 @@ int maxthreads;
 #endif
 #endif
 
+/* Pointless churn is pointless */
+G_GNUC_BEGIN_IGNORE_DEPRECATIONS
+
 /* Determine number of CPUs/cores */
 
 static int ncores;

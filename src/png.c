@@ -1,5 +1,5 @@
 /*	png.c
-	Copyright (C) 2004-2021 Mark Tyler and Dmitry Groshev
+	Copyright (C) 2004-2024 Mark Tyler and Dmitry Groshev
 
 	This file is part of mtPaint.
 
@@ -163,7 +163,7 @@ fformat file_formats[NUM_FTYPES] = {
 /* An X pixmap - not a file at all */
 	{ "PIXMAP", "", "", FF_RGB | FF_NOSAVE },
 /* SVG image - import only */
-	{ "SVG", "svg", "", FF_RGB | FF_ALPHA | FF_SCALE | FF_NOSAVE },
+	{ "SVG", "svg", "svgz", FF_RGB | FF_ALPHA | FF_SCALE | FF_NOSAVE },
 /* mtPaint's own format - extended PAM */
 	{ "* PMM *", "pmm", "", FF_256 | FF_RGB | FF_ANIM | FF_ALPHA | FF_MULTI
 		| FF_LAYER | FF_PALETTE | FF_MEM, XF_TRANS },
@@ -10284,6 +10284,8 @@ static int do_detect_format(char *name, FILE *fp)
 		return (FT_NONE);
 	}
 
+	/* Assume generic GZIP is SVGZ */
+	if (!memcmp(buf, "\x1F\x8B", 2)) return (FT_SVG);
 	/* Assume generic XML is SVG */
 	i = 0; sscanf(buf, " <?xml %n", &i);
 	if (!i) sscanf(buf, " <svg%n", &i);

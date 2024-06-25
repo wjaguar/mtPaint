@@ -4,7 +4,7 @@ mtPaint NEWS
 
 Here is a summary of the main changes in this release (see handbook for full details):
 
-3.51	2021-??-??
+3.51	2024-??-??
 
 	* Kabyle translation added by Yacine Bouklif
 	* Czech translation updated by Pavel Fric
@@ -20,11 +20,13 @@ Here is a summary of the main changes in this release (see handbook for full det
 	* ICC colour profiles embedded in GIF and WebP images now can be applied on load
 	* BMP loader made more tolerant to malformed BMP files
 	* Better support for OS/2 BMP varieties
+	* SVGZ (compressed SVG) files now can be imported
 	* Counting used colours and exact conversion to indexed now are 9-19 times faster
 	* Multithreaded decompression enabled for OpenJPEG 2.2+ in Windows version too
-	* Support for multithreaded compression in OpenJPEG 2.4 added
+	* Support for multithreaded compression in OpenJPEG 2.4+ added
 	* Support for compiling with libtiff 3 restored
 	* Support for compiling with gcc builds (mis)configured with --with-gcc-major-version-only added
+	* Support for compiling with FreeType 2.8 and GTK+1 added
 	* BUGFIX - RGB clipboard when used in Map effect now is padded with black if too small, as it should
 	* BUGFIX - Gradient editor now displays correct overlay colours for utility channels again
 	* BUGFIX - Saved GIF files are now properly labeled GIF89 if transparent and GIF87 if not
@@ -33,10 +35,12 @@ Here is a summary of the main changes in this release (see handbook for full det
 	* BUGFIX - Composited GIF animation frames now do not come out wrong in certain cases (after restore to previous that follows restore to background)
 	* BUGFIX - Exploding, or loading into layers, GIF animation files with screen size and/or frame position outside canvas size limit no longer causes crash
 	* BUGFIX - When first frame of GIF animation is loaded, ".000" is added to the filename, as it should be
+	* BUGFIX - Animation frames and the layers file from loading an image now are ensured not to clash with it or each other when exceeding the path length limit
 	* BUGFIX - When loading animation, raw/composited/nonzero-delay selection now works correctly again
 	* BUGFIX - Loading certain broken BMP files no longer causes crash
 	* BUGFIX - Ctrl+N and Ctrl+P keys now work, or do nothing, properly when focus is on a list in GTK+2/3 mode
 	* BUGFIX - Problem with some scrollable areas in GTK+ 3.22 and later being smaller than they should be is now eliminated
+	* BUGFIX - Response and redraw lag in GTK+3 when moving a large clipboard are now greatly reduced
 
 3.50	2020-12-31
 
