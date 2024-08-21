@@ -577,7 +577,7 @@ int main( int argc, char *argv[] )
 	if (dosort && files_passed) qsort(file_args, files_passed,
 		sizeof(char *), compare_names);
 
-	if (strstr(argv[0], "mtv")) viewer_mode = TRUE;
+	if (strstr(argv[0], "mtv") || strstr(argv[0], "mtview") viewer_mode = TRUE;
 
 	string_init();				// Translate static strings
 	var_init();				// Load INI variables
