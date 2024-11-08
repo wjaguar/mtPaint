@@ -568,3 +568,13 @@ guint threads_timeout_add(guint32 interval, GSourceFunc function, gpointer data)
 #define THREADS_ENTER()
 #define THREADS_LEAVE()
 #endif
+
+// Workaround for broken glibc's
+
+#if (__GLIBC__ == 2) && ((__GLIBC_MINOR__ == 15) || (__GLIBC_MINOR__ == 16))
+static inline int strncasecmp_fix(const char *s1, const char *s2, size_t n)
+{
+	return (!*s1 && !*s2 ? 0 : strncasecmp(s1, s2, n));
+}
+#define strncasecmp(A, B, C) strncasecmp_fix(A, B, C)
+#endif

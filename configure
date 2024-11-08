@@ -4,8 +4,8 @@
 
 echo
 
-MT_V="3.50.10"
-MT_DATE="2024-06-25"
+MT_V="3.50.11"
+MT_DATE="2024-11-08"
 
 MT_VERSION="mtPaint $MT_V"
 MT_LANG=NO
@@ -346,14 +346,14 @@ then
 			2> /dev/null || "$PKG_CONFIG" "$@"
 	}
 	MT_TESTLINK="$CCLD -L$FAKE_ROOT/lib$FAKE_LL -Wl,--unresolved-symbols=ignore-in-shared-libs $LDFLAGS"
-	MT_TESTCOMP="$CC -fno-builtin -isystem $FAKE_ROOT/include $CPPFLAGS ${MT_TESTLINK#$CCLD}"
+	MT_TESTCOMP="$CC -std=c89 -fno-builtin -isystem $FAKE_ROOT/include $CPPFLAGS ${MT_TESTLINK#$CCLD}"
 else
 	PKGCONFIG ()
 	{
 		"$PKG_CONFIG" "$@"
 	}
 	MT_TESTLINK="$CCLD $LDFLAGS"
-	MT_TESTCOMP="$CC -fno-builtin $CPPFLAGS $LDFLAGS"
+	MT_TESTCOMP="$CC -std=c89 -fno-builtin $CPPFLAGS $LDFLAGS"
 fi
 
 if [ "$OS" != "${OS%/MSYS}" ]

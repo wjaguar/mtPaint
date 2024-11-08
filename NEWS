@@ -27,6 +27,8 @@ Here is a summary of the main changes in this release (see handbook for full det
 	* Support for compiling with libtiff 3 restored
 	* Support for compiling with gcc builds (mis)configured with --with-gcc-major-version-only added
 	* Support for compiling with FreeType 2.8 and GTK+1 added
+	* Configure script now works with gcc-14 or clang-16
+	* Workaround for bug in glibc versions 2.15 - 2.16 added (crashed when comparing empty strings)
 	* BUGFIX - RGB clipboard when used in Map effect now is padded with black if too small, as it should
 	* BUGFIX - Gradient editor now displays correct overlay colours for utility channels again
 	* BUGFIX - Saved GIF files are now properly labeled GIF89 if transparent and GIF87 if not
@@ -39,8 +41,10 @@ Here is a summary of the main changes in this release (see handbook for full det
 	* BUGFIX - When loading animation, raw/composited/nonzero-delay selection now works correctly again
 	* BUGFIX - Loading certain broken BMP files no longer causes crash
 	* BUGFIX - Ctrl+N and Ctrl+P keys now work, or do nothing, properly when focus is on a list in GTK+2/3 mode
+	* BUGFIX - Horizontal separators in GTK+ 3.20 and later no longer are drawn as wide bars
 	* BUGFIX - Problem with some scrollable areas in GTK+ 3.22 and later being smaller than they should be is now eliminated
 	* BUGFIX - Response and redraw lag in GTK+3 when moving a large clipboard are now greatly reduced
+	* BUGFIX - Closing pan window with a keypress while moving the panning frame with the mouse now cannot cause crash
 
 3.50	2020-12-31
 

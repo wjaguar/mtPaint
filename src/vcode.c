@@ -41,8 +41,6 @@
 #define gtk_object_get_data_by_id(A,B) g_object_get_qdata(A,B)
 #define gtk_object_set_data_by_id(A,B,C) g_object_set_qdata(A,B,C)
 #define GtkObject GObject
-#define gtk_object_weakref(A,B,C) g_object_weak_ref(A,B,C)
-#define GtkDestroyNotify GWeakNotify
 #define GTK_WIDGET_REALIZED(A) gtk_widget_get_realized(A)
 #define GTK_WIDGET_MAPPED(A) gtk_widget_get_mapped(A)
 #define	GTK_WIDGET_SENSITIVE(A) gtk_widget_get_sensitive(A)
@@ -150,6 +148,7 @@ typedef struct {
 	char unfocus;	// Focus to NULL after displaying
 	char done;	// Set when destroyed
 	char run;	// Set when script is running
+	char ref;	// Set when killed through unref and need the ref back
 } v_dd;
 
 /* Actmap array */
@@ -741,7 +740,8 @@ static int do_evt_mouse(void **slot, void *event, mouse_ext *mouse)
 	void **orig = origin_slot(slot);
 	void **base = slot[0], **desc = slot[1];
 	mouse_den den = { EVSLOT(ev_MOUSE, orig, event), mouse, { 0, 0, 0, 0 } };
-	int op = GET_OP(orig);
+	GtkWidget *top = GET_REAL_WINDOW(base);
+	int res, op = GET_OP(orig);
 
 #if GTK_MAJOR_VERSION >= 2
 	if ((((int)desc[0] & WB_OPMASK) >= op_EVT_XMOUSE0) && tablet_device)
@@ -758,8 +758,12 @@ static int do_evt_mouse(void **slot, void *event, mouse_ext *mouse)
 		den.mouse->y += den.vport[1];
 	}
 
-	return (((evtxr_fn)desc[1])(GET_DDATA(base), base,
-		(int)desc[0] & WB_OPMASK, den.slot, mouse));
+	/* !!! ddata should persist while the event is handled */
+	gtk_widget_ref(top);
+	res = ((evtxr_fn)desc[1])(GET_DDATA(base), base,
+		(int)desc[0] & WB_OPMASK, den.slot, mouse);
+	gtk_widget_unref(top);
+	return (res);
 }
 
 /* !!! After a drop, gtk_drag_end() sends to drag source a fake release event
@@ -7012,6 +7016,13 @@ static void do_destroy(void **wdata);
 #define CT_N(SP,N)	((SP)[(N)].widget)
 #define CT_WHAT(SP)	((SP)->type & 255)
 
+#if GTK_MAJOR_VERSION == 3
+static void free_wdata(void **wdata)
+{
+	free(GET_DDATA(wdata));
+}
+#endif
+
 void **run_create_(void **ifcode, void *ddata, int ddsize, char **script)
 {
 	char *ident = VCODE_KEY;
@@ -7114,14 +7125,23 @@ void **run_create_(void **ifcode, void *ddata, int ddsize, char **script)
 			if (!accel) gtk_accel_group_unref(ag);
 			else gtk_window_add_accel_group(GTK_WINDOW(window), ag);
 
-			gtk_object_set_data(GTK_OBJECT(window), ident,
-				(gpointer)res);
-			gtk_signal_connect_object(GTK_OBJECT(window), "destroy",
-				GTK_SIGNAL_FUNC(do_destroy), (gpointer)res);
 			/* !!! Freeing the datastruct is best to happen only when
 			 * all refs to underlying object are safely dropped */
+#if GTK_MAJOR_VERSION == 3
+			/* !!! GObject's weakrefs trigger NOT on finalize, but on
+			 * dispose (the docs lie), so, use a finalizer on our
+			 * wdata value instead */
+			g_object_set_data_full(G_OBJECT(window), ident,
+				(gpointer)res, (GDestroyNotify)free_wdata);
+#else /* if GTK_MAJOR_VERSION <= 2 */
+			/* GtkObject's weakrefs do trigger on finalize */
 			gtk_object_weakref(GTK_OBJECT(window),
 				(GtkDestroyNotify)free, (gpointer)ddata);
+			gtk_object_set_data(GTK_OBJECT(window), ident,
+				(gpointer)res);
+#endif
+			gtk_signal_connect_object(GTK_OBJECT(window), "destroy",
+				GTK_SIGNAL_FUNC(do_destroy), (gpointer)res);
 #if GTK_MAJOR_VERSION == 1
 			/* To make Smooth theme engine render sliders properly */
 			if (have_sliders) gtk_signal_connect(
@@ -7699,6 +7719,14 @@ void **run_create_(void **ifcode, void *ddata, int ddsize, char **script)
 				if (lp) mods.minw = (int)v;
 // !!! Height = 10
 				mods.minh = 10;
+#if GTK_MAJOR_VERSION == 3
+				/* With CSS nodes, separators get rendered as
+				 * background-color boxes, which is fugly here */
+				if (gtk3version >= 20) css_restyle(widget,
+					"separator.mtPaint_hsep"
+					" { margin-top:5px; margin-bottom:4px; }",
+					"mtPaint_hsep", NULL);
+#endif
 			}
 // !!! Padding = 0
 			break;
@@ -8527,8 +8555,17 @@ void **run_create_(void **ifcode, void *ddata, int ddsize, char **script)
 			break;
 		/* Add a separator menu item */
 		case op_MENUSEP:
-			widget = gtk_menu_item_new();
-			gtk_widget_set_sensitive(widget, FALSE);
+#if GTK_MAJOR_VERSION == 3
+			/* The olden separators recognition logic does not work
+			 * since switch to CSS nodes */
+			if (gtk3version >= 20)
+				widget = gtk_separator_menu_item_new();
+			else
+#endif
+			{
+				widget = gtk_menu_item_new();
+				gtk_widget_set_sensitive(widget, FALSE);
+			}
 			break;
 		/* Add a mount socket with custom-built separable widget */
 		case op_MOUNT:
@@ -9034,6 +9071,12 @@ static void do_destroy(void **wdata)
 	if (vdata->done) return; // Paranoia
 	vdata->done = TRUE;
 
+	if (vdata->ref)
+	{
+		vdata->ref = 0;
+		gtk_widget_ref(GET_REAL_WINDOW(wdata)); // Put the ref back
+	}
+
 	if (vdata->destroy)
 	{
 		void **base = vdata->destroy[0], **desc = vdata->destroy[1];
@@ -9353,7 +9396,15 @@ void run_destroy(void **wdata)
 	}
 	/* Work around WM misbehaviour, and save position & size if needed */
 	cmd_showhide(GET_WINDOW(wdata), FALSE);
+#if 0
+	/* Destroy the contents right now */
 	gtk_widget_destroy(GET_REAL_WINDOW(wdata));
+#else
+	/* Do delayed destruction, by borrowing the structural ref */
+	if (vdata->ref) return;
+	vdata->ref = 1;
+	gtk_widget_unref(GET_REAL_WINDOW(wdata));
+#endif
 }
 
 void cmd_reset(void **slot, void *ddata)

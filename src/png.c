@@ -78,6 +78,9 @@
 #include "spawn.h"
 #include "thread.h"
 
+/* Compatibility defines will be added when they ARE needed, not beforehand */
+G_GNUC_BEGIN_IGNORE_DEPRECATIONS
+
 /* Make fseek() and ftell() on Win64 have the same limits as on 64-bit Unix */
 #ifdef _WIN64 /* LLP64 */
 #define F_LONG_MAX LLONG_MAX /* What can be handled - including allocated */
