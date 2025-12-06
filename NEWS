@@ -4,7 +4,7 @@ mtPaint NEWS
 
 Here is a summary of the main changes in this release (see handbook for full details):
 
-3.51	2025-??-??
+3.51	2026-??-??
 
 	* Kabyle translation added by Yacine Bouklif
 	* Czech translation updated by Pavel Fric
@@ -28,6 +28,7 @@ Here is a summary of the main changes in this release (see handbook for full det
 	* Support for compiling with gcc builds (mis)configured with --with-gcc-major-version-only added
 	* Support for compiling with FreeType 2.8 and GTK+1 added
 	* Configure script now works with gcc-14 or clang-16
+	* Compilation now works with gcc-15
 	* Workaround for bug in glibc versions 2.15 - 2.16 added (crashed when comparing empty strings)
 	* BUGFIX - RGB clipboard when used in Map effect now is padded with black if too small, as it should
 	* BUGFIX - Gradient editor now displays correct overlay colours for utility channels again

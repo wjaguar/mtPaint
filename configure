@@ -4,8 +4,8 @@
 
 echo
 
-MT_V="3.50.12"
-MT_DATE="2025-06-16"
+MT_V="3.50.13"
+MT_DATE="2025-12-06"
 
 MT_VERSION="mtPaint $MT_V"
 MT_LANG=NO
@@ -377,6 +377,17 @@ HAVE_FUNC()
 	CAN_DO "$1()"
 }
 
+FOLLOW_C_STD()
+{
+	echo "
+#if defined(__STDC_VERSION__) && (__STDC_VERSION__ > $1)"'
+#error "Incompatible C language version"
+#endif
+int main(void) { return 0; }
+' > _conf.c
+	${MT_TESTCOMP%% -std=c89*}${MT_TESTCOMP#* -std=c89} _conf.c -o _conf.tmp > /dev/null 2>&1
+}
+
 HAVE_CC_VER()
 {
 	# First 2 parts of GCC or Clang version
@@ -515,6 +526,8 @@ then
 fi
 # Revert the changed defaults in GCC 10 and Clang 11
 { HAVE_GCC_VER 10.0 || HAVE_CLANG_VER 11.0; } && CFLAGS="$CFLAGS -fcommon"
+# Lock the C standard
+FOLLOW_C_STD 201710 || CFLAGS="$CFLAGS -std=gnu17"
 # Enable warnings
 WARN="-Wall $WARN"
 if HAVE_GCC_VER 4.0
