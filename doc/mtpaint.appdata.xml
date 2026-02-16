@@ -1,0 +1,51 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<component type="desktop">
+  <id>com.github.wjaguar.mtPaint</id>
+  <launchable type="desktop-id">mtpaint.desktop</launchable>
+  <metadata_license>CC0-1.0</metadata_license>
+  <project_license>GPL-3.0</project_license>
+  <name>mtPaint</name>
+  <summary>Painting program for creating icons and pixel-based artwork</summary>
+  <description>
+    <p>
+    mtPaint is a simple painting program designed for creating icons and pixel-based artwork.
+    It features a wide range of tools to help you create pixel art, including: a pixel-perfect grid, tools to make pixel gradients with the use of dithering, pixel brushes, and pixel line and shape tools.
+    It can edit indexed palette or 24 bit RGB images. Its main file format is PNG, although it can also handle JPEG, GIF, TIFF, BMP, XPM, and XBM files.
+    </p>
+  </description>
+  <categories>
+    <category>Graphics</category>
+    <category>GTK</category>
+  </categories>
+  <kudos>
+    <kudo>UserDocs</kudo>
+  </kudos>
+  <screenshots>
+    <screenshot type="default">
+      <image>http://mtpaint.sourceforge.net/img/shot01.png</image>
+    </screenshot>
+    <screenshot>
+      <image>http://mtpaint.sourceforge.net/img/shot02.png</image>
+    </screenshot>
+    <screenshot>
+      <image>http://mtpaint.sourceforge.net/img/shot03.png</image>
+    </screenshot>
+    <screenshot>
+      <image>http://mtpaint.sourceforge.net/img/shot04.png</image>
+    </screenshot>
+    <screenshot>
+      <image>http://mtpaint.sourceforge.net/img/shot05.png</image>
+    </screenshot>
+    <screenshot>
+      <image>http://mtpaint.sourceforge.net/img/shot06.png</image>
+    </screenshot>
+  </screenshots>
+  <developer_name>Mark Tyler</developer_name>
+  <url type="bugtracker">https://github.com/wjaguar/mtPaint/issues</url>
+  <url type="help">http://mtpaint.sourceforge.net/handbook/en_GB/chap_00.html</url>
+  <url type="homepage">http://mtpaint.sourceforge.net</url>
+  <content_rating type="oars-1.0" />
+  <provides>
+    <binary>mtpaint</binary>
+  </provides>
+</component>
