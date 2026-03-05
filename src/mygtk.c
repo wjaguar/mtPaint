@@ -1,5 +1,5 @@
 /*	mygtk.c
-	Copyright (C) 2004-2024 Mark Tyler and Dmitry Groshev
+	Copyright (C) 2004-2026 Mark Tyler and Dmitry Groshev
 
 	This file is part of mtPaint.
 
@@ -2800,6 +2800,48 @@ GdkPixmap *render_stock_pixmap(GtkWidget *widget, const gchar *stock_id,
 }
 
 #endif
+
+// Workaround for possibly sabotaged gdk-pixbuf
+
+#ifdef INTERNAL_XPM
+
+#define LARGEST_ICON 128
+GdkPixbuf *wj_pixbuf_new_from_xpm_data(const char **data)
+{
+	icon_image ic;
+	GdkPixbuf *pix;
+
+	ic.w = ic.h = LARGEST_ICON;
+	ic.bpp = 4;
+	ic.img = NULL;
+	if (load_builtin_icon(data, &ic) != 1) return (NULL);
+	pix = gdk_pixbuf_new_from_data(ic.img, GDK_COLORSPACE_RGB,
+		TRUE, 8, ic.w, ic.h, ic.w * 4, (GdkPixbufDestroyNotify)free, NULL);
+	if (!pix) free(ic.img);
+	return (pix);
+}
+
+#if GTK_MAJOR_VERSION == 2
+
+GdkPixmap *wj_pixmap_create_from_xpm_d(GdkDrawable *drawable, GdkBitmap **mask,
+	const GdkColor *ignored, char **data)
+{
+	GdkPixbuf *buf;
+	GdkPixmap *pmap;
+	GdkColormap *cmap;
+
+	buf = wj_pixbuf_new_from_xpm_data((const char **)data);
+	if (!buf) return (NULL);
+
+	cmap = gdk_drawable_get_colormap(drawable);
+	gdk_pixbuf_render_pixmap_and_mask_for_colormap(buf, cmap, &pmap, mask, 128);
+	g_object_unref(buf);
+
+	return (pmap);
+}
+
+#endif
+#endif /* INTERNAL_XPM */
 
 // Image widget
 

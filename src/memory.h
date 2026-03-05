@@ -1,5 +1,5 @@
 /*	memory.h
-	Copyright (C) 2004-2024 Mark Tyler and Dmitry Groshev
+	Copyright (C) 2004-2026 Mark Tyler and Dmitry Groshev
 
 	This file is part of mtPaint.
 
@@ -730,8 +730,10 @@ void pal2rgb(unsigned char *rgb, png_color *pal, int cnt, int len);
 void rgb2pal(png_color *pal, unsigned char *rgb, int cnt);
 double pal2B(png_color *c);		// Linear brightness for palette color
 void mem_greyscale(int gcor);		// Convert image to greyscale
-void do_convert_rgb(int start, int step, int cnt, unsigned char *dest,
-	unsigned char *src, png_color *pal);	// Convert image to RGB
+void do_convert_rgb_(int start, int step, int dstep, int cnt, unsigned char *dest,
+	unsigned char *src, png_color *pal);	// Convert image to holey RGB
+#define do_convert_rgb(A, B, C, D, E, F) \
+	do_convert_rgb_((A), (B), 3, (C), (D), (E), (F)) /* Convert image to plain RGB */
 int mem_convert_indexed(unsigned char *dest, unsigned char *src, int cnt,
 	int cols, png_color *pal);	// Convert image to Indexed Palette
 //	Quantize image using Max-Min algorithm

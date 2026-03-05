@@ -1,5 +1,5 @@
 /*	mygtk.h
-	Copyright (C) 2004-2024 Mark Tyler and Dmitry Groshev
+	Copyright (C) 2004-2026 Mark Tyler and Dmitry Groshev
 
 	This file is part of mtPaint.
 
@@ -59,6 +59,14 @@
 
 #else /* GTK_MAJOR_VERSION == 3 */
 #undef U_LISTS_GTK1
+#endif
+
+///	Icon loader to use
+
+#undef INTERNAL_XPM
+
+#if (GTK_MAJOR_VERSION == 3) || (GTK2VERSION > 20)
+#define INTERNAL_XPM
 #endif
 
 ///	Meaningless differences to hide
@@ -577,4 +585,17 @@ static inline int strncasecmp_fix(const char *s1, const char *s2, size_t n)
 	return (!*s1 && !*s2 ? 0 : strncasecmp(s1, s2, n));
 }
 #define strncasecmp(A, B, C) strncasecmp_fix(A, B, C)
+#endif
+
+// Workaround for possibly sabotaged gdk-pixbuf
+
+#ifdef INTERNAL_XPM
+GdkPixbuf *wj_pixbuf_new_from_xpm_data(const char **data);
+#define gdk_pixbuf_new_from_xpm_data(A) wj_pixbuf_new_from_xpm_data(A)
+#if GTK_MAJOR_VERSION == 2
+GdkPixmap *wj_pixmap_create_from_xpm_d(GdkDrawable *drawable, GdkBitmap **mask,
+	const GdkColor *ignored, char **data);
+#define gdk_pixmap_create_from_xpm_d(A, B, C, D) \
+	wj_pixmap_create_from_xpm_d((A), (B), (C), (D))
+#endif
 #endif

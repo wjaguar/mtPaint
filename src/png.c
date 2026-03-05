@@ -1,5 +1,5 @@
 /*	png.c
-	Copyright (C) 2004-2024 Mark Tyler and Dmitry Groshev
+	Copyright (C) 2004-2026 Mark Tyler and Dmitry Groshev
 
 	This file is part of mtPaint.
 
@@ -308,11 +308,13 @@ static int allocate_image(ls_settings *settings, int cmask)
 	/* Don't show progress bar where there's no need */
 	if (settings->width * settings->height <= (1 << silence_limit))
 		settings->silent = TRUE;
-	if (mode == FS_PATTERN_LOAD) settings->silent = TRUE;
+	if ((mode == FS_PATTERN_LOAD) || (mode == FS_ICON_LOAD))
+		settings->silent = TRUE;
 
 	/* Reduce cmask according to mode */
 	if (mode == FS_CLIP_FILE) cmask &= CMASK_CLIP;
-	else if (mode == FS_CLIPBOARD) cmask &= CMASK_RGBA;
+	else if ((mode == FS_CLIPBOARD) || (mode == FS_ICON_LOAD))
+		cmask &= CMASK_RGBA;
 	else if ((mode == FS_CHANNEL_LOAD) || (mode == FS_PATTERN_LOAD))
 		cmask &= CMASK_IMAGE;
 
@@ -329,7 +331,7 @@ static int allocate_image(ls_settings *settings, int cmask)
 	wbpp = settings->bpp;
 	if (wbpp > 3) settings->bpp = 3;
 
-	j = TRUE; // For FS_LAYER_LOAD
+	j = TRUE; // For FS_LAYER_LOAD && FS_ICON_LOAD
 	sz = (size_t)settings->width * settings->height;
 	switch (mode)
 	{
@@ -339,6 +341,13 @@ static int allocate_image(ls_settings *settings, int cmask)
 			settings->height, settings->bpp, oldmask);
 		/* Drop current image if not enough memory for undo */
 		if (j) mem_free_image(&mem_image, FREE_IMAGE);
+	case FS_ICON_LOAD: /* Icons */
+		if (mode == FS_ICON_LOAD)
+		{
+			/* Check dimensions */
+			if ((settings->width > settings->req_w) ||
+				(settings->height > settings->req_h)) return (-1);
+		}
 	case FS_EXPLODE_FRAMES: /* Frames' temporaries */
 	case FS_LAYER_LOAD: /* Layers */
 		/* Allocate, or at least try to */
@@ -436,6 +445,7 @@ static void delete_alpha(ls_settings *settings, int v)
 
 typedef struct {
 	FILE *file; // for traditional use
+	const char **strs; // for XPM use
 	memx2 m; // data
 	int top;  // end of data
 } memFILE;
@@ -5488,10 +5498,17 @@ static unsigned char ctypes[256] = {
 #define WHITESPACE "\t\n\v\f\r "
 
 typedef struct {
+	const char **strs;
 	FILE *fp;
 	char *buf, *ptr;
 	int size, str, nl;
 } cctx;
+
+static void fsetCM(cctx *ctx, const char **strs)
+{
+	memset(ctx, 0, sizeof(*ctx));
+	ctx->strs = strs;
+}
 
 static void fsetC(cctx *ctx, FILE *fp, char *buf, int len)
 {
@@ -5503,6 +5520,7 @@ static void fsetC(cctx *ctx, FILE *fp, char *buf, int len)
 		ctx->size = len;
 		ctx->str = 0;
 		ctx->nl = 1; // Not middle of line
+		ctx->strs = NULL;
 	}
 	else /* Switch buffers to a LARGER one */
 	{
@@ -5603,10 +5621,13 @@ static char *fgetsC(cctx *ctx)
 	}
 }
 
-/* Gets next C string out of buffer */
-static char *fstrC(cctx *ctx)
+/* Gets next C string, unquoted, out of buffer */
+static const char *fstrC(cctx *ctx)
 {
 	char *s, *t, *w = ctx->ptr;
+
+	/* If getting our XPM as strings array, give one out */
+	if (ctx->strs) return (*ctx->strs++);
 
 	/* String has to begin somewhere */
 	while (!(s = strchr(w, '"')))
@@ -5623,16 +5644,16 @@ static char *fstrC(cctx *ctx)
 		t = strchr(s + 1, '"');
 	}
 	if (!t) return (NULL); // Overlong string
-	/* Cut off the remainder */
-	if (*++t)
+	*t++ = '\0'; /* Cut off at the closing quote */
+	if (*t)
 	{
-		*t++ = '\0'; // Ignoring whatever it was
+		t++; /* Skip the supposed comma */
 		while (ISSPACE(*t)) t++;
 	}
 	/* Remember the tail */
 	ctx->ptr = t;
 
-	return (s);
+	return (s + 1);
 }
 
 /* Gets next C line out of buffer */
@@ -5649,7 +5670,7 @@ static char *flineC(cctx *ctx)
 }
 
 /* "One at a time" hash function */
-static guint32 hashf(guint32 seed, char *key, int len)
+static guint32 hashf(guint32 seed, const char *key, int len)
 {
 	int i;
 
@@ -5683,7 +5704,7 @@ typedef struct {
 	guint32 seed;
 } str_hash;
 
-static int ch_find(str_hash *cuckoo, char *str)
+static int ch_find(str_hash *cuckoo, const char *str)
 {
 	guint32 key;
 	int k, idx, step = cuckoo->step, cpp = cuckoo->cpp;
@@ -5700,7 +5721,7 @@ static int ch_find(str_hash *cuckoo, char *str)
 	}
 }
 
-static int ch_insert(str_hash *cuckoo, char *str)
+static int ch_insert(str_hash *cuckoo, const char *str)
 {
 	char *p, *keys;
 	guint32 key;
@@ -5742,35 +5763,44 @@ static int ch_insert(str_hash *cuckoo, char *str)
 
 #define BUCKET_SIZE 8
 
+#define COLORNAME_BUF 100
+
 /* Comments are allowed where valid */
-static int load_xpm(char *file_name, ls_settings *settings)
+static int load_xpm(char *file_name, ls_settings *settings, memFILE *mf)
 {
 	static const char *cmodes[XPM_COL_DEFS] =
 		{ "c", "g", "g4", "m", "s" };
 	unsigned char *cbuf, *src, *dest, pal[XPM_MAXCOL * 3], *dst0 = pal;
 	guint32 *slots;
 	char lbuf[4096], *buf = lbuf, *bh = NULL;
-	char ckeys[XPM_MAXCOL * 32], *cdefs[XPM_COL_DEFS], *r, *r2, *t;
+	char nbuf[XPM_COL_DEFS * COLORNAME_BUF], *nptr;
+	char ckeys[XPM_MAXCOL * 32], *cdefs[XPM_COL_DEFS];
+	const char *r, *t;
 	str_hash cuckoo;
 	cctx ctx;
-	FILE *fp;
+	FILE *fp = NULL;
 	int uninit_(n), uninit_(nx), uninit_(nslots);
 	int w, h, cols, cpp, hx, hy, res = -1, bpp = 1, trans = -1;
-	int i, j, k, l, lsz = sizeof(lbuf), step = 3, pr = FALSE;
+	int i, j, k, l, nlen, lsz = sizeof(lbuf), step = 3, pr = FALSE;
 
 
-	if (!(fp = fopen(file_name, "r"))) return (-1);
+	if (!mf) /* Regular file */
+	{
+		if (!(fp = fopen(file_name, "r"))) return (-1);
 
-	/* Read the header - accept XPM3 and nothing else */
-	j = 0; fscanf(fp, " /* XPM */%n", &j);
-	if (!j) goto fail;
-	fsetC(&ctx, fp, lbuf, sizeof(lbuf)); /* Init reader */
+		/* Read the header - accept XPM3 and nothing else */
+		j = 0; fscanf(fp, " /* XPM */%n", &j);
+		if (!j) goto fail;
+		fsetC(&ctx, fp, lbuf, sizeof(lbuf)); /* Init reader */
+	}
+	else if (!mf->strs) return (-1); /* No support for in-memory plain XPMs */
+	else fsetCM(&ctx, mf->strs); /* Use string array */
 
 	/* Skip right to the first string like libXpm does */
 	if (!(r = fstrC(&ctx))) goto fail;
 
 	/* Read the values section */
-	i = sscanf(r + 1, "%d%d%d%d%d%d", &w, &h, &cols, &cpp, &hx, &hy);
+	i = sscanf(r, "%d%d%d%d%d%d", &w, &h, &cols, &cpp, &hx, &hy);
 	if (i == 4) hx = hy = -1;
 	else if (i != 6) goto fail;
 	/* Extension marker is ignored, as are extensions themselves */
@@ -5799,12 +5829,15 @@ static int load_xpm(char *file_name, ls_settings *settings)
 	if ((settings->mode != FS_PALETTE_LOAD) && (settings->mode != FS_PALETTE_DEF))
 	{
 		if ((res = allocate_image(settings, CMASK_IMAGE))) goto fail;
-		/* Allocate row buffer */
-		i = w * cpp + 4 + 1024;
-		if (i > lsz) buf = malloc(lsz = i);
-		res = FILE_MEM_ERROR;
-		if (!buf) goto fail;
-		fsetC(&ctx, NULL, buf, lsz); /* Switch buffers */
+		if (!mf)
+		{
+			/* Allocate row buffer */
+			i = w * cpp + 4 + 1024;
+			if (i > lsz) buf = malloc(lsz = i);
+			res = FILE_MEM_ERROR;
+			if (!buf) goto fail;
+			fsetC(&ctx, NULL, buf, lsz); /* Switch buffers */
+		}
 
 		/* Init bucketed hash */
 		if (cols > XPM_MAXCOL)
@@ -5847,57 +5880,64 @@ static int load_xpm(char *file_name, ls_settings *settings)
 	{
 		if (!(r = fstrC(&ctx))) goto fail3;
 		l = strlen(r);
-		if (l < cpp + 4) goto fail3;
-		r[l - 1] = '\0'; // Cut off closing quote
+		if (l < cpp + 2) goto fail3;
 
 		/* Insert color into hash */
-		if (bh) strncpy(dest - 4, r + 1, 4);
-		else ch_insert(&cuckoo, r + 1);
+		if (bh) strncpy(dest - 4, r, 4);
+		else ch_insert(&cuckoo, r);
 
 		/* Parse color definitions */
 		memset(cdefs, 0, sizeof(cdefs));
-		r += cpp + 2;
-		k = -1; r2 = NULL;
+		r += cpp + 1;
+		k = -1; nlen = 0;
 		while (TRUE)
 		{
 			while (ISSPACE(*r)) r++;
 			if (!*r) break;
 			t = r++;
 			while (*r && !ISSPACE(*r)) r++;
-			if (*r) *r++ = '\0';
-			if (k < 0) /* Mode */
+			l = r - t;
+			if ((k < 0) && (l < 3)) /* Mode: 1-2 chars */
 			{
 				for (j = 0; j < XPM_COL_DEFS; j++)
 				{
-					if (!strcmp(t, cmodes[j])) break;
+					if ((t[0] == cmodes[j][0]) &&
+						(t[l - 1] == cmodes[j][l - 1]) &&
+						!cmodes[j][l]) break;
 				}
 				if (j < XPM_COL_DEFS) /* Key */
 				{
-					k = j; r2 = NULL;
+					k = j; nlen = 0;
 					continue;
 				}
 			}
-			if (!r2) /* Color name */
+			if (!nlen) /* Color name */
 			{
 				if (k < 0) goto fail3;
-				cdefs[k] = r2 = t;
+				cdefs[k] = nptr = nbuf + k * COLORNAME_BUF;
 				k = -1;
+			}
+			else nptr[nlen++] = ' '; // For the next part of name
+			if (nlen + l >= COLORNAME_BUF) /* Overlong */
+			{
+				*nptr = '\0'; // The name is invalid
+				nlen = COLORNAME_BUF - 1; // To safely continue parsing
 			}
 			else /* Add next part of name */
 			{
-				l = strlen(r2);
-				r2[l] = ' ';
-				memmove(r2 + l + 1, t, strlen(t) + 1);
+				memcpy(nptr + nlen, t, l);
+				nlen += l;
+				nptr[nlen] = '\0';
 			}
 		}
-		if (!r2) goto fail3; /* Key w/o name */
+		if (!nlen) goto fail3; /* Key w/o name */
 
 		/* Translate the best one */
 		for (j = 0; j < XPM_COL_DEFS; j++)
 		{
 			int c;
 
-			if (!cdefs[j]) continue;
+			if (!cdefs[j] || !*cdefs[j]) continue;
 			if (!strcasecmp(cdefs[j], "none")) /* Transparent */
 			{
 				trans = i;
@@ -6018,7 +6058,7 @@ static int load_xpm(char *file_name, ls_settings *settings)
 	{
 		if (!(r = fstrC(&ctx))) goto fail3;
 		/* libXpm allows overlong strings */
-		if (strlen(++r) < w * cpp + 1) goto fail3;
+		if (strlen(r) < w * cpp) goto fail3;
 		for (j = 0; j < w; j++ , dest += bpp)
 		{
 			if (bh)
@@ -6055,7 +6095,7 @@ static int load_xpm(char *file_name, ls_settings *settings)
 fail3:	if (pr) progress_end();
 	free(bh);
 fail2:	if (buf != lbuf) free(buf);
-fail:	fclose(fp);
+fail:	if (fp) fclose(fp);
 	return (res);
 }
 
@@ -9721,7 +9761,7 @@ static void store_image_extras(image_info *image, image_state *state,
 }
 
 static int load_image_x(char *file_name, memFILE *mf, int mode, int ftype,
-	int rw, int rh)
+	int rw, int rh, ls_settings *out)
 {
 	layer_image *lim = NULL;
 	png_color pal[256];
@@ -9791,7 +9831,7 @@ static int load_image_x(char *file_name, memFILE *mf, int mode, int ftype,
 	case FT_WEBP: res0 = load_webp(file_name, &settings); break;
 #endif
 	case FT_BMP: res0 = load_bmp(file_name, &settings, mf); break;
-	case FT_XPM: res0 = load_xpm(file_name, &settings); break;
+	case FT_XPM: res0 = load_xpm(file_name, &settings, mf); break;
 	case FT_XBM: res0 = load_xbm(file_name, &settings); break;
 	case FT_LSS: res0 = load_lss(file_name, &settings); break;
 	case FT_TGA: res0 = load_tga(file_name, &settings); break;
@@ -9911,6 +9951,14 @@ static int load_image_x(char *file_name, memFILE *mf, int mode, int ftype,
 		/* Failure */
 		else free(settings.img[CHN_IMAGE]);
 		break;
+	case FS_ICON_LOAD:
+		/* Success - send image to the caller */
+		if (res == 1)
+		{
+			*out = settings;
+			break;
+		}
+		/* Fallthrough */
 	case FS_LAYER_LOAD: /* Layer */
 		/* Success - commit load */
 		if (res == 1)
@@ -9961,7 +10009,7 @@ static int load_image_x(char *file_name, memFILE *mf, int mode, int ftype,
 
 int load_image(char *file_name, int mode, int ftype)
 {
-	return (load_image_x(file_name, NULL, mode, ftype, 0, 0));
+	return (load_image_x(file_name, NULL, mode, ftype, 0, 0, NULL));
 }
 
 int load_mem_image(unsigned char *buf, int len, int mode, int ftype)
@@ -9972,12 +10020,55 @@ int load_mem_image(unsigned char *buf, int len, int mode, int ftype)
 		!(file_formats[ftype & FTM_FTYPE].flags & FF_RMEM)) return (-1);
 	memset(&mf, 0, sizeof(mf));
 	mf.m.buf = buf; mf.top = mf.m.size = len;
-	return (load_image_x(NULL, &mf, mode, ftype, 0, 0));
+	return (load_image_x(NULL, &mf, mode, ftype, 0, 0, NULL));
 }
+
+#ifdef INTERNAL_XPM
+
+int load_builtin_icon(const char **xpm, icon_image *ic)
+{
+	memFILE mf;
+	ls_settings s;
+	unsigned char *rgba, *img, *alpha;
+	int res, wh, tr;
+
+	memset(&mf, 0, sizeof(mf));
+	mf.strs = xpm;
+	res = load_image_x(NULL, &mf, FS_ICON_LOAD, FT_XPM, ic->w, ic->h, &s);
+	if (res != 1) return (res); /* Paranoia */
+	wh = s.width * s.height;
+	rgba = malloc(wh * 4);
+	if (!rgba) res = FILE_MEM_ERROR;
+	else /* Assemble RGBA */
+	{
+		img = s.img[CHN_IMAGE];
+
+		/* Alpha */
+		alpha = rgba + wh * 3;
+		memset(alpha, 255, wh);
+		tr = s.bpp == 3 ? s.rgb_trans : s.xpm_trans;
+		if (tr >= 0) mem_mask_colors(alpha, img, 0, wh, 1, s.bpp, tr, tr);
+		copy_bytes(rgba + 3, alpha, wh, 4, 1);
+
+		/* RGB */
+		if (s.bpp == 1) do_convert_rgb_(0, 1, 4, wh, rgba, img, s.pal);
+		else copy_bytes(rgba, img, wh, 4, 3);
+
+		/* Output */
+		ic->w = s.width;
+		ic->h = s.height;
+		ic->bpp = 4;
+		ic->img = rgba;
+	}
+	mem_free_chanlist(s.img);
+	return (res);
+}
+
+#endif
 
 int load_image_scale(char *file_name, int mode, int ftype, int w, int h)
 {
-	return (load_image_x(file_name, NULL, mode, ftype, w, h));
+	return (load_image_x(file_name, NULL, mode, ftype, w, h, NULL));
 }
 
 // !!! The only allowed modes for now are FS_LAYER_LOAD and FS_EXPLODE_FRAMES

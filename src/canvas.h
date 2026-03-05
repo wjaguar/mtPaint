@@ -1,5 +1,5 @@
 /*	canvas.h
-	Copyright (C) 2004-2020 Mark Tyler and Dmitry Groshev
+	Copyright (C) 2004-2026 Mark Tyler and Dmitry Groshev
 
 	This file is part of mtPaint.
 
@@ -117,6 +117,7 @@ enum {
 	FS_SELECT_DIR,
 	FS_LAYER_LOAD,
 	FS_PATTERN_LOAD,
+	FS_ICON_LOAD,
 	FS_CLIPBOARD,
 	FS_PALETTE_DEF
 };

@@ -1,5 +1,5 @@
 /*	vcode.c
-	Copyright (C) 2013-2024 Dmitry Groshev
+	Copyright (C) 2013-2026 Dmitry Groshev
 
 	This file is part of mtPaint.
 
@@ -6576,6 +6576,13 @@ static GtkWidget *get_wrap(void **slot)
 //		(op == op_CANVASIMG) || (op == op_CANVASIMGB) || // Leave frame be
 		(op == op_PATHs) || (op == op_PATH) || (op == op_TEXT))
 		w = gtk_widget_get_parent(w);
+#if GTK_MAJOR_VERSION == 3
+	/* Need this to properly hide toolbars */
+	{
+		GtkWidget *wp = gtk_widget_get_parent(w);
+		if (wp && GTK_IS_FLOW_BOX_CHILD(wp)) w = wp;
+	}
+#endif
 	return (w);
 }
 

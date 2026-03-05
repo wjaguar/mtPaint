@@ -4,8 +4,8 @@
 
 echo
 
-MT_V="3.50.13"
-MT_DATE="2025-12-06"
+MT_V="3.50.14"
+MT_DATE="2026-03-05"
 
 MT_VERSION="mtPaint $MT_V"
 MT_LANG=NO
@@ -529,6 +529,10 @@ fi
 # Lock the C standard
 FOLLOW_C_STD 201710 || CFLAGS="$CFLAGS -std=gnu17"
 # Enable warnings
+if [ -n "$WARN" ] ; then # The panic mode
+	{ HAVE_GCC_VER 15.0 || HAVE_CLANG_VER 15.0; } && \
+		WARN="$WARN -Wdeprecated-non-prototype"
+fi
 WARN="-Wall $WARN"
 if HAVE_GCC_VER 4.0
 then # Tell gcc 4.x to shut up

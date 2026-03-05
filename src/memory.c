@@ -1,5 +1,5 @@
 /*	memory.c
-	Copyright (C) 2004-2021 Mark Tyler and Dmitry Groshev
+	Copyright (C) 2004-2026 Mark Tyler and Dmitry Groshev
 
 	This file is part of mtPaint.
 
@@ -2583,18 +2583,19 @@ void set_zoom_centre( int x, int y )
 }
 
 // Convert image to RGB
-void do_convert_rgb(int start, int step, int cnt, unsigned char *dest,
+void do_convert_rgb_(int start, int step, int dstep, int cnt, unsigned char *dest,
 	unsigned char *src, png_color *pal)
 {
-	dest += start * 3;
+	dest += start * dstep;
 	src += start;
+	dstep *= step;
 	while (cnt-- > 0)
 	{
 		png_color *col = pal + *src;
 		dest[0] = col->red;
 		dest[1] = col->green;
 		dest[2] = col->blue;
-		dest += step * 3; src += step;
+		dest += dstep; src += step;
 	}
 }
 

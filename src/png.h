@@ -1,5 +1,5 @@
 /*	png.h
-	Copyright (C) 2004-2019 Mark Tyler and Dmitry Groshev
+	Copyright (C) 2004-2026 Mark Tyler and Dmitry Groshev
 
 	This file is part of mtPaint.
 
@@ -207,4 +207,17 @@ int valid_file(char *filename);		// Can this file be opened for reading?
 
 #ifdef U_TIFF
 void init_tiff_formats();	// Check what libtiff can handle
+#endif
+
+#ifdef INTERNAL_XPM
+
+/* Interface icon loader */
+
+typedef struct {
+	int w, h, bpp;
+	unsigned char *img;
+} icon_image;
+
+int load_builtin_icon(const char **xpm, icon_image *ic);
+
 #endif
